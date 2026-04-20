@@ -5,6 +5,8 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
   const [events] = useState(initialEvents || [])
   const [notes, setNotes] = useState(initialNotes || [])
 
+  console.log('Dashboard monté, URL:', supabaseUrl)
+
   const silenceCount = events.filter(e => e.status === 'silence').length
   const relanceCount = events.filter(e => e.status === 'relance_envoyee').length
 
