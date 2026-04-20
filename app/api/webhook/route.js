@@ -21,37 +21,36 @@ function twimlResponse(message) {
 async function transcribeAudio(mediaUrl) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID
   const authToken = process.env.TWILIO_AUTH_TOKEN
-  
+
   const response = await fetch(mediaUrl, {
     headers: {
       'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64')
     }
   })
-  
+
   const audioBuffer = await response.arrayBuffer()
   const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
-  
+
   const transcription = await groq.audio.transcriptions.create({
     file: audioFile,
     model: 'whisper-large-v3',
     language: 'fr'
   })
-  
+
   return transcription.text
 }
 
 async function synthesizeNote(text) {
   const message = await anthropic.messages.create({
-    model: 'claude-opus-4-5-20251101',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 300,
+    system: `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées. 
+Transforme le message d'un intervenant en note professionnelle en 2-3 phrases.
+Mets en avant l'état général, les points d'attention et les actions effectuées.`,
     messages: [
       {
         role: 'user',
-        content: `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées. 
-        Transforme ce message d'un intervenant en note professionnelle structurée en 2-3 phrases.
-        Mets en avant l'état général, les points d'attention et les actions effectuées.
-        
-        Message : ${text}`
+        content: text
       }
     ]
   })
@@ -61,7 +60,6 @@ async function synthesizeNote(text) {
 export async function POST(request) {
   try {
     const formData = await request.formData()
-    const from = formData.get('From') || ''
     const body = formData.get('Body') || ''
     const numMedia = parseInt(formData.get('NumMedia') || '0')
     const mediaUrl = formData.get('MediaUrl0') || ''
@@ -81,22 +79,28 @@ export async function POST(request) {
       return twimlResponse('Message reçu.')
     }
 
-    const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
-    const seniorId = seniors?.[0]?.id
+    if (noteContent) {
+      const { data: seniors } = await supabase
+        .from('seniors')
+        .select('id')
+        .limit(1)
 
-    if (seniorId && noteContent) {
-      await supabase.from('notes').insert({
-        senior_id: seniorId,
-        content: noteContent,
-        source: source,
-        created_at: new Date().toISOString()
-      })
+      const seniorId = seniors?.[0]?.id
+
+      if (seniorId) {
+        await supabase.from('notes').insert({
+          senior_id: seniorId,
+          content: noteContent,
+          source: source,
+          created_at: new Date().toISOString()
+        })
+      }
     }
 
     return twimlResponse('✅ Note reçue et ajoutée au dossier Holiris. Merci !')
 
   } catch (error) {
-    console.error('Erreur webhook:', error)
+    console.error('Erreur webhook:', error.message)
     return twimlResponse('Message reçu.')
   }
 }
