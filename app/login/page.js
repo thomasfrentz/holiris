@@ -13,7 +13,7 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOtp({ 
       email,
       options: {
-        emailRedirectTo: 'http://localhost:3000/auth/callback'
+        emailRedirectTo: 'https://holiris.vercel.app/auth/callback'
       }
     })
     if (!error) setSent(true)
