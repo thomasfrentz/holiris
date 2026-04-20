@@ -42,7 +42,7 @@ async function transcribeAudio(mediaUrl) {
 
 async function synthesizeNote(text) {
   const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-haiku-4-5',
     max_tokens: 300,
     system: `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées. 
 Transforme le message d'un intervenant en note professionnelle en 2-3 phrases.
