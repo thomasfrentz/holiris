@@ -21,7 +21,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   useEffect(() => {
     console.log('useEffect déclenché !')
-    console.log('URL:', supabaseUrl)
+    console.log('URL Supabase:', supabaseUrl)
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('Clés Supabase manquantes')
@@ -29,7 +29,6 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
-    console.log('Client Supabase créé')
 
     const channel = supabase
       .channel('db-notes')
@@ -51,7 +50,6 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       })
 
     return () => {
-      console.log('Nettoyage channel')
       channel.unsubscribe()
     }
   }, [supabaseUrl, supabaseKey])
