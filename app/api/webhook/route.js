@@ -9,8 +9,14 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
+function twimlResponse(message) {
+  return new NextResponse(
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`,
+    { headers: { 'Content-Type': 'text/xml' } }
+  )
+}
+
 async function transcribeAudio(mediaUrl) {
-  // Télécharger le fichier audio depuis Twilio
   const accountSid = process.env.TWILIO_ACCOUNT_SID
   const authToken = process.env.TWILIO_AUTH_TOKEN
   
@@ -32,79 +38,59 @@ async function transcribeAudio(mediaUrl) {
   return transcription.text
 }
 
-async function synthesizeNote(transcription, from) {
+async function synthesizeNote(text) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       {
         role: 'system',
-        content: `Tu es l'assistant IA de Holiris. Un intervenant médical vient d'envoyer un message vocal sur l'état d'un patient. 
-        Transforme cette transcription en note structurée et professionnelle en 2-3 phrases maximum.
-        Mets en avant les points importants : état général, points d'attention, actions effectuées.`
+        content: `Tu es l'assistant IA de Holiris. Transforme ce message d'un intervenant médical en note professionnelle structurée en 2-3 phrases. Mets en avant l'état général, les points d'attention et les actions effectuées.`
       },
-      {
-        role: 'user',
-        content: transcription
-      }
+      { role: 'user', content: text }
     ]
   })
-  
   return completion.choices[0].message.content
 }
 
 export async function POST(request) {
   try {
     const formData = await request.formData()
-    
-    const from = formData.get('From')
-    const body = formData.get('Body')
+    const from = formData.get('From') || ''
+    const body = formData.get('Body') || ''
     const numMedia = parseInt(formData.get('NumMedia') || '0')
-    const mediaUrl = formData.get('MediaUrl0')
+    const mediaUrl = formData.get('MediaUrl0') || ''
     const mediaType = formData.get('MediaContentType0') || ''
 
     let noteContent = ''
     let source = 'whatsapp_text'
 
     if (numMedia > 0 && mediaType.includes('audio')) {
-      // Message vocal → transcription Whisper + synthèse Claude
-      console.log('Audio reçu, transcription en cours...')
       const transcription = await transcribeAudio(mediaUrl)
-      console.log('Transcription:', transcription)
-      noteContent = await synthesizeNote(transcription, from)
+      noteContent = await synthesizeNote(transcription)
       source = 'whatsapp_audio'
     } else if (body) {
-      // Message texte → synthèse directe
-      noteContent = await synthesizeNote(body, from)
+      noteContent = await synthesizeNote(body)
       source = 'whatsapp_text'
+    } else {
+      return twimlResponse('Message reçu.')
     }
 
-    if (noteContent) {
-      // Récupérer le premier senior (à améliorer plus tard avec matching par numéro)
-      const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
-      const seniorId = seniors?.[0]?.id
+    const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
+    const seniorId = seniors?.[0]?.id
 
-      if (seniorId) {
-        await supabase.from('notes').insert({
-          senior_id: seniorId,
-          content: noteContent,
-          source: source,
-          created_at: new Date().toISOString()
-        })
-        console.log('Note sauvegardée:', noteContent)
-      }
+    if (seniorId && noteContent) {
+      await supabase.from('notes').insert({
+        senior_id: seniorId,
+        content: noteContent,
+        source: source,
+        created_at: new Date().toISOString()
+      })
     }
 
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>✅ Note reçue et ajoutée au dossier Holiris. Merci !</Message>
-</Response>`
-
-    return new NextResponse(twiml, {
-      headers: { 'Content-Type': 'text/xml' }
-    })
+    return twimlResponse('✅ Note reçue et ajoutée au dossier Holiris. Merci !')
 
   } catch (error) {
     console.error('Erreur webhook:', error)
-    return NextResponse.json({ error: 'Erreur' }, { status: 500 })
+    return twimlResponse('Message reçu.')
   }
 }
