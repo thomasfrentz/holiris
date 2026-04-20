@@ -41,20 +41,24 @@ async function transcribeAudio(mediaUrl) {
 }
 
 async function synthesizeNote(text) {
-  const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 300,
-    system: `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées. 
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      system: `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées. 
 Transforme le message d'un intervenant en note professionnelle en 2-3 phrases.
 Mets en avant l'état général, les points d'attention et les actions effectuées.`,
-    messages: [
-      {
-        role: 'user',
-        content: text
-      }
-    ]
+      messages: [{ role: 'user', content: text }]
+    })
   })
-  return message.content[0].text
+  const data = await response.json()
+  return data.content[0].text
 }
 
 export async function POST(request) {
