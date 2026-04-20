@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 export default function Dashboard({ initialSenior, initialEvents, initialNotes, supabaseUrl, supabaseKey }) {
   const [events] = useState(initialEvents || [])
   const [notes, setNotes] = useState(initialNotes || [])
+  const [totalNotes, setTotalNotes] = useState(initialNotes?.length || 0)
 
   const silenceCount = events.filter(e => e.status === 'silence').length
   const relanceCount = events.filter(e => e.status === 'relance_envoyee').length
@@ -20,13 +21,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
 
   useEffect(() => {
-    console.log('useEffect déclenché !')
-    console.log('URL Supabase:', supabaseUrl)
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Clés Supabase manquantes')
-      return
-    }
+    if (!supabaseUrl || !supabaseKey) return
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
@@ -42,6 +37,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
         (payload) => {
           console.log('🎉 Nouvelle note !', payload)
           setNotes(prev => [payload.new, ...prev].slice(0, 3))
+          setTotalNotes(prev => prev + 1)
         }
       )
       .subscribe((status, err) => {
@@ -66,7 +62,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       {/* STATS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
         {[
-          { icon: '✅', label: 'Notes reçues', value: notes.length, color: '#2ecc71' },
+          { icon: '✅', label: 'Notes reçues', value: totalNotes, color: '#2ecc71' },
           { icon: '🔴', label: 'Silences détectés', value: silenceCount, color: '#e74c3c' },
           { icon: '📨', label: 'Relances envoyées', value: relanceCount, color: '#f39c12' },
         ].map((s) => (
