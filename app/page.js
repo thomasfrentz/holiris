@@ -36,6 +36,11 @@ export default async function Home() {
     .order('created_at', { ascending: false })
     .limit(3)
 
+  const { count: totalNotes } = await supabase
+    .from('notes')
+    .select('*', { count: 'exact', head: true })
+    .eq('senior_id', senior?.id)
+
   const silenceCount = events?.filter(e => e.status === 'silence').length ?? 0
 
   return (
@@ -88,6 +93,7 @@ export default async function Home() {
         initialSenior={senior}
         initialEvents={events}
         initialNotes={notes}
+        initialTotalNotes={totalNotes || 0}
         supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL}
         supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       />

@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-export default function Dashboard({ initialSenior, initialEvents, initialNotes, supabaseUrl, supabaseKey }) {
+export default function Dashboard({ initialSenior, initialEvents, initialNotes, initialTotalNotes, supabaseUrl, supabaseKey }) {
   const [events] = useState(initialEvents || [])
   const [notes, setNotes] = useState(initialNotes || [])
-  const [totalNotes, setTotalNotes] = useState(initialNotes?.length || 0)
+  const [totalNotes, setTotalNotes] = useState(initialTotalNotes || 0)
 
   const silenceCount = events.filter(e => e.status === 'silence').length
   const relanceCount = events.filter(e => e.status === 'relance_envoyee').length
