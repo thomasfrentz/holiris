@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
+import Groq from 'groq-sdk'
 import { createClient } from '@supabase/supabase-js'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -29,9 +31,9 @@ async function transcribeAudio(mediaUrl) {
   const audioBuffer = await response.arrayBuffer()
   const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
   
-  const transcription = await openai.audio.transcriptions.create({
+  const transcription = await groq.audio.transcriptions.create({
     file: audioFile,
-    model: 'whisper-1',
+    model: 'whisper-large-v3',
     language: 'fr'
   })
   
@@ -39,17 +41,21 @@ async function transcribeAudio(mediaUrl) {
 }
 
 async function synthesizeNote(text) {
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const message = await anthropic.messages.create({
+    model: 'claude-opus-4-5',
+    max_tokens: 300,
     messages: [
       {
-        role: 'system',
-        content: `Tu es l'assistant IA de Holiris. Transforme ce message d'un intervenant médical en note professionnelle structurée en 2-3 phrases. Mets en avant l'état général, les points d'attention et les actions effectuées.`
-      },
-      { role: 'user', content: text }
+        role: 'user',
+        content: `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées. 
+        Transforme ce message d'un intervenant en note professionnelle structurée en 2-3 phrases.
+        Mets en avant l'état général, les points d'attention et les actions effectuées.
+        
+        Message : ${text}`
+      }
     ]
   })
-  return completion.choices[0].message.content
+  return message.content[0].text
 }
 
 export async function POST(request) {
