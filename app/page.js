@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { redirect } from 'next/navigation'
 import Dashboard from './dashboard'
+import Link from 'next/link'
 
 export default async function Home() {
   const cookieStore = await cookies()
