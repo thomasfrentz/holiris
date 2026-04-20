@@ -1,13 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
-
-export default function Dashboard({ initialSenior, initialEvents, initialNotes }) {
+export default function Dashboard({ initialSenior, initialEvents, initialNotes, supabaseUrl, supabaseKey }) {
   const [events] = useState(initialEvents || [])
   const [notes, setNotes] = useState(initialNotes || [])
 
@@ -24,24 +18,36 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes }
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
 
   useEffect(() => {
-    const notesChannel = supabase
-      .channel('notes-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notes' },
-        (payload) => {
-          console.log('Nouvelle note !', payload.new)
-          setNotes(prev => [payload.new, ...prev].slice(0, 3))
-        }
-      )
-      .subscribe((status) => {
-        console.log('Statut abonnement notes:', status)
-      })
+    console.log('Initialisation Realtime avec URL:', supabaseUrl)
 
-    return () => {
-      supabase.removeChannel(notesChannel)
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Variables Supabase manquantes !')
+      return
     }
-  }, [])
+
+    // Import dynamique pour éviter les problèmes SSR
+    import('@supabase/supabase-js').then(({ createClient }) => {
+      const supabase = createClient(supabaseUrl, supabaseKey)
+
+      const channel = supabase
+        .channel('notes-realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notes' },
+          (payload) => {
+            console.log('🎉 Nouvelle note reçue !', payload.new)
+            setNotes(prev => [payload.new, ...prev].slice(0, 3))
+          }
+        )
+        .subscribe((status) => {
+          console.log('Statut Realtime:', status)
+        })
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    })
+  }, [supabaseUrl, supabaseKey])
 
   return (
     <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
@@ -87,7 +93,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes }
         })}
       </div>
 
-      {/* NOTES TEMPS RÉEL */}
+      {/* NOTES */}
       <h2 style={{ fontSize: 14, fontWeight: 'bold', color: '#12201a', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
         Dernières notes <span style={{ color: '#2ecc71', fontSize: 11 }}>● temps réel</span>
       </h2>
