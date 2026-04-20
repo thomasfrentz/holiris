@@ -1,6 +1,24 @@
-import { supabase } from '../lib/supabase'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
+import { redirect } from 'next/navigation'
 
 export default async function Home() {
+  const cookieStore = await cookies()
+  
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll() {},
+      },
+    }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const { data: seniors } = await supabase.from('seniors').select('*')
   const senior = seniors?.[0]
 
@@ -23,17 +41,15 @@ export default async function Home() {
 
   const statusConfig = {
     note_received: { color: '#2ecc71', label: '✅ Note reçue' },
-    silence:       { color: '#e74c3c', label: '🔴 Silence détecté' },
+    silence: { color: '#e74c3c', label: '🔴 Silence détecté' },
     relance_envoyee: { color: '#f39c12', label: '📨 Relance envoyée' },
-    a_venir:       { color: '#3498db', label: '🕐 À venir' },
+    a_venir: { color: '#3498db', label: '🕐 À venir' },
   }
 
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-
-      {/* SIDEBAR */}
       <aside style={{ width: 260, background: '#12201a', color: '#e8f0eb', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 42, height: 42, background: '#2ecc71', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#12201a', fontSize: 18 }}>H</div>
@@ -72,16 +88,18 @@ export default async function Home() {
             <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>L'IA a relancé les intervenants</div>
           </div>
         )}
+
+        <div style={{ marginTop: 'auto', fontSize: 12, color: '#4a7a5a' }}>
+          Connecté : {user.email}
+        </div>
       </aside>
 
-      {/* MAIN */}
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
         <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>⚡ Flux en temps réel</h1>
         <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
           {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
 
-        {/* STATS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
           {[
             { icon: '✅', label: 'Notes reçues', value: noteCount, color: '#2ecc71' },
@@ -96,7 +114,6 @@ export default async function Home() {
           ))}
         </div>
 
-        {/* EVENTS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
           {events?.map((e) => {
             const cfg = statusConfig[e.status] ?? { color: '#999', label: e.status }
@@ -118,7 +135,6 @@ export default async function Home() {
           })}
         </div>
 
-        {/* NOTES */}
         <h2 style={{ fontSize: 14, fontWeight: 'bold', color: '#12201a', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Dernières notes</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {notes?.map((n) => (
