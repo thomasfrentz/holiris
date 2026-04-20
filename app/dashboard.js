@@ -8,11 +8,9 @@ const supabase = createBrowserClient(
 )
 
 export default function Dashboard({ initialSenior, initialEvents, initialNotes }) {
-  const [events, setEvents] = useState(initialEvents || [])
+  const [events] = useState(initialEvents || [])
   const [notes, setNotes] = useState(initialNotes || [])
-  const [senior] = useState(initialSenior)
 
-  const noteCount = events.filter(e => e.status === 'note_received').length
   const silenceCount = events.filter(e => e.status === 'silence').length
   const relanceCount = events.filter(e => e.status === 'relance_envoyee').length
 
@@ -26,21 +24,22 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes }
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
 
   useEffect(() => {
-    // Abonnement temps réel sur les notes
-    const channel = supabase
+    const notesChannel = supabase
       .channel('notes-realtime')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notes' },
         (payload) => {
-          console.log('Nouvelle note reçue !', payload.new)
+          console.log('Nouvelle note !', payload.new)
           setNotes(prev => [payload.new, ...prev].slice(0, 3))
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Statut abonnement notes:', status)
+      })
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(notesChannel)
     }
   }, [])
 
@@ -93,8 +92,8 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes }
         Dernières notes <span style={{ color: '#2ecc71', fontSize: 11 }}>● temps réel</span>
       </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {notes?.map((n) => (
-          <div key={n.id} style={{ background: '#fff', borderRadius: 10, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', animation: 'fadeIn 0.5s ease' }}>
+        {notes?.map((n, index) => (
+          <div key={n.id || index} style={{ background: '#fff', borderRadius: 10, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 'bold', color: '#12201a' }}>
                 {n.source === 'whatsapp_audio' ? '🎤 Note vocale' : n.source === 'whatsapp_text' ? '💬 WhatsApp' : '📝 Note manuelle'}
