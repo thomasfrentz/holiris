@@ -74,7 +74,6 @@ export async function POST(request) {
     const mediaUrl = formData.get('MediaUrl0') || ''
     const mediaType = formData.get('MediaContentType0') || ''
 
-    // Nettoyer le numéro WhatsApp (ex: whatsapp:+33612345678 → +33612345678)
     const phoneNumber = from.replace('whatsapp:', '')
     console.log('Message de:', phoneNumber)
 
@@ -85,19 +84,17 @@ export async function POST(request) {
       .or(`whatsapp.eq.${phoneNumber},phone.eq.${phoneNumber}`)
       .limit(1)
 
-    console.log('Intervenant trouvé:', intervenantData)
-
     let seniorId = null
-    let intervenantName = 'Intervenant'
+    let intervenantName = 'Intervenant inconnu'
+    let intervenantRole = ''
 
     if (intervenantData?.length > 0) {
       seniorId = intervenantData[0].senior_id
       intervenantName = intervenantData[0].name
+      intervenantRole = intervenantData[0].role
     } else {
-      // Fallback : premier senior si intervenant non trouvé
       const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
       seniorId = seniors?.[0]?.id
-      console.log('Intervenant non trouvé, utilisation du senior par défaut')
     }
 
     if (!seniorId) return twimlResponse('Erreur : aucun senior trouvé.')
@@ -107,7 +104,6 @@ export async function POST(request) {
 
     if (numMedia > 0 && mediaType.includes('audio')) {
       const transcription = await transcribeAudio(mediaUrl)
-      console.log('Transcription:', transcription)
       noteContent = await synthesizeNote(transcription)
       source = 'whatsapp_audio'
     } else if (body) {
@@ -122,12 +118,12 @@ export async function POST(request) {
         senior_id: seniorId,
         content: noteContent,
         source: source,
+        intervenant_name: `${intervenantName}${intervenantRole ? ' · ' + intervenantRole : ''}`,
         created_at: new Date().toISOString()
       })
-      console.log('Note sauvegardée pour senior:', seniorId)
     }
 
-    return twimlResponse(`✅ Note reçue pour ${intervenantName}. Merci !`)
+    return twimlResponse(`✅ Note reçue. Merci ${intervenantName} !`)
 
   } catch (error) {
     console.error('Erreur webhook:', error.message)
