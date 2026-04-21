@@ -18,62 +18,31 @@ export default async function Home() {
 
   if (!authCookie) redirect('/login')
 
-  // Décoder le token pour récupérer le user_id
-  let userId = null
-  try {
-    const tokenValue = authCookie.value
-    const parts = tokenValue.split('.')
-    if (parts.length >= 2) {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-      userId = payload.sub
-    }
-  } catch (e) {
-    console.error('Erreur décodage token:', e)
-    redirect('/login')
-  }
-
-  if (!userId) redirect('/login')
-
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  // Récupérer le senior lié à cet utilisateur
-  const { data: familleData } = await supabase
-    .from('famille')
-    .select('senior_id')
-    .eq('user_id', userId)
-    .limit(1)
-
-  const seniorId = familleData?.[0]?.senior_id
-
-  if (!seniorId) redirect('/login')
-
-  const { data: seniors } = await supabase
-    .from('seniors')
-    .select('*')
-    .eq('id', seniorId)
-
+  const { data: seniors } = await supabase.from('seniors').select('*')
   const senior = seniors?.[0]
 
   const { data: events } = await supabase
     .from('events')
     .select('*, intervenants(*)')
-    .eq('senior_id', seniorId)
+    .eq('senior_id', senior?.id)
     .order('scheduled_at', { ascending: true })
 
   const { data: notes } = await supabase
     .from('notes')
     .select('*')
-    .eq('senior_id', seniorId)
+    .eq('senior_id', senior?.id)
     .order('created_at', { ascending: false })
     .limit(3)
 
   const { count: totalNotes } = await supabase
     .from('notes')
     .select('*', { count: 'exact', head: true })
-    .eq('senior_id', seniorId)
+    .eq('senior_id', senior?.id)
 
   const silenceCount = events?.filter(e => e.status === 'silence').length ?? 0
 
