@@ -11,7 +11,7 @@ const supabase = createClient(
 
 function twimlResponse(message) {
   return new NextResponse(
-    `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`,
+    '<?xml version="1.0" encoding="UTF-8"?><Response><Message>' + message + '</Message></Response>',
     { headers: { 'Content-Type': 'text/xml' } }
   )
 }
@@ -19,22 +19,18 @@ function twimlResponse(message) {
 async function transcribeAudio(mediaUrl) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID
   const authToken = process.env.TWILIO_AUTH_TOKEN
-
   const response = await fetch(mediaUrl, {
     headers: {
-      'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64')
+      'Authorization': 'Basic ' + Buffer.from(accountSid + ':' + authToken).toString('base64')
     }
   })
-
   const audioBuffer = await response.arrayBuffer()
   const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
-
   const transcription = await groq.audio.transcriptions.create({
     file: audioFile,
     model: 'whisper-large-v3',
     language: 'fr'
   })
-
   return transcription.text
 }
 
@@ -50,28 +46,20 @@ async function synthesizeNote(text) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
-        system: `Tu es l'assistant IA de Holiris. Transforme le message d'un intervenant en note professionnelle en 2-3 phrases. Mets en avant l'état général, les points d'attention et les actions effectuées.`,
+        system: 'Tu es assistant IA de Holiris. Transforme le message en note professionnelle en 2-3 phrases. Mets en avant etat general, points attention et actions effectuees.',
         messages: [{ role: 'user', content: text }]
       })
     })
-
     const data = await response.json()
-    console.log('Status Anthropic:', response.status)
-    console.log('Réponse Anthropic:', JSON.stringify(data))
-
-    if (data.content?.[0]?.text) return data.content[0].text
+    console.log('Anthropic status:', response.status)
+    console.log('Anthropic data:', JSON.stringify(data))
+    if (data.content && data.content[0] && data.content[0].text) {
+      return data.content[0].text
+    }
     return text
   } catch (error) {
-    console.error('Erreur Anthropic:', error)
+    console.error('Erreur Anthropic:', error.message)
     return text
-  }
-}
-
-    const data = await response.json()
-    if (data.content?.[0]?.text) return data.content[0].text
-    return `Note reçue : ${text}`
-  } catch (error) {
-    return `Note reçue : ${text}`
   }
 }
 
@@ -87,27 +75,26 @@ export async function POST(request) {
     const phoneNumber = from.replace('whatsapp:', '')
     console.log('Message de:', phoneNumber)
 
-    // Chercher l'intervenant par son numéro
     const { data: intervenantData } = await supabase
       .from('intervenants')
-      .select('*, seniors(*)')
-      .or(`whatsapp.eq.${phoneNumber},phone.eq.${phoneNumber}`)
+      .select('*')
+      .or('whatsapp.eq.' + phoneNumber + ',phone.eq.' + phoneNumber)
       .limit(1)
 
     let seniorId = null
     let intervenantName = 'Intervenant inconnu'
     let intervenantRole = ''
 
-    if (intervenantData?.length > 0) {
+    if (intervenantData && intervenantData.length > 0) {
       seniorId = intervenantData[0].senior_id
       intervenantName = intervenantData[0].name
       intervenantRole = intervenantData[0].role
     } else {
       const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
-      seniorId = seniors?.[0]?.id
+      seniorId = seniors && seniors[0] ? seniors[0].id : null
     }
 
-    if (!seniorId) return twimlResponse('Erreur : aucun senior trouvé.')
+    if (!seniorId) return twimlResponse('Erreur : aucun senior trouve.')
 
     let noteContent = ''
     let source = 'whatsapp_text'
@@ -120,7 +107,7 @@ export async function POST(request) {
       noteContent = await synthesizeNote(body)
       source = 'whatsapp_text'
     } else {
-      return twimlResponse('Message reçu.')
+      return twimlResponse('Message recu.')
     }
 
     if (noteContent) {
@@ -128,15 +115,15 @@ export async function POST(request) {
         senior_id: seniorId,
         content: noteContent,
         source: source,
-        intervenant_name: `${intervenantName}${intervenantRole ? ' · ' + intervenantRole : ''}`,
+        intervenant_name: intervenantName + (intervenantRole ? ' · ' + intervenantRole : ''),
         created_at: new Date().toISOString()
       })
     }
 
-    return twimlResponse(`✅ Note reçue. Merci ${intervenantName} !`)
+    return twimlResponse('Note recue. Merci ' + intervenantName + ' !')
 
   } catch (error) {
     console.error('Erreur webhook:', error.message)
-    return twimlResponse('Message reçu.')
+    return twimlResponse('Message recu.')
   }
 }
