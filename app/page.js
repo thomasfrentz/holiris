@@ -1,50 +1,86 @@
-import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
-import { redirect } from 'next/navigation'
-import Dashboard from './dashboard'
+'use client'
+import { useState, useEffect } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Dashboard from './dashboard'
 
-export const dynamic = 'force-dynamic'
+export default function Home() {
+  const [senior, setSenior] = useState(null)
+  const [events, setEvents] = useState([])
+  const [notes, setNotes] = useState([])
+  const [totalNotes, setTotalNotes] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
-export default async function Home() {
-  const cookieStore = await cookies()
-  const allCookies = cookieStore.getAll()
-
-  const authCookie = allCookies.find(c =>
-    c.name.includes('auth-token') ||
-    c.name.includes('access-token') ||
-    c.name.startsWith('sb-')
-  )
-
-  if (!authCookie) redirect('/login')
-
-  const supabase = createClient(
+  const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const { data: seniors } = await supabase.from('seniors').select('*')
-  const senior = seniors?.[0]
+  useEffect(() => {
+    async function loadData() {
+      // Vérifier l'authentification
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-  const { data: events } = await supabase
-    .from('events')
-    .select('*, intervenants(*)')
-    .eq('senior_id', senior?.id)
-    .order('scheduled_at', { ascending: true })
+      // Récupérer le senior lié à cet utilisateur
+      const { data: familleData } = await supabase
+        .from('famille')
+        .select('senior_id')
+        .eq('user_id', user.id)
+        .limit(1)
 
-  const { data: notes } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('senior_id', senior?.id)
-    .order('created_at', { ascending: false })
-    .limit(3)
+      const seniorId = familleData?.[0]?.senior_id
+      if (!seniorId) {
+        router.push('/login')
+        return
+      }
 
-  const { count: totalNotes } = await supabase
-    .from('notes')
-    .select('*', { count: 'exact', head: true })
-    .eq('senior_id', senior?.id)
+      // Charger les données du senior
+      const { data: seniors } = await supabase
+        .from('seniors')
+        .select('*')
+        .eq('id', seniorId)
+      setSenior(seniors?.[0])
 
-  const silenceCount = events?.filter(e => e.status === 'silence').length ?? 0
+      const { data: eventsData } = await supabase
+        .from('events')
+        .select('*, intervenants(*)')
+        .eq('senior_id', seniorId)
+        .order('scheduled_at', { ascending: true })
+      setEvents(eventsData || [])
+
+      const { data: notesData } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('senior_id', seniorId)
+        .order('created_at', { ascending: false })
+        .limit(3)
+      setNotes(notesData || [])
+
+      const { count } = await supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true })
+        .eq('senior_id', seniorId)
+      setTotalNotes(count || 0)
+
+      setLoading(false)
+    }
+
+    loadData()
+  }, [])
+
+  const silenceCount = events.filter(e => e.status === 'silence').length
+
+  if (loading) return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
+      <div style={{ color: '#888', fontSize: 16 }}>Chargement...</div>
+    </div>
+  )
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
@@ -101,7 +137,7 @@ export default async function Home() {
         initialSenior={senior}
         initialEvents={events}
         initialNotes={notes}
-        initialTotalNotes={totalNotes || 0}
+        initialTotalNotes={totalNotes}
         supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL}
         supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       />
