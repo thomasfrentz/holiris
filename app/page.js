@@ -1,24 +1,32 @@
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Dashboard from './dashboard'
+import Link from 'next/link'
+
+export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-      },
-    }
+  const allCookies = cookieStore.getAll()
+  
+  // Chercher le token de session dans les cookies
+  const authCookie = allCookies.find(c => 
+    c.name.includes('auth-token') || 
+    c.name.includes('access-token') ||
+    c.name.startsWith('sb-')
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  console.log('Cookies trouvés:', allCookies.map(c => c.name))
+
+  if (!authCookie) {
+    redirect('/login')
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
 
   const { data: seniors } = await supabase.from('seniors').select('*')
   const senior = seniors?.[0]
@@ -66,14 +74,23 @@ export default async function Home() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
-            { icon: '⚡', label: 'Flux en temps réel' },
-            { icon: '📅', label: 'Agenda' },
-            { icon: '📝', label: 'Carnet de suivi' },
-            { icon: '🤖', label: 'Assistant IA' },
+            { icon: '⚡', label: 'Flux en temps réel', href: '/' },
+            { icon: '📅', label: 'Agenda', href: '/agenda' },
+            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
           ].map((item) => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, color: '#9abaa8', cursor: 'pointer', fontSize: 14 }}>
-              <span>{item.icon}</span>{item.label}
-            </div>
+            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px', borderRadius: 8,
+                color: item.href === '/' ? '#2ecc71' : '#9abaa8',
+                background: item.href === '/' ? 'rgba(46,204,113,0.15)' : 'none',
+                fontWeight: item.href === '/' ? 'bold' : 'normal',
+                cursor: 'pointer', fontSize: 14
+              }}>
+                <span>{item.icon}</span>{item.label}
+              </div>
+            </Link>
           ))}
         </nav>
 
@@ -83,10 +100,6 @@ export default async function Home() {
             <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>L'IA a relancé les intervenants</div>
           </div>
         )}
-
-        <div style={{ marginTop: 'auto', fontSize: 12, color: '#4a7a5a' }}>
-          {user.email}
-        </div>
       </aside>
 
       <Dashboard
