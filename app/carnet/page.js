@@ -18,25 +18,33 @@ export default function Carnet() {
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      if (!user) { router.push('/login'); return }
 
-      const { data: seniors } = await supabase.from('seniors').select('*')
-      const s = seniors?.[0]
-      setSenior(s)
+      // Récupérer le senior lié à cet utilisateur
+      const { data: familleData } = await supabase
+        .from('famille')
+        .select('senior_id')
+        .eq('user_id', user.id)
+        .limit(1)
+
+      const seniorId = familleData?.[0]?.senior_id
+      if (!seniorId) { router.push('/login'); return }
+
+      const { data: seniors } = await supabase
+        .from('seniors')
+        .select('*')
+        .eq('id', seniorId)
+      setSenior(seniors?.[0])
 
       const { data: notes } = await supabase
         .from('notes')
         .select('*')
-        .eq('senior_id', s?.id)
+        .eq('senior_id', seniorId)
         .order('created_at', { ascending: false })
-
       setNotes(notes || [])
+
       setLoading(false)
     }
-
     loadData()
   }, [])
 
@@ -72,6 +80,7 @@ export default function Carnet() {
             { icon: '⚡', label: 'Flux en temps réel', href: '/' },
             { icon: '📅', label: 'Agenda', href: '/agenda' },
             { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
             { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
           ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
@@ -95,7 +104,7 @@ export default function Carnet() {
           📝 Carnet de suivi
         </h1>
         <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
-          {notes.length} notes au total
+          {notes.length} notes au total · {senior?.name}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -126,8 +135,9 @@ export default function Carnet() {
           ))}
 
           {notes.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#aaa', padding: 40 }}>
-              Aucune note pour le moment
+            <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
+              <div>Aucune note pour le moment</div>
             </div>
           )}
         </div>
