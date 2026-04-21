@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { useRouter } from 'next/navigation'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -9,7 +8,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState('login')
-  const router = useRouter()
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,8 +23,7 @@ export default function Login() {
       if (error) {
         setError('Email ou mot de passe incorrect')
       } else {
-        router.push('/')
-        router.refresh()
+        window.location.href = '/'
       }
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
