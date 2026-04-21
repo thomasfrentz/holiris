@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState('login')
@@ -26,13 +27,37 @@ export default function Login() {
         window.location.href = '/'
       }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) {
-        setError(error.message)
-      } else {
-        setError('Compte créé ! Vous pouvez vous connecter.')
-        setMode('login')
+      const { data: seniorData, error: codeError } = await supabase
+        .from('seniors')
+        .select('id')
+        .eq('invite_code', inviteCode.toUpperCase())
+        .limit(1)
+
+      if (codeError || !seniorData?.length) {
+        setError("Code d'invitation invalide")
+        setLoading(false)
+        return
       }
+
+      const seniorId = seniorData[0].id
+
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({ email, password })
+      if (signUpError) {
+        setError(signUpError.message)
+        setLoading(false)
+        return
+      }
+
+      await supabase.from('famille').insert({
+        senior_id: seniorId,
+        user_id: authData.user.id,
+        name: email.split('@')[0],
+        email: email,
+        role: 'Famille'
+      })
+
+      setError('Compte créé ! Vous pouvez vous connecter.')
+      setMode('login')
     }
     setLoading(false)
   }
@@ -58,9 +83,18 @@ export default function Login() {
           placeholder="Votre mot de passe"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          style={{ width: '100%', padding: '12px 16px', border: '1px solid #ddd', borderRadius: 10, fontSize: 14, fontFamily: 'Georgia, serif', outline: 'none', boxSizing: 'border-box', marginBottom: 12 }}
+          style={{ width: '100%', padding: '12px 16px', border: '1px solid #ddd', borderRadius: 10, fontSize: 14, fontFamily: 'Georgia, serif', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
         />
+
+        {mode === 'signup' && (
+          <input
+            placeholder="Code d'invitation (ex: ROCA-2024-001)"
+            value={inviteCode}
+            onChange={e => setInviteCode(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            style={{ width: '100%', padding: '12px 16px', border: '1px solid #2ecc71', borderRadius: 10, fontSize: 14, fontFamily: 'Georgia, serif', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }}
+          />
+        )}
 
         {error && (
           <div style={{ background: error.includes('créé') ? '#eafaf1' : '#fdf0f0', color: error.includes('créé') ? '#27ae60' : '#e74c3c', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12 }}>
@@ -70,7 +104,7 @@ export default function Login() {
 
         <button
           onClick={handleSubmit}
-          disabled={loading || !email || !password}
+          disabled={loading || !email || !password || (mode === 'signup' && !inviteCode)}
           style={{ width: '100%', background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '12px 0', fontSize: 15, fontWeight: 'bold', cursor: 'pointer', marginBottom: 12 }}
         >
           {loading ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
