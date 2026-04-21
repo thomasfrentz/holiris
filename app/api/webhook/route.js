@@ -50,12 +50,22 @@ async function synthesizeNote(text) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
-        system: `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées dans les Pyrénées-Orientales. 
-Transforme le message d'un intervenant en note professionnelle en 2-3 phrases.
-Mets en avant l'état général, les points d'attention et les actions effectuées.`,
+        system: `Tu es l'assistant IA de Holiris. Transforme le message d'un intervenant en note professionnelle en 2-3 phrases. Mets en avant l'état général, les points d'attention et les actions effectuées.`,
         messages: [{ role: 'user', content: text }]
       })
     })
+
+    const data = await response.json()
+    console.log('Status Anthropic:', response.status)
+    console.log('Réponse Anthropic:', JSON.stringify(data))
+
+    if (data.content?.[0]?.text) return data.content[0].text
+    return text
+  } catch (error) {
+    console.error('Erreur Anthropic:', error)
+    return text
+  }
+}
 
     const data = await response.json()
     if (data.content?.[0]?.text) return data.content[0].text
