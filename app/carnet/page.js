@@ -20,7 +20,6 @@ export default function Carnet() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      // Récupérer le senior lié à cet utilisateur
       const { data: familleData } = await supabase
         .from('famille')
         .select('senior_id')
@@ -47,6 +46,12 @@ export default function Carnet() {
     }
     loadData()
   }, [])
+
+  const sourceLabel = (source) => {
+    if (source === 'whatsapp_audio') return { icon: '🎤', label: 'Note vocale', color: '#9b59b6' }
+    if (source === 'whatsapp_text') return { icon: '💬', label: 'WhatsApp', color: '#25D366' }
+    return { icon: '📝', label: 'Note', color: '#3498db' }
+  }
 
   if (loading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
@@ -104,35 +109,56 @@ export default function Carnet() {
           📝 Carnet de suivi
         </h1>
         <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
-          {notes.length} notes au total · {senior?.name}
+          {notes.length} notes · {senior?.name}
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {notes.map((n, index) => (
-            <div key={n.id || index} style={{
-              background: '#fff',
-              borderRadius: 10,
-              padding: 16,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-              borderLeft: `4px solid ${n.source === 'whatsapp_audio' ? '#9b59b6' : n.source === 'whatsapp_text' ? '#2ecc71' : '#3498db'}`
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 'bold', color: '#12201a' }}>
-                  {n.source === 'whatsapp_audio' ? '🎤 Note vocale' :
-                   n.source === 'whatsapp_text' ? '💬 WhatsApp' : '📝 Note'}
-                </span>
-                <span style={{ fontSize: 11, color: '#aaa' }}>
-                  {new Date(n.created_at).toLocaleString('fr-FR', {
-                    weekday: 'short', day: '2-digit', month: '2-digit',
-                    hour: '2-digit', minute: '2-digit'
-                  })}
-                </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {notes.map((n, index) => {
+            const src = sourceLabel(n.source)
+            return (
+              <div key={n.id || index} style={{
+                background: '#fff',
+                borderRadius: 12,
+                padding: 18,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                borderLeft: `4px solid ${src.color}`
+              }}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14 }}>{src.icon}</span>
+                      <span style={{ fontSize: 12, fontWeight: 'bold', color: src.color }}>{src.label}</span>
+                    </div>
+                    {n.intervenant_name && (
+                      <div style={{
+                        fontSize: 13,
+                        color: '#333',
+                        fontWeight: '600',
+                        background: '#f0f4f0',
+                        padding: '3px 10px',
+                        borderRadius: 20,
+                        display: 'inline-block'
+                      }}>
+                        👤 {n.intervenant_name}
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 11, color: '#aaa', flexShrink: 0, marginLeft: 10 }}>
+                    {new Date(n.created_at).toLocaleString('fr-FR', {
+                      weekday: 'short', day: '2-digit', month: '2-digit',
+                      hour: '2-digit', minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+
+                {/* Contenu */}
+                <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>
+                  {n.content}
+                </p>
               </div>
-              <p style={{ fontSize: 14, color: '#444', lineHeight: 1.6, margin: 0 }}>
-                {n.content}
-              </p>
-            </div>
-          ))}
+            )
+          })}
 
           {notes.length === 0 && (
             <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
