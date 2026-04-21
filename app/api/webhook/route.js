@@ -58,16 +58,9 @@ Mets en avant l'état général, les points d'attention et les actions effectué
     })
 
     const data = await response.json()
-    console.log('Réponse Anthropic:', JSON.stringify(data))
-
-    if (data.content && data.content[0] && data.content[0].text) {
-      return data.content[0].text
-    }
-
+    if (data.content?.[0]?.text) return data.content[0].text
     return `Note reçue : ${text}`
-
   } catch (error) {
-    console.error('Erreur Anthropic:', error)
     return `Note reçue : ${text}`
   }
 }
@@ -75,52 +68,66 @@ Mets en avant l'état général, les points d'attention et les actions effectué
 export async function POST(request) {
   try {
     const formData = await request.formData()
+    const from = formData.get('From') || ''
     const body = formData.get('Body') || ''
     const numMedia = parseInt(formData.get('NumMedia') || '0')
     const mediaUrl = formData.get('MediaUrl0') || ''
     const mediaType = formData.get('MediaContentType0') || ''
 
+    // Nettoyer le numéro WhatsApp (ex: whatsapp:+33612345678 → +33612345678)
+    const phoneNumber = from.replace('whatsapp:', '')
+    console.log('Message de:', phoneNumber)
+
+    // Chercher l'intervenant par son numéro
+    const { data: intervenantData } = await supabase
+      .from('intervenants')
+      .select('*, seniors(*)')
+      .or(`whatsapp.eq.${phoneNumber},phone.eq.${phoneNumber}`)
+      .limit(1)
+
+    console.log('Intervenant trouvé:', intervenantData)
+
+    let seniorId = null
+    let intervenantName = 'Intervenant'
+
+    if (intervenantData?.length > 0) {
+      seniorId = intervenantData[0].senior_id
+      intervenantName = intervenantData[0].name
+    } else {
+      // Fallback : premier senior si intervenant non trouvé
+      const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
+      seniorId = seniors?.[0]?.id
+      console.log('Intervenant non trouvé, utilisation du senior par défaut')
+    }
+
+    if (!seniorId) return twimlResponse('Erreur : aucun senior trouvé.')
+
     let noteContent = ''
     let source = 'whatsapp_text'
 
     if (numMedia > 0 && mediaType.includes('audio')) {
-      console.log('Audio reçu, transcription en cours...')
       const transcription = await transcribeAudio(mediaUrl)
       console.log('Transcription:', transcription)
       noteContent = await synthesizeNote(transcription)
       source = 'whatsapp_audio'
     } else if (body) {
-      console.log('Texte reçu:', body)
       noteContent = await synthesizeNote(body)
       source = 'whatsapp_text'
     } else {
       return twimlResponse('Message reçu.')
     }
 
-    console.log('Note finale:', noteContent)
-
     if (noteContent) {
-      const { data: seniors, error: seniorError } = await supabase
-        .from('seniors')
-        .select('id')
-        .limit(1)
-
-      console.log('Senior trouvé:', seniors, seniorError)
-
-      const seniorId = seniors?.[0]?.id
-
-      if (seniorId) {
-        const { error: insertError } = await supabase.from('notes').insert({
-          senior_id: seniorId,
-          content: noteContent,
-          source: source,
-          created_at: new Date().toISOString()
-        })
-        console.log('Insertion note:', insertError ? insertError : 'OK')
-      }
+      await supabase.from('notes').insert({
+        senior_id: seniorId,
+        content: noteContent,
+        source: source,
+        created_at: new Date().toISOString()
+      })
+      console.log('Note sauvegardée pour senior:', seniorId)
     }
 
-    return twimlResponse('✅ Note reçue et ajoutée au dossier Holiris. Merci !')
+    return twimlResponse(`✅ Note reçue pour ${intervenantName}. Merci !`)
 
   } catch (error) {
     console.error('Erreur webhook:', error.message)
