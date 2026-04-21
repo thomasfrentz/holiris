@@ -1,37 +1,50 @@
-import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
-import { redirect } from 'next/navigation'
+'use client'
+import { useState, useEffect } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-export const dynamic = 'force-dynamic'
+export default function Carnet() {
+  const [notes, setNotes] = useState([])
+  const [senior, setSenior] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
-export default async function Carnet() {
-  const cookieStore = await cookies()
-  const allCookies = cookieStore.getAll()
-
-  const authCookie = allCookies.find(c =>
-    c.name.includes('auth-token') ||
-    c.name.includes('access-token') ||
-    c.name.startsWith('sb-')
-  )
-
-  if (!authCookie) {
-    redirect('/login')
-  }
-
-  const supabase = createClient(
+  const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const { data: seniors } = await supabase.from('seniors').select('*')
-  const senior = seniors?.[0]
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-  const { data: notes } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('senior_id', senior?.id)
-    .order('created_at', { ascending: false })
+      const { data: seniors } = await supabase.from('seniors').select('*')
+      const s = seniors?.[0]
+      setSenior(s)
+
+      const { data: notes } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('senior_id', s?.id)
+        .order('created_at', { ascending: false })
+
+      setNotes(notes || [])
+      setLoading(false)
+    }
+
+    loadData()
+  }, [])
+
+  if (loading) return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
+      <div style={{ color: '#888' }}>Chargement...</div>
+    </div>
+  )
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
@@ -82,11 +95,11 @@ export default async function Carnet() {
           📝 Carnet de suivi
         </h1>
         <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
-          {notes?.length ?? 0} notes au total
+          {notes.length} notes au total
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {notes?.map((n, index) => (
+          {notes.map((n, index) => (
             <div key={n.id || index} style={{
               background: '#fff',
               borderRadius: 10,
@@ -112,7 +125,7 @@ export default async function Carnet() {
             </div>
           ))}
 
-          {notes?.length === 0 && (
+          {notes.length === 0 && (
             <div style={{ textAlign: 'center', color: '#aaa', padding: 40 }}>
               Aucune note pour le moment
             </div>
