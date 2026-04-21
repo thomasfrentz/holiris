@@ -7,21 +7,22 @@ export const dynamic = 'force-dynamic'
 
 export default async function Carnet() {
   const cookieStore = await cookies()
-  
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      global: {
-        headers: {
-          cookie: cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ')
-        }
-      }
-    }
+  const allCookies = cookieStore.getAll()
+
+  const authCookie = allCookies.find(c =>
+    c.name.includes('auth-token') ||
+    c.name.includes('access-token') ||
+    c.name.startsWith('sb-')
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!authCookie) {
+    redirect('/login')
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
 
   const { data: seniors } = await supabase.from('seniors').select('*')
   const senior = seniors?.[0]
@@ -74,10 +75,6 @@ export default async function Carnet() {
             </Link>
           ))}
         </nav>
-
-        <div style={{ marginTop: 'auto', fontSize: 12, color: '#4a7a5a' }}>
-          {user.email}
-        </div>
       </aside>
 
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
