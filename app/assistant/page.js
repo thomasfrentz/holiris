@@ -74,37 +74,21 @@ export default function Assistant() {
     setMessages(prev => [...prev, { role: 'user', text: userMsg }])
     setAiLoading(true)
 
-    const context = `Tu es l'assistant IA de Holiris, plateforme de suivi des personnes âgées dans les Pyrénées-Orientales.
-
-Personne suivie : ${senior?.name}, ${senior?.age} ans, ${senior?.city}
-
-Dernières notes (${notes.length}) :
-${notes.slice(0, 5).map(n => '- ' + new Date(n.created_at).toLocaleDateString('fr-FR') + ' : ' + n.content).join('\n')}
-
-Prochains événements :
-${events.slice(0, 5).map(e => '- ' + new Date(e.scheduled_at).toLocaleDateString('fr-FR') + ' : ' + e.label + ' (' + e.status + ')').join('\n')}
-
-Réponds de façon bienveillante et concise (3-5 phrases max). Tu peux aussi expliquer les aides disponibles (APA, MaPrimeAdapt, etc.).`
+    const context = 'Tu es l\'assistant IA de Holiris, plateforme de suivi des personnes âgées dans les Pyrénées-Orientales.\n\nPersonne suivie : ' + (senior?.name || '') + ', ' + (senior?.age || '') + ' ans, ' + (senior?.city || '') + '\n\nDernières notes :\n' + notes.slice(0, 5).map(n => '- ' + new Date(n.created_at).toLocaleDateString('fr-FR') + ' : ' + n.content).join('\n') + '\n\nProchains événements :\n' + events.slice(0, 5).map(e => '- ' + new Date(e.scheduled_at).toLocaleDateString('fr-FR') + ' : ' + e.label).join('\n') + '\n\nRéponds de façon bienveillante et concise (3-5 phrases max).'
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 500,
-          system: context,
+          context,
           messages: [{ role: 'user', content: userMsg }]
         })
       })
-      const data = await response.json()
-      const reply = data.content?.[0]?.text || 'Désolé, je n\'ai pas pu répondre.'
-      setMessages(prev => [...prev, { role: 'assistant', text: reply }])
-    } catch {
+      const data = await res.json()
+      setMessages(prev => [...prev, { role: 'assistant', text: data.text }])
+    } catch (e) {
+      console.error('Erreur:', e)
       setMessages(prev => [...prev, { role: 'assistant', text: 'Erreur de connexion.' }])
     }
     setAiLoading(false)
@@ -158,7 +142,7 @@ Réponds de façon bienveillante et concise (3-5 phrases max). Tu peux aussi exp
         </nav>
       </aside>
 
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 28 }}>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 28, overflow: 'hidden' }}>
         <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>🤖 Assistant IA</h1>
         <p style={{ color: '#888', marginBottom: 20, fontSize: 13 }}>
           Je connais la situation de {senior?.name} — posez-moi vos questions
@@ -185,14 +169,14 @@ Réponds de façon bienveillante et concise (3-5 phrases max). Tu peux aussi exp
           {aiLoading && (
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ fontSize: 22 }}>🤖</div>
-              <div style={{ background: '#fff', padding: '12px 16px', borderRadius: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', color: '#2ecc71', letterSpacing: 4 }}>● ● ●</div>
+              <div style={{ background: '#fff', padding: '12px 16px', borderRadius: 14, color: '#2ecc71', letterSpacing: 4 }}>● ● ●</div>
             </div>
           )}
           <div ref={chatEndRef} />
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          {['Résume la semaine', 'Comment va ' + senior?.name + ' ?', 'Qu\'est-ce que l\'APA ?'].map(s => (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          {['Résume la semaine', 'Comment va ' + (senior?.name || 'mon proche') + ' ?', 'Qu\'est-ce que l\'APA ?'].map(s => (
             <button key={s} onClick={() => setInput(s)} style={{ background: '#f0f4f0', border: '1px solid #d4e4d8', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', fontSize: 12, color: '#12201a' }}>
               {s}
             </button>
