@@ -1,29 +1,26 @@
 import { NextResponse } from 'next/server'
+import Groq from 'groq-sdk'
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 export async function POST(request) {
   try {
     const { messages, context } = await request.json()
 
-    const response = await fetch('https://holiris.vercel.app/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        system: context,
-        messages
-      })
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: context },
+        ...messages
+      ],
+      max_tokens: 500,
     })
 
-    const data = await response.json()
-    const text = data.content?.[0]?.text || 'Désolé je n\'ai pas pu répondre.'
+    const text = completion.choices[0]?.message?.content || 'Désolé je n\'ai pas pu répondre.'
     return NextResponse.json({ text })
 
   } catch (error) {
+    console.error('Erreur Groq:', error.message)
     return NextResponse.json({ text: 'Erreur de connexion.' }, { status: 500 })
   }
 }
