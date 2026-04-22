@@ -7,7 +7,11 @@ import Link from 'next/link'
 export default function Carnet() {
   const [notes, setNotes] = useState([])
   const [senior, setSenior] = useState(null)
+  const [famille, setFamille] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [newNote, setNewNote] = useState('')
+  const [saving, setSaving] = useState(false)
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -22,12 +26,14 @@ export default function Carnet() {
 
       const { data: familleData } = await supabase
         .from('famille')
-        .select('senior_id')
+        .select('*')
         .eq('user_id', user.id)
         .limit(1)
 
       const seniorId = familleData?.[0]?.senior_id
       if (!seniorId) { router.push('/login'); return }
+
+      setFamille(familleData[0])
 
       const { data: seniors } = await supabase
         .from('seniors')
@@ -47,9 +53,32 @@ export default function Carnet() {
     loadData()
   }, [])
 
+  async function addNote() {
+    if (!newNote.trim()) return
+    setSaving(true)
+
+    const authorName = famille?.name || famille?.email?.split('@')[0] || 'Famille'
+
+    const { data, error } = await supabase.from('notes').insert({
+      senior_id: senior.id,
+      content: newNote,
+      source: 'famille',
+      intervenant_name: authorName + (famille?.role ? ' · ' + famille.role : ''),
+      created_at: new Date().toISOString()
+    }).select()
+
+    if (!error && data) {
+      setNotes(prev => [data[0], ...prev])
+      setNewNote('')
+      setShowForm(false)
+    }
+    setSaving(false)
+  }
+
   const sourceLabel = (source) => {
     if (source === 'whatsapp_audio') return { icon: '🎤', label: 'Note vocale', color: '#9b59b6' }
     if (source === 'whatsapp_text') return { icon: '💬', label: 'WhatsApp', color: '#25D366' }
+    if (source === 'famille') return { icon: '👨‍👩‍👧', label: 'Note famille', color: '#3498db' }
     return { icon: '📝', label: 'Note', color: '#3498db' }
   }
 
@@ -87,6 +116,7 @@ export default function Carnet() {
             { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
             { icon: '👥', label: 'Intervenants', href: '/intervenants' },
             { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
           ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
@@ -105,12 +135,51 @@ export default function Carnet() {
       </aside>
 
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>
-          📝 Carnet de suivi
-        </h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>
+            📝 Carnet de suivi
+          </h1>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            + Ajouter une note
+          </button>
+        </div>
         <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
           {notes.length} notes · {senior?.name}
         </p>
+
+        {showForm && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
+              Note de <strong>{famille?.name || famille?.email}</strong>
+              {famille?.role && <span> · {famille.role}</span>}
+            </div>
+            <textarea
+              placeholder="Décrivez l'état de votre proche, une observation, un événement..."
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              rows={4}
+              style={{ width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', resize: 'none', boxSizing: 'border-box', marginBottom: 12 }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={addNote}
+                disabled={saving || !newNote.trim()}
+                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                {saving ? 'Publication...' : 'Publier'}
+              </button>
+              <button
+                onClick={() => { setShowForm(false); setNewNote('') }}
+                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {notes.map((n, index) => {
@@ -121,9 +190,8 @@ export default function Carnet() {
                 borderRadius: 12,
                 padding: 18,
                 boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                borderLeft: `4px solid ${src.color}`
+                borderLeft: '4px solid ' + src.color
               }}>
-                {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -151,8 +219,6 @@ export default function Carnet() {
                     })}
                   </span>
                 </div>
-
-                {/* Contenu */}
                 <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>
                   {n.content}
                 </p>
