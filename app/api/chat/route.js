@@ -4,7 +4,7 @@ export async function POST(request) {
   try {
     const { messages, context } = await request.json()
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://holiris.vercel.app/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
