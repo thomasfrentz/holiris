@@ -57,21 +57,32 @@ export default function Profil() {
   }, [])
 
   async function saveProfil() {
-    if (!prenom || !nom) return
-    setSaving(true)
+  if (!prenom || !nom) return
+  setSaving(true)
 
-    await supabase
-      .from('famille')
-      .update({
-        name: prenom + ' ' + nom,
-        role: lien
-      })
-      .eq('user_id', user.id)
+  console.log('Sauvegarde pour user_id:', user.id)
+  console.log('Données:', { name: prenom + ' ' + nom, role: lien })
 
+  const { data, error } = await supabase
+    .from('famille')
+    .update({
+      name: prenom + ' ' + nom,
+      role: lien
+    })
+    .eq('user_id', user.id)
+    .select()
+
+  console.log('Résultat:', data, 'Erreur:', error)
+
+  if (!error) {
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
-    setSaving(false)
+  } else {
+    console.error('Erreur sauvegarde:', error)
+    alert('Erreur: ' + error.message)
   }
+  setSaving(false)
+}
 
   async function logout() {
     await supabase.auth.signOut()
