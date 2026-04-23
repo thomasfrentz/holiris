@@ -73,7 +73,26 @@ export default function Profil() {
       .eq('user_id', user.id)
 
     if (!error) {
+      // Envoyer message de bienvenue si numéro renseigné pour la première fois
+      if (whatsappFormatted && !famille?.whatsapp) {
+        try {
+          await fetch('/api/invite-famille', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              whatsapp: whatsappFormatted,
+              prenom,
+              seniorName: senior?.name
+            })
+          })
+          console.log('Message de bienvenue envoyé')
+        } catch (e) {
+          console.error('Erreur envoi message bienvenue:', e)
+        }
+      }
+
       setSaved(true)
+      setFamille(prev => ({ ...prev, whatsapp: whatsappFormatted }))
       setTimeout(() => setSaved(false), 3000)
     }
     setSaving(false)
@@ -186,7 +205,7 @@ export default function Profil() {
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #25D366', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
             />
             <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
-              💡 Renseignez votre numéro pour envoyer des notes via WhatsApp
+              💡 Renseignez votre numéro pour envoyer et recevoir des notes via WhatsApp
             </div>
           </div>
 
