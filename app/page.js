@@ -4,14 +4,15 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Dashboard from './dashboard'
+import { useSenior } from './lib/useSenior'
 
 export default function Home() {
-  const [senior, setSenior] = useState(null)
   const [events, setEvents] = useState([])
   const [notes, setNotes] = useState([])
   const [totalNotes, setTotalNotes] = useState(0)
   const [alertes, setAlertes] = useState([])
   const [loading, setLoading] = useState(true)
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -23,23 +24,8 @@ export default function Home() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      if (!selectedSeniorId) return
 
-      const { data: familleData } = await supabase
-        .from('famille')
-        .select('senior_id')
-        .eq('user_id', user.id)
-        .limit(1)
-
-      const seniorId = familleData?.[0]?.senior_id
-      if (!seniorId) { router.push('/login'); return }
-
-      const { data: seniors } = await supabase
-        .from('seniors')
-        .select('*')
-        .eq('id', seniorId)
-      setSenior(seniors?.[0])
-
-      // Événements de cette semaine uniquement
       const debutSemaine = new Date()
       debutSemaine.setHours(0, 0, 0, 0)
       const finSemaine = new Date()
@@ -49,7 +35,7 @@ export default function Home() {
       const { data: eventsData } = await supabase
         .from('events')
         .select('*, intervenants(*)')
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
         .gte('scheduled_at', debutSemaine.toISOString())
         .lte('scheduled_at', finSemaine.toISOString())
         .order('scheduled_at', { ascending: true })
@@ -58,7 +44,7 @@ export default function Home() {
       const { data: notesData } = await supabase
         .from('notes')
         .select('*')
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
         .limit(3)
       setNotes(notesData || [])
@@ -66,13 +52,13 @@ export default function Home() {
       const { count } = await supabase
         .from('notes')
         .select('*', { count: 'exact', head: true })
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
       setTotalNotes(count || 0)
 
       const { data: alertesData } = await supabase
         .from('alertes')
         .select('*')
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
         .eq('lu', false)
         .order('created_at', { ascending: false })
       setAlertes(alertesData || [])
@@ -80,7 +66,7 @@ export default function Home() {
       setLoading(false)
     }
     loadData()
-  }, [])
+  }, [selectedSeniorId])
 
   const silenceCount = events.filter(e => e.status === 'silence').length
 
@@ -89,7 +75,7 @@ export default function Home() {
     window.location.href = '/login'
   }
 
-  if (loading) return (
+  if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
       <div style={{ color: '#888', fontSize: 16 }}>Chargement...</div>
     </div>
@@ -106,15 +92,32 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-          <div style={{ fontWeight: 'bold' }}>{senior?.name}</div>
-          <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{senior?.age} ans · {senior?.city}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#2ecc71', marginTop: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', display: 'inline-block' }} />
-            Situation stable
+        {/* Sélecteur de senior pour admin */}
+        {isAdmin && seniors.length > 1 ? (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
+            <select
+              value={selectedSeniorId || ''}
+              onChange={e => switchSenior(e.target.value)}
+              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}
+            >
+              {seniors.map(s => (
+                <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
           </div>
-        </div>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
+            <div style={{ fontWeight: 'bold' }}>{selectedSenior?.name}</div>
+            <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#2ecc71', marginTop: 6 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', display: 'inline-block' }} />
+              Situation stable
+            </div>
+          </div>
+        )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
@@ -147,18 +150,23 @@ export default function Home() {
           </div>
         )}
 
+        {isAdmin && (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ fontSize: 12, fontWeight: 'bold', color: '#ff8070' }}>🔐 Mode Admin</div>
+            <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>Accès complet activé</div>
+          </div>
+        )}
+
         <div style={{ marginTop: 'auto' }}>
-          <button
-            onClick={logout}
-            style={{ width: '100%', background: 'rgba(231,76,60,0.15)', color: '#ff8070', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 8, padding: '10px 0', fontSize: 13, cursor: 'pointer', fontWeight: 'bold' }}
-          >
+          <button onClick={logout}
+            style={{ width: '100%', background: 'rgba(231,76,60,0.15)', color: '#ff8070', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 8, padding: '10px 0', fontSize: 13, cursor: 'pointer', fontWeight: 'bold' }}>
             🚪 Se déconnecter
           </button>
         </div>
       </aside>
 
       <Dashboard
-        initialSenior={senior}
+        initialSenior={selectedSenior}
         initialEvents={events}
         initialNotes={notes}
         initialTotalNotes={totalNotes}
