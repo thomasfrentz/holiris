@@ -1,21 +1,27 @@
 'use client'
 import Link from 'next/link'
 
+const Logo = ({ size = 32 }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
+      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
+      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
+      <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
+      <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
+    </svg>
+    <span style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: size * 0.75, fontWeight: 300, letterSpacing: '0.12em' }}>
+      Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
+    </span>
+  </div>
+)
+
 export default function Landing() {
   return (
     <div style={{ fontFamily: 'var(--font-body, DM Sans, sans-serif)', background: '#1E2820', color: '#FAFCFA', margin: 0 }}>
 
       {/* NAV */}
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 48px', background: 'rgba(30,40,32,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(107,143,113,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
-            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
-            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
-            <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
-            <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
-          </svg>
-          <span style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 24, fontWeight: 300, letterSpacing: '0.12em' }}>Holiris</span>
-        </div>
+        <Logo size={32} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <a href="#fonctionnalites" style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: 14 }}>Fonctionnalités</a>
           <a href="#tarifs" style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: 14 }}>Tarifs</a>
@@ -42,7 +48,7 @@ export default function Landing() {
           </svg>
 
           <h1 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(56px, 10vw, 96px)', fontWeight: 300, letterSpacing: '0.06em', lineHeight: 1, marginBottom: 24, color: '#FAFCFA' }}>
-            Holi<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>ris</span>
+            Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
           </h1>
 
           <p style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(18px, 2.5vw, 26px)', fontWeight: 300, fontStyle: 'italic', color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', marginBottom: 48 }}>
@@ -190,15 +196,7 @@ export default function Landing() {
 
       {/* FOOTER */}
       <div style={{ borderTop: '1px solid rgba(107,143,113,0.15)', padding: '32px 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="24" height="24" viewBox="0 0 64 64" fill="none">
-            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
-            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
-            <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
-            <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
-          </svg>
-          <span style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 18, fontWeight: 300, letterSpacing: '0.12em' }}>Holiris</span>
-        </div>
+        <Logo size={24} />
         <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           <Link href="/privacy" style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', letterSpacing: '0.1em' }}>Confidentialité</Link>
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>© 2026 Holiris · Pyrénées-Orientales</span>
