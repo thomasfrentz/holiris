@@ -3,17 +3,16 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAdmin } from '../lib/useAdmin'
+import { useSenior } from '../lib/useSenior'
 
 export default function Carnet() {
   const [notes, setNotes] = useState([])
-  const [senior, setSenior] = useState(null)
   const [famille, setFamille] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
-  const { isAdmin } = useAdmin()
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -25,35 +24,26 @@ export default function Carnet() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      if (!selectedSeniorId) return
 
       const { data: familleData } = await supabase
         .from('famille')
         .select('*')
         .eq('user_id', user.id)
         .limit(1)
-
-      const seniorId = familleData?.[0]?.senior_id
-      if (!seniorId) { router.push('/login'); return }
-
-      setFamille(familleData[0])
-
-      const { data: seniors } = await supabase
-        .from('seniors')
-        .select('*')
-        .eq('id', seniorId)
-      setSenior(seniors?.[0])
+      setFamille(familleData?.[0])
 
       const { data: notes } = await supabase
         .from('notes')
         .select('*')
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
       setNotes(notes || [])
 
       setLoading(false)
     }
     loadData()
-  }, [])
+  }, [selectedSeniorId])
 
   async function addNote() {
     if (!newNote.trim()) return
@@ -62,7 +52,7 @@ export default function Carnet() {
     const authorName = famille?.name || famille?.email?.split('@')[0] || 'Famille'
 
     const { data, error } = await supabase.from('notes').insert({
-      senior_id: senior.id,
+      senior_id: selectedSeniorId,
       content: newNote,
       source: 'famille',
       intervenant_name: authorName + (famille?.role ? ' · ' + famille.role : ''),
@@ -98,7 +88,7 @@ export default function Carnet() {
     return { icon: '📝', label: 'Note', color: '#3498db' }
   }
 
-  if (loading) return (
+  if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
       <div style={{ color: '#888' }}>Chargement...</div>
     </div>
@@ -115,15 +105,22 @@ export default function Carnet() {
           </div>
         </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-          <div style={{ fontWeight: 'bold' }}>{senior?.name}</div>
-          <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{senior?.age} ans · {senior?.city}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#2ecc71', marginTop: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', display: 'inline-block' }} />
-            Situation stable
+        {isAdmin && seniors.length > 1 ? (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
+            <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
+              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
+              {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
           </div>
-        </div>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
+            <div style={{ fontWeight: 'bold' }}>{selectedSenior?.name}</div>
+            <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
+          </div>
+        )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
@@ -159,17 +156,13 @@ export default function Carnet() {
 
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>
-            📝 Carnet de suivi
-          </h1>
+          <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>📝 Carnet de suivi</h1>
           <button onClick={() => setShowForm(!showForm)}
             style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
             + Ajouter une note
           </button>
         </div>
-        <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
-          {notes.length} notes · {senior?.name}
-        </p>
+        <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>{notes.length} notes · {selectedSenior?.name}</p>
 
         {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
@@ -177,13 +170,8 @@ export default function Carnet() {
               Note de <strong>{famille?.name || famille?.email}</strong>
               {famille?.role && <span> · {famille.role}</span>}
             </div>
-            <textarea
-              placeholder="Décrivez l'état de votre proche, une observation, un événement..."
-              value={newNote}
-              onChange={e => setNewNote(e.target.value)}
-              rows={4}
-              style={{ width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', resize: 'none', boxSizing: 'border-box', marginBottom: 12 }}
-            />
+            <textarea placeholder="Décrivez l'état de votre proche..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={4}
+              style={{ width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', resize: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={addNote} disabled={saving || !newNote.trim()}
                 style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
@@ -201,13 +189,7 @@ export default function Carnet() {
           {notes.map((n, index) => {
             const src = sourceLabel(n.source)
             return (
-              <div key={n.id || index} style={{
-                background: '#fff',
-                borderRadius: 12,
-                padding: 18,
-                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                borderLeft: '4px solid ' + src.color
-              }}>
+              <div key={n.id || index} style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderLeft: '4px solid ' + src.color }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -222,32 +204,26 @@ export default function Carnet() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 10 }}>
                     <span style={{ fontSize: 11, color: '#aaa' }}>
-                      {new Date(n.created_at).toLocaleString('fr-FR', {
-                        weekday: 'short', day: '2-digit', month: '2-digit',
-                        hour: '2-digit', minute: '2-digit'
-                      })}
+                      {new Date(n.created_at).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {isAdmin && (
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => editNote(n.id, n.content)}
                           style={{ background: '#f0f9ff', color: '#3498db', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
-                          ✏️ Modifier
+                          ✏️
                         </button>
                         <button onClick={() => deleteNote(n.id)}
                           style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
-                          🗑️ Supprimer
+                          🗑️
                         </button>
                       </div>
                     )}
                   </div>
                 </div>
-                <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>
-                  {n.content}
-                </p>
+                <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>{n.content}</p>
               </div>
             )
           })}
-
           {notes.length === 0 && (
             <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
