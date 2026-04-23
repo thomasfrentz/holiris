@@ -39,10 +39,19 @@ export default function Home() {
         .eq('id', seniorId)
       setSenior(seniors?.[0])
 
+      // Événements de cette semaine uniquement
+      const debutSemaine = new Date()
+      debutSemaine.setHours(0, 0, 0, 0)
+      const finSemaine = new Date()
+      finSemaine.setDate(finSemaine.getDate() + (7 - finSemaine.getDay()))
+      finSemaine.setHours(23, 59, 59, 999)
+
       const { data: eventsData } = await supabase
         .from('events')
         .select('*, intervenants(*)')
         .eq('senior_id', seniorId)
+        .gte('scheduled_at', debutSemaine.toISOString())
+        .lte('scheduled_at', finSemaine.toISOString())
         .order('scheduled_at', { ascending: true })
       setEvents(eventsData || [])
 
