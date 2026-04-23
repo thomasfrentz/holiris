@@ -3,14 +3,15 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSenior } from '../lib/useSenior'
 
 export default function Intervenants() {
   const [intervenants, setIntervenants] = useState([])
-  const [senior, setSenior] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [inviteSent, setInviteSent] = useState(null)
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
 
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
@@ -28,33 +29,19 @@ export default function Intervenants() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-
-      const { data: familleData } = await supabase
-        .from('famille')
-        .select('senior_id')
-        .eq('user_id', user.id)
-        .limit(1)
-
-      const seniorId = familleData?.[0]?.senior_id
-      if (!seniorId) { router.push('/login'); return }
-
-      const { data: seniors } = await supabase
-        .from('seniors')
-        .select('*')
-        .eq('id', seniorId)
-      setSenior(seniors?.[0])
+      if (!selectedSeniorId) return
 
       const { data: intervenantsData } = await supabase
         .from('intervenants')
         .select('*')
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
       setIntervenants(intervenantsData || [])
 
       setLoading(false)
     }
     loadData()
-  }, [])
+  }, [selectedSeniorId])
 
   async function addIntervenant() {
     if (!prenom || !nom || !role || !telephone) return
@@ -64,42 +51,27 @@ export default function Intervenants() {
 
     const { error } = await supabase.from('intervenants').insert({
       name: prenom + ' ' + nom,
-      role,
-      phone: telephone,
-      whatsapp,
-      senior_id: senior.id
+      role, phone: telephone, whatsapp,
+      senior_id: selectedSeniorId
     })
 
     if (!error) {
-      // Envoyer le message d'invitation
       try {
         const response = await fetch('/api/invite-intervenant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            whatsapp,
-            prenom,
-            nom,
-            role,
-            seniorName: senior.name
-          })
+          body: JSON.stringify({ whatsapp, prenom, nom, role, seniorName: selectedSenior?.name })
         })
         const data = await response.json()
         if (data.success) setInviteSent(prenom + ' ' + nom)
-      } catch (e) {
-        console.error('Erreur envoi invitation:', e)
-      }
+      } catch (e) { console.error('Erreur invitation:', e) }
 
-      setPrenom('')
-      setNom('')
-      setRole('')
-      setTelephone('')
+      setPrenom(''); setNom(''); setRole(''); setTelephone('')
       setShowForm(false)
 
       const { data } = await supabase
-        .from('intervenants')
-        .select('*')
-        .eq('senior_id', senior.id)
+        .from('intervenants').select('*')
+        .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
       setIntervenants(data || [])
 
@@ -109,6 +81,7 @@ export default function Intervenants() {
   }
 
   async function deleteIntervenant(id) {
+    if (!isAdmin) return
     await supabase.from('intervenants').delete().eq('id', id)
     setIntervenants(prev => prev.filter(i => i.id !== id))
   }
@@ -120,7 +93,7 @@ export default function Intervenants() {
     'Pharmacien': '💊', 'Autre': '👤',
   }
 
-  if (loading) return (
+  if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
       <div style={{ color: '#888' }}>Chargement...</div>
     </div>
@@ -137,11 +110,22 @@ export default function Intervenants() {
           </div>
         </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-          <div style={{ fontWeight: 'bold' }}>{senior?.name}</div>
-          <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{senior?.age} ans · {senior?.city}</div>
-        </div>
+        {isAdmin && seniors.length > 1 ? (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
+            <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
+              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
+              {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
+          </div>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
+            <div style={{ fontWeight: 'bold' }}>{selectedSenior?.name}</div>
+            <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
+          </div>
+        )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
@@ -166,18 +150,23 @@ export default function Intervenants() {
             </Link>
           ))}
         </nav>
+
+        {isAdmin && (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ fontSize: 12, fontWeight: 'bold', color: '#ff8070' }}>🔐 Mode Admin</div>
+            <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>Suppression activée</div>
+          </div>
+        )}
       </aside>
 
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>👥 Intervenants</h1>
-            <p style={{ color: '#888', fontSize: 13 }}>{intervenants.length} intervenant{intervenants.length > 1 ? 's' : ''} pour {senior?.name}</p>
+            <p style={{ color: '#888', fontSize: 13 }}>{intervenants.length} intervenant{intervenants.length > 1 ? 's' : ''} pour {selectedSenior?.name}</p>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-          >
+          <button onClick={() => setShowForm(!showForm)}
+            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
             + Ajouter
           </button>
         </div>
@@ -201,20 +190,16 @@ export default function Intervenants() {
               <select value={role} onChange={e => setRole(e.target.value)}
                 style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
                 <option value="">Rôle / Fonction</option>
-                <option>Infirmière</option>
-                <option>Infirmier</option>
-                <option>Kinésithérapeute</option>
-                <option>Aide à domicile</option>
-                <option>Médecin</option>
-                <option>Cardiologue</option>
-                <option>Pharmacien</option>
-                <option>Autre</option>
+                <option>Infirmière</option><option>Infirmier</option>
+                <option>Kinésithérapeute</option><option>Aide à domicile</option>
+                <option>Médecin</option><option>Cardiologue</option>
+                <option>Pharmacien</option><option>Autre</option>
               </select>
               <input placeholder="Téléphone (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
                 style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
             </div>
             <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
-              💡 Un message de bienvenue sera automatiquement envoyé sur WhatsApp pour expliquer le fonctionnement d'Holiris.
+              💡 Un message de bienvenue sera automatiquement envoyé sur WhatsApp.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
@@ -241,10 +226,12 @@ export default function Intervenants() {
                   {i.whatsapp && <span style={{ marginLeft: 8, color: '#25D366' }}>· WhatsApp ✓</span>}
                 </div>
               </div>
-              <button onClick={() => deleteIntervenant(i.id)}
-                style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-                Supprimer
-              </button>
+              {isAdmin && (
+                <button onClick={() => deleteIntervenant(i.id)}
+                  style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
+                  🗑️ Supprimer
+                </button>
+              )}
             </div>
           ))}
 
@@ -252,7 +239,7 @@ export default function Intervenants() {
             <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
               <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Aucun intervenant</div>
-              <div style={{ fontSize: 13 }}>Ajoutez les professionnels qui s'occupent de {senior?.name}</div>
+              <div style={{ fontSize: 13 }}>Ajoutez les professionnels qui s'occupent de {selectedSenior?.name}</div>
             </div>
           )}
         </div>
