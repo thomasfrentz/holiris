@@ -3,14 +3,15 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSenior } from '../lib/useSenior'
 
 export default function Agenda() {
   const [events, setEvents] = useState([])
   const [intervenants, setIntervenants] = useState([])
-  const [senior, setSenior] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
 
   const [label, setLabel] = useState('')
   const [type, setType] = useState('care')
@@ -40,39 +41,25 @@ export default function Agenda() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-
-      const { data: familleData } = await supabase
-        .from('famille')
-        .select('senior_id')
-        .eq('user_id', user.id)
-        .limit(1)
-
-      const seniorId = familleData?.[0]?.senior_id
-      if (!seniorId) { router.push('/login'); return }
-
-      const { data: seniors } = await supabase
-        .from('seniors')
-        .select('*')
-        .eq('id', seniorId)
-      setSenior(seniors?.[0])
+      if (!selectedSeniorId) return
 
       const { data: eventsData } = await supabase
         .from('events')
         .select('*, intervenants(*)')
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
         .order('scheduled_at', { ascending: true })
       setEvents(eventsData || [])
 
       const { data: intervenantsData } = await supabase
         .from('intervenants')
         .select('*')
-        .eq('senior_id', seniorId)
+        .eq('senior_id', selectedSeniorId)
       setIntervenants(intervenantsData || [])
 
       setLoading(false)
     }
     loadData()
-  }, [])
+  }, [selectedSeniorId])
 
   function toggleDay(day) {
     setRecurrenceDays(prev =>
@@ -80,20 +67,17 @@ export default function Agenda() {
     )
   }
 
-  async function generateRecurringEvents(baseEvent, seniorId) {
+  async function generateRecurringEvents(baseEvent) {
     const events = []
     const startDate = new Date(baseEvent.scheduled_at)
     const endDate = new Date(startDate)
-    endDate.setMonth(endDate.getMonth() + 3) // Générer 3 mois d'événements
+    endDate.setMonth(endDate.getMonth() + 3)
 
     if (recurrence === 'daily') {
       let current = new Date(startDate)
       current.setDate(current.getDate() + 1)
       while (current <= endDate) {
-        events.push({
-          ...baseEvent,
-          scheduled_at: new Date(current).toISOString(),
-        })
+        events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         current.setDate(current.getDate() + 1)
       }
     } else if (recurrence === 'weekly' && recurrenceDays.length > 0) {
@@ -101,10 +85,7 @@ export default function Agenda() {
       current.setDate(current.getDate() + 1)
       while (current <= endDate) {
         if (recurrenceDays.includes(String(current.getDay()))) {
-          events.push({
-            ...baseEvent,
-            scheduled_at: new Date(current).toISOString(),
-          })
+          events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         }
         current.setDate(current.getDate() + 1)
       }
@@ -112,24 +93,17 @@ export default function Agenda() {
       let current = new Date(startDate)
       current.setDate(current.getDate() + 14)
       while (current <= endDate) {
-        events.push({
-          ...baseEvent,
-          scheduled_at: new Date(current).toISOString(),
-        })
+        events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         current.setDate(current.getDate() + 14)
       }
     } else if (recurrence === 'monthly') {
       let current = new Date(startDate)
       current.setMonth(current.getMonth() + 1)
       while (current <= endDate) {
-        events.push({
-          ...baseEvent,
-          scheduled_at: new Date(current).toISOString(),
-        })
+        events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         current.setMonth(current.getMonth() + 1)
       }
     }
-
     return events
   }
 
@@ -138,55 +112,36 @@ export default function Agenda() {
     setSaving(true)
 
     const scheduledAt = new Date(date + 'T' + heure).toISOString()
-
     const baseEvent = {
-      senior_id: senior.id,
+      senior_id: selectedSeniorId,
       intervenant_id: intervenantId || null,
-      label,
-      type,
+      label, type,
       scheduled_at: scheduledAt,
       status: 'a_venir',
       recurrence: recurrence !== 'none' ? recurrence : null,
       recurrence_days: recurrenceDays.length > 0 ? recurrenceDays.join(',') : null
     }
 
-    const { data, error } = await supabase
-      .from('events')
-      .insert(baseEvent)
-      .select('*, intervenants(*)')
+    const { data, error } = await supabase.from('events').insert(baseEvent).select('*, intervenants(*)')
 
     if (!error && data) {
       let allNewEvents = [data[0]]
-
-      // Générer les événements récurrents
       if (recurrence !== 'none') {
-        const recurringEvents = await generateRecurringEvents(baseEvent, senior.id)
+        const recurringEvents = await generateRecurringEvents(baseEvent)
         if (recurringEvents.length > 0) {
-          const { data: recurData } = await supabase
-            .from('events')
-            .insert(recurringEvents)
-            .select('*, intervenants(*)')
+          const { data: recurData } = await supabase.from('events').insert(recurringEvents).select('*, intervenants(*)')
           if (recurData) allNewEvents = [...allNewEvents, ...recurData]
         }
       }
-
-      setEvents(prev => [...prev, ...allNewEvents].sort((a, b) =>
-        new Date(a.scheduled_at) - new Date(b.scheduled_at)
-      ))
-
-      setLabel('')
-      setType('care')
-      setIntervenantId('')
-      setDate('')
-      setHeure('')
-      setRecurrence('none')
-      setRecurrenceDays([])
-      setShowForm(false)
+      setEvents(prev => [...prev, ...allNewEvents].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at)))
+      setLabel(''); setType('care'); setIntervenantId(''); setDate(''); setHeure('')
+      setRecurrence('none'); setRecurrenceDays([]); setShowForm(false)
     }
     setSaving(false)
   }
 
   async function deleteEvent(id) {
+    if (!isAdmin) return
     await supabase.from('events').delete().eq('id', id)
     setEvents(prev => prev.filter(e => e.id !== id))
   }
@@ -208,23 +163,18 @@ export default function Agenda() {
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
 
   const recurrenceLabel = {
-    none: 'Une seule fois',
-    daily: 'Tous les jours',
-    weekly: 'Toutes les semaines',
-    biweekly: 'Toutes les 2 semaines',
-    monthly: 'Tous les mois',
+    none: 'Une seule fois', daily: 'Tous les jours',
+    weekly: 'Toutes les semaines', biweekly: 'Toutes les 2 semaines', monthly: 'Tous les mois',
   }
 
   const groupedEvents = events.reduce((acc, e) => {
-    const date = new Date(e.scheduled_at).toLocaleDateString('fr-FR', {
-      weekday: 'long', day: 'numeric', month: 'long'
-    })
+    const date = new Date(e.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
     if (!acc[date]) acc[date] = []
     acc[date].push(e)
     return acc
   }, {})
 
-  if (loading) return (
+  if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
       <div style={{ color: '#888' }}>Chargement...</div>
     </div>
@@ -241,11 +191,22 @@ export default function Agenda() {
           </div>
         </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-          <div style={{ fontWeight: 'bold' }}>{senior?.name}</div>
-          <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{senior?.age} ans · {senior?.city}</div>
-        </div>
+        {isAdmin && seniors.length > 1 ? (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
+            <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
+              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
+              {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
+          </div>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
+            <div style={{ fontWeight: 'bold' }}>{selectedSenior?.name}</div>
+            <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
+          </div>
+        )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
@@ -270,18 +231,23 @@ export default function Agenda() {
             </Link>
           ))}
         </nav>
+
+        {isAdmin && (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ fontSize: 12, fontWeight: 'bold', color: '#ff8070' }}>🔐 Mode Admin</div>
+            <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>Suppression activée</div>
+          </div>
+        )}
       </aside>
 
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>📅 Agenda</h1>
-            <p style={{ color: '#888', fontSize: 13 }}>{events.length} événement{events.length > 1 ? 's' : ''} · {senior?.name}</p>
+            <p style={{ color: '#888', fontSize: 13 }}>{events.length} événement{events.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-          >
+          <button onClick={() => setShowForm(!showForm)}
+            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
             + Ajouter
           </button>
         </div>
@@ -289,7 +255,6 @@ export default function Agenda() {
         {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel événement</h2>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Description</label>
@@ -304,7 +269,6 @@ export default function Agenda() {
                 </select>
               </div>
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Intervenant</label>
@@ -325,7 +289,6 @@ export default function Agenda() {
                   style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
               </div>
             </div>
-
             <div style={{ marginBottom: 12 }}>
               <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Récurrence</label>
               <select value={recurrence} onChange={e => { setRecurrence(e.target.value); setRecurrenceDays([]) }}
@@ -337,33 +300,27 @@ export default function Agenda() {
                 <option value="monthly">Tous les mois</option>
               </select>
             </div>
-
             {recurrence === 'weekly' && (
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Jours de la semaine</label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {joursOptions.map(j => (
                     <button key={j.value} onClick={() => toggleDay(j.value)}
-                      style={{
-                        padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', fontWeight: 'bold',
+                      style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', fontWeight: 'bold',
                         background: recurrenceDays.includes(j.value) ? '#12201a' : '#f0f4f0',
                         color: recurrenceDays.includes(j.value) ? '#2ecc71' : '#888',
-                        border: recurrenceDays.includes(j.value) ? '1px solid #12201a' : '1px solid #ddd'
-                      }}>
+                        border: recurrenceDays.includes(j.value) ? '1px solid #12201a' : '1px solid #ddd' }}>
                       {j.label}
                     </button>
                   ))}
                 </div>
               </div>
             )}
-
             {recurrence !== 'none' && (
               <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
-                🔄 {recurrenceLabel[recurrence]} — les événements seront générés sur 3 mois
-                {recurrence === 'weekly' && recurrenceDays.length > 0 && ' · Jours : ' + recurrenceDays.map(d => joursOptions.find(j => j.value === d)?.label).join(', ')}
+                🔄 {recurrenceLabel[recurrence]} — événements générés sur 3 mois
               </div>
             )}
-
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={addEvent} disabled={saving || !label || !date || !heure}
                 style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
@@ -409,10 +366,12 @@ export default function Agenda() {
                       <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>
                         {cfg.label}
                       </div>
-                      <button onClick={() => deleteEvent(e.id)}
-                        style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
-                        ✕
-                      </button>
+                      {isAdmin && (
+                        <button onClick={() => deleteEvent(e.id)}
+                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
+                          🗑️
+                        </button>
+                      )}
                     </div>
                   </div>
                 )
