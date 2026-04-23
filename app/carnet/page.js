@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAdmin } from '../lib/useAdmin'
 
 export default function Carnet() {
   const [notes, setNotes] = useState([])
@@ -12,7 +13,7 @@ export default function Carnet() {
   const [showForm, setShowForm] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { isAdmin } = useAdmin()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -21,10 +22,6 @@ export default function Carnet() {
   )
 
   useEffect(() => {
-    // Vérifier si mode admin
-    const params = new URLSearchParams(window.location.search)
-    setIsAdmin(params.get('admin') === 'true')
-
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -81,8 +78,17 @@ export default function Carnet() {
   }
 
   async function deleteNote(id) {
+    if (!isAdmin) return
     await supabase.from('notes').delete().eq('id', id)
     setNotes(prev => prev.filter(n => n.id !== id))
+  }
+
+  async function editNote(id, content) {
+    if (!isAdmin) return
+    const newContent = prompt('Modifier la note :', content)
+    if (!newContent || newContent === content) return
+    await supabase.from('notes').update({ content: newContent }).eq('id', id)
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, content: newContent } : n))
   }
 
   const sourceLabel = (source) => {
@@ -142,18 +148,22 @@ export default function Carnet() {
             </Link>
           ))}
         </nav>
+
+        {isAdmin && (
+          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ fontSize: 12, fontWeight: 'bold', color: '#ff8070' }}>🔐 Mode Admin</div>
+            <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>Modification et suppression activées</div>
+          </div>
+        )}
       </aside>
 
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>
             📝 Carnet de suivi
-            {isAdmin && <span style={{ fontSize: 12, background: '#e74c3c', color: '#fff', borderRadius: 6, padding: '2px 8px', marginLeft: 10 }}>MODE ADMIN</span>}
           </h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-          >
+          <button onClick={() => setShowForm(!showForm)}
+            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
             + Ajouter une note
           </button>
         </div>
@@ -218,12 +228,16 @@ export default function Carnet() {
                       })}
                     </span>
                     {isAdmin && (
-                      <button
-                        onClick={() => deleteNote(n.id)}
-                        style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}
-                      >
-                        🗑️ Supprimer
-                      </button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => editNote(n.id, n.content)}
+                          style={{ background: '#f0f9ff', color: '#3498db', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
+                          ✏️ Modifier
+                        </button>
+                        <button onClick={() => deleteNote(n.id)}
+                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
+                          🗑️ Supprimer
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
