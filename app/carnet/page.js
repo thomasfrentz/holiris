@@ -12,6 +12,7 @@ export default function Carnet() {
   const [showForm, setShowForm] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -20,6 +21,10 @@ export default function Carnet() {
   )
 
   useEffect(() => {
+    // Vérifier si mode admin
+    const params = new URLSearchParams(window.location.search)
+    setIsAdmin(params.get('admin') === 'true')
+
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -73,6 +78,11 @@ export default function Carnet() {
       setShowForm(false)
     }
     setSaving(false)
+  }
+
+  async function deleteNote(id) {
+    await supabase.from('notes').delete().eq('id', id)
+    setNotes(prev => prev.filter(n => n.id !== id))
   }
 
   const sourceLabel = (source) => {
@@ -138,6 +148,7 @@ export default function Carnet() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>
             📝 Carnet de suivi
+            {isAdmin && <span style={{ fontSize: 12, background: '#e74c3c', color: '#fff', borderRadius: 6, padding: '2px 8px', marginLeft: 10 }}>MODE ADMIN</span>}
           </h1>
           <button
             onClick={() => setShowForm(!showForm)}
@@ -164,17 +175,12 @@ export default function Carnet() {
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', resize: 'none', boxSizing: 'border-box', marginBottom: 12 }}
             />
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={addNote}
-                disabled={saving || !newNote.trim()}
-                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-              >
+              <button onClick={addNote} disabled={saving || !newNote.trim()}
+                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
                 {saving ? 'Publication...' : 'Publier'}
               </button>
-              <button
-                onClick={() => { setShowForm(false); setNewNote('') }}
-                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}
-              >
+              <button onClick={() => { setShowForm(false); setNewNote('') }}
+                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
                 Annuler
               </button>
             </div>
@@ -199,25 +205,27 @@ export default function Carnet() {
                       <span style={{ fontSize: 12, fontWeight: 'bold', color: src.color }}>{src.label}</span>
                     </div>
                     {n.intervenant_name && (
-                      <div style={{
-                        fontSize: 13,
-                        color: '#333',
-                        fontWeight: '600',
-                        background: '#f0f4f0',
-                        padding: '3px 10px',
-                        borderRadius: 20,
-                        display: 'inline-block'
-                      }}>
+                      <div style={{ fontSize: 13, color: '#333', fontWeight: '600', background: '#f0f4f0', padding: '3px 10px', borderRadius: 20, display: 'inline-block' }}>
                         👤 {n.intervenant_name}
                       </div>
                     )}
                   </div>
-                  <span style={{ fontSize: 11, color: '#aaa', flexShrink: 0, marginLeft: 10 }}>
-                    {new Date(n.created_at).toLocaleString('fr-FR', {
-                      weekday: 'short', day: '2-digit', month: '2-digit',
-                      hour: '2-digit', minute: '2-digit'
-                    })}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 10 }}>
+                    <span style={{ fontSize: 11, color: '#aaa' }}>
+                      {new Date(n.created_at).toLocaleString('fr-FR', {
+                        weekday: 'short', day: '2-digit', month: '2-digit',
+                        hour: '2-digit', minute: '2-digit'
+                      })}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => deleteNote(n.id)}
+                        style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        🗑️ Supprimer
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>
                   {n.content}
