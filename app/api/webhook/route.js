@@ -53,6 +53,31 @@ async function synthesizeNote(text) {
   }
 }
 
+async function findSeniorByName(text, intervenantSeniorId) {
+  // Chercher tous les seniors
+  const { data: seniors } = await supabase
+    .from('seniors')
+    .select('id, name')
+
+  if (!seniors?.length) return intervenantSeniorId
+
+  const textLower = text.toLowerCase()
+
+  // Chercher si un prénom ou nom de senior est mentionné dans le message
+  for (const senior of seniors) {
+    const parts = senior.name.toLowerCase().split(' ')
+    for (const part of parts) {
+      if (part.length > 2 && textLower.includes(part)) {
+        console.log('Senior trouvé par nom dans le message:', senior.name)
+        return senior.id
+      }
+    }
+  }
+
+  // Fallback : senior lié à l'intervenant
+  return intervenantSeniorId
+}
+
 async function analyzeForAlerts(text, seniorId) {
   try {
     const completion = await groq.chat.completions.create({
@@ -60,7 +85,7 @@ async function analyzeForAlerts(text, seniorId) {
       messages: [
         {
           role: 'system',
-          content: `Tu es l'assistant IA de Holiris. Analyse ce message d'un intervenant et détecte les signaux faibles qui méritent une alerte pour la famille.
+          content: `Tu es l'assistant IA de Holiris. Analyse ce message et détecte les signaux faibles qui méritent une alerte pour la famille.
 
 Signaux à surveiller :
 - Douleurs (genou, dos, tête, abdomen...)
@@ -72,13 +97,12 @@ Signaux à surveiller :
 - Médicaments non pris
 - Symptômes inhabituels
 
-Réponds UNIQUEMENT en JSON avec ce format exact :
-{"alerte": true, "niveau": "warning", "message": "Description courte de l'alerte"}
+Réponds UNIQUEMENT en JSON :
+{"alerte": true, "niveau": "warning", "message": "Description courte"}
 ou
 {"alerte": false}
 
-Le niveau peut être "info", "warning" ou "danger".
-"danger" uniquement pour chute, douleur intense, confusion grave.`
+Niveaux : "info", "warning", "danger".`
         },
         { role: 'user', content: text }
       ],
@@ -152,17 +176,19 @@ export async function POST(request) {
       return twimlResponse('Message recu.')
     }
 
+    // Chercher le senior par nom dans le message
+    const finalSeniorId = await findSeniorByName(rawText, seniorId)
+
     if (noteContent) {
       await supabase.from('notes').insert({
-        senior_id: seniorId,
+        senior_id: finalSeniorId,
         content: noteContent,
         source: source,
         intervenant_name: intervenantName + (intervenantRole ? ' · ' + intervenantRole : ''),
         created_at: new Date().toISOString()
       })
 
-      // Analyser le message brut pour détecter les signaux faibles
-      await analyzeForAlerts(rawText, seniorId)
+      await analyzeForAlerts(rawText, finalSeniorId)
     }
 
     return twimlResponse('Note recue. Merci ' + intervenantName + ' !')
