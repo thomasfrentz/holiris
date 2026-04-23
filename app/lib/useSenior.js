@@ -29,7 +29,6 @@ export function useSenior() {
       setIsAdmin(famille.is_admin === true)
 
       if (famille.is_admin) {
-        // Admin voit tous les seniors
         const { data: allSeniors } = await supabase
           .from('seniors')
           .select('*')
@@ -37,7 +36,6 @@ export function useSenior() {
         setSeniors(allSeniors || [])
         setSelectedSeniorId(famille.selected_senior_id || allSeniors?.[0]?.id)
       } else {
-        // Utilisateur normal voit uniquement son senior
         const { data: seniorData } = await supabase
           .from('seniors')
           .select('*')
@@ -58,6 +56,7 @@ export function useSenior() {
       .from('famille')
       .update({ selected_senior_id: seniorId })
       .eq('user_id', user.id)
+    window.location.reload()
   }
 
   const selectedSenior = seniors.find(s => s.id === selectedSeniorId)
