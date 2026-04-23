@@ -15,6 +15,7 @@ export default function Profil() {
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [lien, setLien] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
 
   const router = useRouter()
 
@@ -38,11 +39,11 @@ export default function Profil() {
       if (familleData?.[0]) {
         const f = familleData[0]
         setFamille(f)
-        // Découper le nom en prénom/nom si déjà renseigné
         const parts = (f.name || '').split(' ')
         setPrenom(parts[0] || '')
         setNom(parts.slice(1).join(' ') || '')
         setLien(f.role || '')
+        setWhatsapp(f.whatsapp || '')
       }
 
       const { data: seniors } = await supabase
@@ -57,32 +58,26 @@ export default function Profil() {
   }, [])
 
   async function saveProfil() {
-  if (!prenom || !nom) return
-  setSaving(true)
+    if (!prenom || !nom) return
+    setSaving(true)
 
-  console.log('Sauvegarde pour user_id:', user.id)
-  console.log('Données:', { name: prenom + ' ' + nom, role: lien })
+    let whatsappFormatted = whatsapp.replace(/\s/g, '').replace(/^0/, '+33')
 
-  const { data, error } = await supabase
-    .from('famille')
-    .update({
-      name: prenom + ' ' + nom,
-      role: lien
-    })
-    .eq('user_id', user.id)
-    .select()
+    const { error } = await supabase
+      .from('famille')
+      .update({
+        name: prenom + ' ' + nom,
+        role: lien,
+        whatsapp: whatsappFormatted || null
+      })
+      .eq('user_id', user.id)
 
-  console.log('Résultat:', data, 'Erreur:', error)
-
-  if (!error) {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-  } else {
-    console.error('Erreur sauvegarde:', error)
-    alert('Erreur: ' + error.message)
+    if (!error) {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    }
+    setSaving(false)
   }
-  setSaving(false)
-}
 
   async function logout() {
     await supabase.auth.signOut()
@@ -142,61 +137,57 @@ export default function Profil() {
         </nav>
 
         <div style={{ marginTop: 'auto' }}>
-          <button
-            onClick={logout}
-            style={{ width: '100%', background: 'rgba(231,76,60,0.15)', color: '#ff8070', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 8, padding: '10px 0', fontSize: 13, cursor: 'pointer', fontWeight: 'bold' }}
-          >
+          <button onClick={logout}
+            style={{ width: '100%', background: 'rgba(231,76,60,0.15)', color: '#ff8070', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 8, padding: '10px 0', fontSize: 13, cursor: 'pointer', fontWeight: 'bold' }}>
             🚪 Se déconnecter
           </button>
         </div>
       </aside>
 
       <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>
-          👤 Mon profil
-        </h1>
-        <p style={{ color: '#888', marginBottom: 28, fontSize: 13 }}>
-          {user?.email}
-        </p>
+        <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>👤 Mon profil</h1>
+        <p style={{ color: '#888', marginBottom: 28, fontSize: 13 }}>{user?.email}</p>
 
         <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', maxWidth: 500 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 20 }}>
-            Mes informations
-          </h2>
+          <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 20 }}>Mes informations</h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Prénom</label>
-              <input
-                placeholder="Votre prénom"
-                value={prenom}
-                onChange={e => setPrenom(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
-              />
+              <input placeholder="Votre prénom" value={prenom} onChange={e => setPrenom(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Nom</label>
-              <input
-                placeholder="Votre nom"
-                value={nom}
-                onChange={e => setNom(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
-              />
+              <input placeholder="Votre nom" value={nom} onChange={e => setNom(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
             </div>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>
+              Lien avec {senior?.name}
+            </label>
+            <select value={lien} onChange={e => setLien(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
+              <option value="">Sélectionnez votre lien</option>
+              {liens.map(l => <option key={l}>{l}</option>)}
+            </select>
           </div>
 
           <div style={{ marginBottom: 20 }}>
             <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>
-              Lien avec {senior?.name}
+              📱 Numéro WhatsApp
             </label>
-            <select
-              value={lien}
-              onChange={e => setLien(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}
-            >
-              <option value="">Sélectionnez votre lien</option>
-              {liens.map(l => <option key={l}>{l}</option>)}
-            </select>
+            <input
+              placeholder="Ex: 06 12 34 56 78"
+              value={whatsapp}
+              onChange={e => setWhatsapp(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #25D366', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
+            />
+            <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+              💡 Renseignez votre numéro pour envoyer des notes via WhatsApp
+            </div>
           </div>
 
           {saved && (
@@ -205,19 +196,14 @@ export default function Profil() {
             </div>
           )}
 
-          <button
-            onClick={saveProfil}
-            disabled={saving || !prenom || !nom}
-            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-          >
+          <button onClick={saveProfil} disabled={saving || !prenom || !nom}
+            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
             {saving ? 'Sauvegarde...' : 'Sauvegarder'}
           </button>
         </div>
 
         <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', maxWidth: 500, marginTop: 16 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 8 }}>
-            Mon proche
-          </h2>
+          <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 8 }}>Mon proche</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ fontSize: 36 }}>👵</div>
             <div>

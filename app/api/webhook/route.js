@@ -53,29 +53,23 @@ async function synthesizeNote(text) {
   }
 }
 
-async function findSeniorByName(text, intervenantSeniorId) {
-  // Chercher tous les seniors
-  const { data: seniors } = await supabase
-    .from('seniors')
-    .select('id, name')
-
-  if (!seniors?.length) return intervenantSeniorId
+async function findSeniorByName(text, fallbackSeniorId) {
+  const { data: seniors } = await supabase.from('seniors').select('id, name')
+  if (!seniors?.length) return fallbackSeniorId
 
   const textLower = text.toLowerCase()
 
-  // Chercher si un prénom ou nom de senior est mentionné dans le message
   for (const senior of seniors) {
     const parts = senior.name.toLowerCase().split(' ')
     for (const part of parts) {
       if (part.length > 2 && textLower.includes(part)) {
-        console.log('Senior trouvé par nom dans le message:', senior.name)
+        console.log('Senior trouvé par nom:', senior.name)
         return senior.id
       }
     }
   }
 
-  // Fallback : senior lié à l'intervenant
-  return intervenantSeniorId
+  return fallbackSeniorId
 }
 
 async function analyzeForAlerts(text, seniorId) {
@@ -140,6 +134,7 @@ export async function POST(request) {
     const phoneNumber = from.replace('whatsapp:', '')
     console.log('Message de:', phoneNumber)
 
+    // Chercher d'abord dans intervenants
     const { data: intervenantData } = await supabase
       .from('intervenants')
       .select('*')
@@ -147,16 +142,32 @@ export async function POST(request) {
       .limit(1)
 
     let seniorId = null
-    let intervenantName = 'Intervenant inconnu'
+    let intervenantName = 'Inconnu'
     let intervenantRole = ''
 
     if (intervenantData && intervenantData.length > 0) {
       seniorId = intervenantData[0].senior_id
       intervenantName = intervenantData[0].name
       intervenantRole = intervenantData[0].role
+      console.log('Intervenant trouvé:', intervenantName)
     } else {
-      const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
-      seniorId = seniors && seniors[0] ? seniors[0].id : null
+      // Chercher dans famille
+      const { data: familleData } = await supabase
+        .from('famille')
+        .select('*')
+        .eq('whatsapp', phoneNumber)
+        .limit(1)
+
+      if (familleData && familleData.length > 0) {
+        seniorId = familleData[0].senior_id
+        intervenantName = familleData[0].name || familleData[0].email
+        intervenantRole = familleData[0].role || 'Famille'
+        console.log('Membre famille trouvé:', intervenantName)
+      } else {
+        const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
+        seniorId = seniors && seniors[0] ? seniors[0].id : null
+        console.log('Numéro non reconnu, senior par défaut')
+      }
     }
 
     if (!seniorId) return twimlResponse('Erreur : aucun senior trouve.')
@@ -176,7 +187,6 @@ export async function POST(request) {
       return twimlResponse('Message recu.')
     }
 
-    // Chercher le senior par nom dans le message
     const finalSeniorId = await findSeniorByName(rawText, seniorId)
 
     if (noteContent) {
