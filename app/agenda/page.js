@@ -12,18 +12,29 @@ export default function Agenda() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Formulaire
   const [label, setLabel] = useState('')
   const [type, setType] = useState('care')
   const [intervenantId, setIntervenantId] = useState('')
   const [date, setDate] = useState('')
   const [heure, setHeure] = useState('')
+  const [recurrence, setRecurrence] = useState('none')
+  const [recurrenceDays, setRecurrenceDays] = useState([])
 
   const router = useRouter()
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
+
+  const joursOptions = [
+    { value: '1', label: 'Lun' },
+    { value: '2', label: 'Mar' },
+    { value: '3', label: 'Mer' },
+    { value: '4', label: 'Jeu' },
+    { value: '5', label: 'Ven' },
+    { value: '6', label: 'Sam' },
+    { value: '0', label: 'Dim' },
+  ]
 
   useEffect(() => {
     async function loadData() {
@@ -63,30 +74,113 @@ export default function Agenda() {
     loadData()
   }, [])
 
+  function toggleDay(day) {
+    setRecurrenceDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    )
+  }
+
+  async function generateRecurringEvents(baseEvent, seniorId) {
+    const events = []
+    const startDate = new Date(baseEvent.scheduled_at)
+    const endDate = new Date(startDate)
+    endDate.setMonth(endDate.getMonth() + 3) // Générer 3 mois d'événements
+
+    if (recurrence === 'daily') {
+      let current = new Date(startDate)
+      current.setDate(current.getDate() + 1)
+      while (current <= endDate) {
+        events.push({
+          ...baseEvent,
+          scheduled_at: new Date(current).toISOString(),
+        })
+        current.setDate(current.getDate() + 1)
+      }
+    } else if (recurrence === 'weekly' && recurrenceDays.length > 0) {
+      let current = new Date(startDate)
+      current.setDate(current.getDate() + 1)
+      while (current <= endDate) {
+        if (recurrenceDays.includes(String(current.getDay()))) {
+          events.push({
+            ...baseEvent,
+            scheduled_at: new Date(current).toISOString(),
+          })
+        }
+        current.setDate(current.getDate() + 1)
+      }
+    } else if (recurrence === 'biweekly') {
+      let current = new Date(startDate)
+      current.setDate(current.getDate() + 14)
+      while (current <= endDate) {
+        events.push({
+          ...baseEvent,
+          scheduled_at: new Date(current).toISOString(),
+        })
+        current.setDate(current.getDate() + 14)
+      }
+    } else if (recurrence === 'monthly') {
+      let current = new Date(startDate)
+      current.setMonth(current.getMonth() + 1)
+      while (current <= endDate) {
+        events.push({
+          ...baseEvent,
+          scheduled_at: new Date(current).toISOString(),
+        })
+        current.setMonth(current.getMonth() + 1)
+      }
+    }
+
+    return events
+  }
+
   async function addEvent() {
     if (!label || !date || !heure) return
     setSaving(true)
 
     const scheduledAt = new Date(date + 'T' + heure).toISOString()
 
-    const { data, error } = await supabase.from('events').insert({
+    const baseEvent = {
       senior_id: senior.id,
       intervenant_id: intervenantId || null,
       label,
       type,
       scheduled_at: scheduledAt,
-      status: 'a_venir'
-    }).select('*, intervenants(*)')
+      status: 'a_venir',
+      recurrence: recurrence !== 'none' ? recurrence : null,
+      recurrence_days: recurrenceDays.length > 0 ? recurrenceDays.join(',') : null
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .insert(baseEvent)
+      .select('*, intervenants(*)')
 
     if (!error && data) {
-      setEvents(prev => [...prev, data[0]].sort((a, b) =>
+      let allNewEvents = [data[0]]
+
+      // Générer les événements récurrents
+      if (recurrence !== 'none') {
+        const recurringEvents = await generateRecurringEvents(baseEvent, senior.id)
+        if (recurringEvents.length > 0) {
+          const { data: recurData } = await supabase
+            .from('events')
+            .insert(recurringEvents)
+            .select('*, intervenants(*)')
+          if (recurData) allNewEvents = [...allNewEvents, ...recurData]
+        }
+      }
+
+      setEvents(prev => [...prev, ...allNewEvents].sort((a, b) =>
         new Date(a.scheduled_at) - new Date(b.scheduled_at)
       ))
+
       setLabel('')
       setType('care')
       setIntervenantId('')
       setDate('')
       setHeure('')
+      setRecurrence('none')
+      setRecurrenceDays([])
       setShowForm(false)
     }
     setSaving(false)
@@ -113,7 +207,14 @@ export default function Agenda() {
 
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
 
-  // Grouper les événements par date
+  const recurrenceLabel = {
+    none: 'Une seule fois',
+    daily: 'Tous les jours',
+    weekly: 'Toutes les semaines',
+    biweekly: 'Toutes les 2 semaines',
+    monthly: 'Tous les mois',
+  }
+
   const groupedEvents = events.reduce((acc, e) => {
     const date = new Date(e.scheduled_at).toLocaleDateString('fr-FR', {
       weekday: 'long', day: 'numeric', month: 'long'
@@ -188,70 +289,88 @@ export default function Agenda() {
         {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel événement</h2>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Description</label>
-                <input
-                  placeholder="Ex: Passage infirmière"
-                  value={label}
-                  onChange={e => setLabel(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
-                />
+                <input placeholder="Ex: Passage infirmière" value={label} onChange={e => setLabel(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Type</label>
-                <select
-                  value={type}
-                  onChange={e => setType(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}
-                >
+                <select value={type} onChange={e => setType(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
                   {typeOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Intervenant</label>
-                <select
-                  value={intervenantId}
-                  onChange={e => setIntervenantId(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}
-                >
+                <select value={intervenantId} onChange={e => setIntervenantId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
                   <option value="">Aucun</option>
                   {intervenants.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Date</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
-                />
+                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Date de début</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Heure</label>
-                <input
-                  type="time"
-                  value={heure}
-                  onChange={e => setHeure(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
-                />
+                <input type="time" value={heure} onChange={e => setHeure(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
               </div>
             </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Récurrence</label>
+              <select value={recurrence} onChange={e => { setRecurrence(e.target.value); setRecurrenceDays([]) }}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
+                <option value="none">Une seule fois</option>
+                <option value="daily">Tous les jours</option>
+                <option value="weekly">Toutes les semaines (choisir les jours)</option>
+                <option value="biweekly">Toutes les 2 semaines</option>
+                <option value="monthly">Tous les mois</option>
+              </select>
+            </div>
+
+            {recurrence === 'weekly' && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Jours de la semaine</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {joursOptions.map(j => (
+                    <button key={j.value} onClick={() => toggleDay(j.value)}
+                      style={{
+                        padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', fontWeight: 'bold',
+                        background: recurrenceDays.includes(j.value) ? '#12201a' : '#f0f4f0',
+                        color: recurrenceDays.includes(j.value) ? '#2ecc71' : '#888',
+                        border: recurrenceDays.includes(j.value) ? '1px solid #12201a' : '1px solid #ddd'
+                      }}>
+                      {j.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recurrence !== 'none' && (
+              <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
+                🔄 {recurrenceLabel[recurrence]} — les événements seront générés sur 3 mois
+                {recurrence === 'weekly' && recurrenceDays.length > 0 && ' · Jours : ' + recurrenceDays.map(d => joursOptions.find(j => j.value === d)?.label).join(', ')}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={addEvent}
-                disabled={saving || !label || !date || !heure}
-                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                {saving ? 'Ajout...' : 'Ajouter'}
+              <button onClick={addEvent} disabled={saving || !label || !date || !heure}
+                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+                {saving ? 'Création...' : recurrence !== 'none' ? 'Créer les événements récurrents' : 'Ajouter'}
               </button>
-              <button
-                onClick={() => setShowForm(false)}
-                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}
-              >
+              <button onClick={() => setShowForm(false)}
+                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
                 Annuler
               </button>
             </div>
@@ -277,7 +396,10 @@ export default function Agenda() {
                   <div key={e.id} style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', borderLeft: '4px solid ' + cfg.color, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
                     <div style={{ fontSize: 24 }}>{typeIcon[e.type] ?? '📋'}</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold', fontSize: 14, color: '#12201a' }}>{e.label}</div>
+                      <div style={{ fontWeight: 'bold', fontSize: 14, color: '#12201a' }}>
+                        {e.label}
+                        {e.recurrence && <span style={{ fontSize: 11, color: '#2ecc71', marginLeft: 8 }}>🔄 {recurrenceLabel[e.recurrence]}</span>}
+                      </div>
                       <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
                         {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                         {e.intervenants && ' · ' + e.intervenants.name}
@@ -287,10 +409,8 @@ export default function Agenda() {
                       <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>
                         {cfg.label}
                       </div>
-                      <button
-                        onClick={() => deleteEvent(e.id)}
-                        style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
-                      >
+                      <button onClick={() => deleteEvent(e.id)}
+                        style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
                         ✕
                       </button>
                     </div>
