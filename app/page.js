@@ -10,6 +10,7 @@ export default function Home() {
   const [events, setEvents] = useState([])
   const [notes, setNotes] = useState([])
   const [totalNotes, setTotalNotes] = useState(0)
+  const [alertes, setAlertes] = useState([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -20,14 +21,9 @@ export default function Home() {
 
   useEffect(() => {
     async function loadData() {
-      // Vérifier l'authentification
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      if (!user) { router.push('/login'); return }
 
-      // Récupérer le senior lié à cet utilisateur
       const { data: familleData } = await supabase
         .from('famille')
         .select('senior_id')
@@ -35,12 +31,8 @@ export default function Home() {
         .limit(1)
 
       const seniorId = familleData?.[0]?.senior_id
-      if (!seniorId) {
-        router.push('/login')
-        return
-      }
+      if (!seniorId) { router.push('/login'); return }
 
-      // Charger les données du senior
       const { data: seniors } = await supabase
         .from('seniors')
         .select('*')
@@ -68,13 +60,25 @@ export default function Home() {
         .eq('senior_id', seniorId)
       setTotalNotes(count || 0)
 
+      const { data: alertesData } = await supabase
+        .from('alertes')
+        .select('*')
+        .eq('senior_id', seniorId)
+        .eq('lu', false)
+        .order('created_at', { ascending: false })
+      setAlertes(alertesData || [])
+
       setLoading(false)
     }
-
     loadData()
   }, [])
 
   const silenceCount = events.filter(e => e.status === 'silence').length
+
+  async function logout() {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
 
   if (loading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
@@ -108,7 +112,9 @@ export default function Home() {
             { icon: '⚡', label: 'Flux en temps réel', href: '/' },
             { icon: '📅', label: 'Agenda', href: '/agenda' },
             { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
             { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
           ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
@@ -131,6 +137,15 @@ export default function Home() {
             <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>L'IA a relancé les intervenants</div>
           </div>
         )}
+
+        <div style={{ marginTop: 'auto' }}>
+          <button
+            onClick={logout}
+            style={{ width: '100%', background: 'rgba(231,76,60,0.15)', color: '#ff8070', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 8, padding: '10px 0', fontSize: 13, cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            🚪 Se déconnecter
+          </button>
+        </div>
       </aside>
 
       <Dashboard
@@ -138,6 +153,7 @@ export default function Home() {
         initialEvents={events}
         initialNotes={notes}
         initialTotalNotes={totalNotes}
+        initialAlertes={alertes}
         supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL}
         supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       />
