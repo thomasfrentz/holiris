@@ -10,8 +10,8 @@ export default function Intervenants() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [inviteSent, setInviteSent] = useState(null)
 
-  // Formulaire
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [role, setRole] = useState('')
@@ -60,11 +60,10 @@ export default function Intervenants() {
     if (!prenom || !nom || !role || !telephone) return
     setSaving(true)
 
-    // Formater le numéro WhatsApp
     let whatsapp = telephone.replace(/\s/g, '').replace(/^0/, '+33')
 
     const { error } = await supabase.from('intervenants').insert({
-      name: `${prenom} ${nom}`,
+      name: prenom + ' ' + nom,
       role,
       phone: telephone,
       whatsapp,
@@ -72,6 +71,25 @@ export default function Intervenants() {
     })
 
     if (!error) {
+      // Envoyer le message d'invitation
+      try {
+        const response = await fetch('/api/invite-intervenant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            whatsapp,
+            prenom,
+            nom,
+            role,
+            seniorName: senior.name
+          })
+        })
+        const data = await response.json()
+        if (data.success) setInviteSent(prenom + ' ' + nom)
+      } catch (e) {
+        console.error('Erreur envoi invitation:', e)
+      }
+
       setPrenom('')
       setNom('')
       setRole('')
@@ -84,6 +102,8 @@ export default function Intervenants() {
         .eq('senior_id', senior.id)
         .order('created_at', { ascending: false })
       setIntervenants(data || [])
+
+      setTimeout(() => setInviteSent(null), 5000)
     }
     setSaving(false)
   }
@@ -94,14 +114,10 @@ export default function Intervenants() {
   }
 
   const roleIcons = {
-    'Infirmière': '💉',
-    'Infirmier': '💉',
-    'Kinésithérapeute': '🦵',
-    'Aide à domicile': '🤝',
-    'Médecin': '🏥',
-    'Cardiologue': '❤️',
-    'Pharmacien': '💊',
-    'Autre': '👤',
+    'Infirmière': '💉', 'Infirmier': '💉',
+    'Kinésithérapeute': '🦵', 'Aide à domicile': '🤝',
+    'Médecin': '🏥', 'Cardiologue': '❤️',
+    'Pharmacien': '💊', 'Autre': '👤',
   }
 
   if (loading) return (
@@ -134,6 +150,7 @@ export default function Intervenants() {
             { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
             { icon: '👥', label: 'Intervenants', href: '/intervenants' },
             { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
           ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
@@ -165,29 +182,24 @@ export default function Intervenants() {
           </button>
         </div>
 
+        {inviteSent && (
+          <div style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#27ae60', fontWeight: 'bold' }}>
+            ✅ Message d'invitation envoyé à {inviteSent} sur WhatsApp !
+          </div>
+        )}
+
         {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel intervenant</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <input
-                placeholder="Prénom"
-                value={prenom}
-                onChange={e => setPrenom(e.target.value)}
-                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }}
-              />
-              <input
-                placeholder="Nom"
-                value={nom}
-                onChange={e => setNom(e.target.value)}
-                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }}
-              />
+              <input placeholder="Prénom" value={prenom} onChange={e => setPrenom(e.target.value)}
+                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
+              <input placeholder="Nom" value={nom} onChange={e => setNom(e.target.value)}
+                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <select
-                value={role}
-                onChange={e => setRole(e.target.value)}
-                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}
-              >
+              <select value={role} onChange={e => setRole(e.target.value)}
+                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
                 <option value="">Rôle / Fonction</option>
                 <option>Infirmière</option>
                 <option>Infirmier</option>
@@ -198,28 +210,19 @@ export default function Intervenants() {
                 <option>Pharmacien</option>
                 <option>Autre</option>
               </select>
-              <input
-                placeholder="Téléphone (ex: 06 12 34 56 78)"
-                value={telephone}
-                onChange={e => setTelephone(e.target.value)}
-                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }}
-              />
+              <input placeholder="Téléphone (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
+                style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
             </div>
             <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
-              💡 Ce numéro sera utilisé pour les relances automatiques WhatsApp et pour identifier les notes vocales de cet intervenant.
+              💡 Un message de bienvenue sera automatiquement envoyé sur WhatsApp pour expliquer le fonctionnement d'Holiris.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={addIntervenant}
-                disabled={saving || !prenom || !nom || !role || !telephone}
-                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                {saving ? 'Ajout...' : 'Ajouter'}
+              <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
+                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+                {saving ? 'Ajout...' : 'Ajouter et inviter'}
               </button>
-              <button
-                onClick={() => setShowForm(false)}
-                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}
-              >
+              <button onClick={() => setShowForm(false)}
+                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
                 Annuler
               </button>
             </div>
@@ -235,13 +238,11 @@ export default function Intervenants() {
                 <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{i.role}</div>
                 <div style={{ fontSize: 12, color: '#5a8a6a', marginTop: 4 }}>
                   📱 {i.phone}
-                  {i.whatsapp && <span style={{ marginLeft: 8, color: '#25D366' }}>· WhatsApp: {i.whatsapp}</span>}
+                  {i.whatsapp && <span style={{ marginLeft: 8, color: '#25D366' }}>· WhatsApp ✓</span>}
                 </div>
               </div>
-              <button
-                onClick={() => deleteIntervenant(i.id)}
-                style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}
-              >
+              <button onClick={() => deleteIntervenant(i.id)}
+                style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
                 Supprimer
               </button>
             </div>
