@@ -3,127 +3,125 @@ import Groq from 'groq-sdk'
 import { createClient } from '@supabase/supabase-js'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-function twimlResponse(message) {
-  return new NextResponse(
-    '<?xml version="1.0" encoding="UTF-8"?><Response><Message>' + message + '</Message></Response>',
-    { headers: { 'Content-Type': 'text/xml' } }
-  )
-}
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const mode = searchParams.get('hub.mode')
+  const token = searchParams.get('hub.verify_token')
+  const challenge = searchParams.get('hub.challenge')
 
-async function transcribeAudio(mediaUrl) {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID
-  const authToken = process.env.TWILIO_AUTH_TOKEN
-  const response = await fetch(mediaUrl, {
-    headers: {
-      'Authorization': 'Basic ' + Buffer.from(accountSid + ':' + authToken).toString('base64')
-    }
-  })
-  const audioBuffer = await response.arrayBuffer()
-  const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
-  const transcription = await groq.audio.transcriptions.create({
-    file: audioFile,
-    model: 'whisper-large-v3',
-    language: 'fr'
-  })
-  return transcription.text
-}
-
-async function synthesizeNote(text) {
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        system: 'Tu es assistant IA de Holiris. Transforme le message en note professionnelle en 2-3 phrases. Mets en avant etat general, points attention et actions effectuees.',
-        messages: [{ role: 'user', content: text }]
-      })
-    })
-    const data = await response.json()
-    console.log('Anthropic status:', response.status)
-    console.log('Anthropic data:', JSON.stringify(data))
-    if (data.content && data.content[0] && data.content[0].text) {
-      return data.content[0].text
-    }
-    return text
-  } catch (error) {
-    console.error('Erreur Anthropic:', error.message)
-    return text
+  if (mode === 'subscribe' && token === 'holiris2024') {
+    return new NextResponse(challenge, { status: 200 })
   }
+  return new NextResponse('Forbidden', { status: 403 })
 }
 
 export async function POST(request) {
   try {
-    const formData = await request.formData()
-    const from = formData.get('From') || ''
-    const body = formData.get('Body') || ''
-    const numMedia = parseInt(formData.get('NumMedia') || '0')
-    const mediaUrl = formData.get('MediaUrl0') || ''
-    const mediaType = formData.get('MediaContentType0') || ''
+    const body = await request.json()
+    const entry = body.entry?.[0]
+    const changes = entry?.changes?.[0]
+    const message = changes?.value?.messages?.[0]
 
-    const phoneNumber = from.replace('whatsapp:', '')
-    console.log('Message de:', phoneNumber)
+    if (!message) return NextResponse.json({ status: 'no message' })
+
+    const from = message.from
+    const messageType = message.type
+
+    console.log('Message Meta reçu de:', from, 'type:', messageType)
 
     const { data: intervenantData } = await supabase
       .from('intervenants')
       .select('*')
-      .or('whatsapp.eq.' + phoneNumber + ',phone.eq.' + phoneNumber)
+      .or('whatsapp.eq.+' + from + ',phone.eq.+' + from)
       .limit(1)
 
     let seniorId = null
     let intervenantName = 'Intervenant inconnu'
     let intervenantRole = ''
 
-    if (intervenantData && intervenantData.length > 0) {
+    if (intervenantData?.length > 0) {
       seniorId = intervenantData[0].senior_id
       intervenantName = intervenantData[0].name
       intervenantRole = intervenantData[0].role
     } else {
       const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
-      seniorId = seniors && seniors[0] ? seniors[0].id : null
+      seniorId = seniors?.[0]?.id
     }
 
-    if (!seniorId) return twimlResponse('Erreur : aucun senior trouve.')
+    if (!seniorId) return NextResponse.json({ status: 'no senior' })
 
     let noteContent = ''
     let source = 'whatsapp_text'
 
-    if (numMedia > 0 && mediaType.includes('audio')) {
-      const transcription = await transcribeAudio(mediaUrl)
+    if (messageType === 'text') {
+      noteContent = await synthesizeNote(message.text.body)
+      source = 'whatsapp_text'
+    } else if (messageType === 'audio') {
+      const transcription = await transcribeMetaAudio(message.audio.id)
       noteContent = await synthesizeNote(transcription)
       source = 'whatsapp_audio'
-    } else if (body) {
-      noteContent = await synthesizeNote(body)
-      source = 'whatsapp_text'
-    } else {
-      return twimlResponse('Message recu.')
     }
 
     if (noteContent) {
       await supabase.from('notes').insert({
         senior_id: seniorId,
         content: noteContent,
-        source: source,
+        source,
         intervenant_name: intervenantName + (intervenantRole ? ' · ' + intervenantRole : ''),
         created_at: new Date().toISOString()
       })
     }
 
-    return twimlResponse('Note recue. Merci ' + intervenantName + ' !')
+    return NextResponse.json({ status: 'ok' })
 
   } catch (error) {
-    console.error('Erreur webhook:', error.message)
-    return twimlResponse('Message recu.')
+    console.error('Erreur webhook Meta:', error.message)
+    return NextResponse.json({ status: 'error' }, { status: 500 })
+  }
+}
+
+async function transcribeMetaAudio(audioId) {
+  const urlResponse = await fetch(
+    'https://graph.facebook.com/v18.0/' + audioId,
+    { headers: { 'Authorization': 'Bearer ' + process.env.META_WHATSAPP_TOKEN } }
+  )
+  const urlData = await urlResponse.json()
+
+  const audioResponse = await fetch(urlData.url, {
+    headers: { 'Authorization': 'Bearer ' + process.env.META_WHATSAPP_TOKEN }
+  })
+  const audioBuffer = await audioResponse.arrayBuffer()
+  const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
+
+  const transcription = await groq.audio.transcriptions.create({
+    file: audioFile,
+    model: 'whisper-large-v3',
+    language: 'fr'
+  })
+
+  return transcription.text
+}
+
+async function synthesizeNote(text) {
+  try {
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        {
+          role: 'system',
+          content: 'Tu es l\'assistant de Holiris. Transforme ce message en note courte et naturelle en 1-2 phrases maximum. Sois direct et factuel. Commence directement par l\'information, sans formule de politesse, sans objet, sans signature. Exemple : "Tension correcte à 12/8, bonne humeur ce matin." ou "Séance de kiné effectuée, progression du genou droit."'
+        },
+        { role: 'user', content: text }
+      ],
+      max_tokens: 150
+    })
+    return completion.choices[0]?.message?.content || text
+  } catch {
+    return text
   }
 }
