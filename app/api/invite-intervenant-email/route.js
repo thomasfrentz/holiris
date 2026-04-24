@@ -23,7 +23,7 @@ export async function POST(request) {
 
     // Envoyer l'email
     const { error } = await resend.emails.send({
-      from: 'Holiris <onboarding@resend.dev>',
+      from: 'Holiris <contact@holiris.fr>',
       to: email,
       subject: 'Votre accès Holiris — Suivi de ' + seniorName,
       html: `
