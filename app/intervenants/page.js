@@ -11,12 +11,14 @@ export default function Intervenants() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(null)
+  const [emailSent, setEmailSent] = useState(null)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
 
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [role, setRole] = useState('')
   const [telephone, setTelephone] = useState('')
+  const [email, setEmail] = useState('')
 
   const router = useRouter()
   const supabase = createBrowserClient(
@@ -56,21 +58,43 @@ export default function Intervenants() {
 
     let whatsapp = telephone.replace(/\s/g, '').replace(/^0/, '+33')
 
-    const { error } = await supabase.from('intervenants').insert({
+    const { data, error } = await supabase.from('intervenants').insert({
       name: prenom + ' ' + nom,
       role, phone: telephone, whatsapp,
+      email: email || null,
       senior_id: selectedSeniorId
-    })
+    }).select()
 
-    if (!error) {
-      setPrenom(''); setNom(''); setRole(''); setTelephone('')
+    if (!error && data) {
+      // Envoyer email si renseigné
+      if (email && data[0]) {
+        try {
+          const res = await fetch('/api/invite-intervenant-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              intervenantId: data[0].id,
+              email,
+              prenom,
+              nom,
+              role,
+              seniorName: selectedSenior?.name
+            })
+          })
+          const result = await res.json()
+          if (result.success) setEmailSent(prenom + ' ' + nom)
+        } catch (e) { console.error('Erreur email:', e) }
+      }
+
+      setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
       setShowForm(false)
 
-      const { data } = await supabase
+      const { data: updated } = await supabase
         .from('intervenants').select('*')
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
-      setIntervenants(data || [])
+      setIntervenants(updated || [])
+      setTimeout(() => setEmailSent(null), 5000)
     }
     setSaving(false)
   }
@@ -83,7 +107,6 @@ export default function Intervenants() {
 
   function copyInvitation(intervenant) {
     const message = 'Bonjour ' + intervenant.name.split(' ')[0] + ' 👋\n\nJe vous invite à utiliser Holiris pour le suivi de ' + selectedSenior?.name + '.\n\nAprès chaque passage, envoyez simplement un message vocal ou texte sur WhatsApp au +15556480002.\n\n✅ Partagez : état général, humeur, activités\n❌ Ne partagez pas : diagnostics, ordonnances, données médicales\n\nPour créer votre compte : https://holiris.fr/login\n\nMerci pour votre accompagnement 🌸'
-
     navigator.clipboard.writeText(message).then(() => {
       setCopied(intervenant.id)
       setTimeout(() => setCopied(null), 3000)
@@ -168,6 +191,12 @@ export default function Intervenants() {
           </button>
         </div>
 
+        {emailSent && (
+          <div style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#27ae60', fontWeight: 'bold' }}>
+            ✅ Email d'invitation envoyé à {emailSent} !
+          </div>
+        )}
+
         {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel intervenant</h2>
@@ -177,7 +206,7 @@ export default function Intervenants() {
               <input placeholder="Nom" value={nom} onChange={e => setNom(e.target.value)}
                 style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <select value={role} onChange={e => setRole(e.target.value)}
                 style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
                 <option value="">Rôle / Fonction</option>
@@ -189,8 +218,12 @@ export default function Intervenants() {
               <input placeholder="Téléphone (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
                 style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
             </div>
-            <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
-              💡 Après l'ajout, copiez le message d'invitation et envoyez-le par SMS ou WhatsApp.
+            <div style={{ marginBottom: 16 }}>
+              <input placeholder="Email (optionnel — pour envoyer l'invitation)" value={email} onChange={e => setEmail(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #b8d8bc', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
+              <div style={{ fontSize: 11, color: '#5a8a6a', marginTop: 4 }}>
+                💡 Un email avec un code d'accès sera envoyé automatiquement
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
@@ -216,12 +249,14 @@ export default function Intervenants() {
                   <div style={{ fontSize: 12, color: '#5a8a6a', marginTop: 4 }}>
                     📱 {i.phone}
                     {i.whatsapp && <span style={{ marginLeft: 8, color: '#25D366' }}>· WhatsApp ✓</span>}
+                    {i.email && <span style={{ marginLeft: 8, color: '#7A6FA8' }}>· ✉️ {i.email}</span>}
+                    {i.user_id && <span style={{ marginLeft: 8, color: '#2ecc71' }}>· Compte actif ✓</span>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <button onClick={() => copyInvitation(i)}
                     style={{ background: copied === i.id ? '#eafaf1' : '#f0f9f4', color: copied === i.id ? '#27ae60' : '#2d5a47', border: '1px solid ' + (copied === i.id ? '#2ecc71' : '#b8d8bc'), borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
-                    {copied === i.id ? '✅ Copié !' : '📋 Copier invitation'}
+                    {copied === i.id ? '✅ Copié !' : '📋 Copier SMS'}
                   </button>
                   {isAdmin && (
                     <button onClick={() => deleteIntervenant(i.id)}
