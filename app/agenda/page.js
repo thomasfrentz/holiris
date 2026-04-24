@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSenior } from '../lib/useSenior'
+import { useIntervenant } from '../lib/useIntervenant'
 
 export default function Agenda() {
   const [events, setEvents] = useState([])
@@ -11,7 +12,6 @@ export default function Agenda() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
 
   const [label, setLabel] = useState('')
   const [type, setType] = useState('care')
@@ -20,6 +20,14 @@ export default function Agenda() {
   const [heure, setHeure] = useState('')
   const [recurrence, setRecurrence] = useState('none')
   const [recurrenceDays, setRecurrenceDays] = useState([])
+
+  const { seniors, selectedSenior: adminSenior, selectedSeniorId: adminSeniorId, switchSenior: adminSwitch, isAdmin } = useSenior()
+  const { selectedSenior: intervenantSenior, selectedSeniorId: intervenantSeniorId, switchSenior: intervenantSwitch, seniorsList, isIntervenant, loading: intervenantLoading } = useIntervenant()
+
+  // Résoudre qui est actif
+  const selectedSenior = isAdmin ? adminSenior : intervenantSenior
+  const selectedSeniorId = isAdmin ? adminSeniorId : intervenantSeniorId
+  const canEdit = isAdmin || isIntervenant
 
   const router = useRouter()
   const supabase = createBrowserClient(
@@ -34,7 +42,7 @@ export default function Agenda() {
     { value: '0', label: 'Dim' },
   ]
 
-  const navItems = [
+  const navItemsAdmin = [
     { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
     { icon: '📅', label: 'Agenda', href: '/agenda' },
     { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
@@ -43,11 +51,18 @@ export default function Agenda() {
     { icon: '👤', label: 'Mon profil', href: '/profil' },
   ]
 
+  const navItemsIntervenant = [
+    { icon: '🏠', label: 'Mon espace', href: '/espace-intervenant' },
+    { icon: '📅', label: 'Agenda', href: '/agenda' },
+  ]
+
+  const navItems = isAdmin ? navItemsAdmin : navItemsIntervenant
+
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      if (!selectedSeniorId) return
+      if (!selectedSeniorId) { setLoading(false); return }
 
       const { data: eventsData } = await supabase
         .from('events')
@@ -180,7 +195,7 @@ export default function Agenda() {
     return acc
   }, {})
 
-  if (loading || !selectedSenior) return (
+  if (loading || intervenantLoading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
       <div style={{ color: '#888' }}>Chargement...</div>
     </div>
@@ -193,16 +208,27 @@ export default function Agenda() {
           <div style={{ width: 42, height: 42, background: '#2ecc71', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#12201a', fontSize: 18 }}>H</div>
           <div>
             <div style={{ fontWeight: 'bold', fontSize: 18 }}>Holiris</div>
-            <div style={{ fontSize: 10, color: '#5a8a6a', letterSpacing: 1 }}>PYRÉNÉES-ORIENTALES</div>
+            <div style={{ fontSize: 10, color: '#5a8a6a', letterSpacing: 1 }}>
+              {isAdmin ? 'PYRÉNÉES-ORIENTALES' : 'ESPACE INTERVENANT'}
+            </div>
           </div>
         </div>
 
         {isAdmin && seniors.length > 1 ? (
           <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
-            <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
+            <select value={adminSeniorId || ''} onChange={e => adminSwitch(e.target.value)}
               style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
               {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
+          </div>
+        ) : isIntervenant && seniorsList.length > 1 ? (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
+            <select value={intervenantSeniorId || ''} onChange={e => intervenantSwitch(e.target.value)}
+              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
+              {seniorsList.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
             </select>
             <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
           </div>
@@ -245,13 +271,15 @@ export default function Agenda() {
             <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>📅 Agenda</h1>
             <p style={{ color: '#888', fontSize: 13 }}>{events.length} événement{events.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
           </div>
-          <button onClick={() => setShowForm(!showForm)}
-            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-            + Ajouter
-          </button>
+          {canEdit && (
+            <button onClick={() => setShowForm(!showForm)}
+              style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+              + Ajouter
+            </button>
+          )}
         </div>
 
-        {showForm && (
+        {showForm && canEdit && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel événement</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
