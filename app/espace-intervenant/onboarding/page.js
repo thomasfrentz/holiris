@@ -22,7 +22,6 @@ export default function OnboardingIntervenant() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Chercher avec le code exact
     const { data: intervenantData } = await supabase
       .from('intervenants')
       .select('*')
@@ -43,7 +42,7 @@ export default function OnboardingIntervenant() {
       return
     }
 
-    // Lier le compte
+    // Lier ce row
     const { error: updateError } = await supabase
       .from('intervenants')
       .update({ user_id: user.id })
@@ -55,7 +54,14 @@ export default function OnboardingIntervenant() {
       return
     }
 
-    // Délai pour que Supabase propage la mise à jour
+    // Synchroniser tous les rows du même email sur le même user_id
+    if (intervenant.email) {
+      await supabase
+        .from('intervenants')
+        .update({ user_id: user.id })
+        .eq('email', intervenant.email)
+    }
+
     window.location.href = '/espace-intervenant/success'
   }
 
@@ -87,7 +93,7 @@ export default function OnboardingIntervenant() {
           <input
             placeholder="Collez votre code ici"
             value={code}
-            onChange={e => setCode(e.target.value)}
+            onChange={e => setCode(e.target.value.toUpperCase())}
             onKeyDown={e => e.key === 'Enter' && linkAccount()}
             style={{ width: '100%', padding: '14px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 16, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.2em', textAlign: 'center' }}
           />

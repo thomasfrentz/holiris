@@ -11,6 +11,11 @@ export default function IntervenantDashboard() {
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showCodeInput, setShowCodeInput] = useState(false)
+  const [newCode, setNewCode] = useState('')
+  const [codeLoading, setCodeLoading] = useState(false)
+  const [codeError, setCodeError] = useState('')
+  const [codeSuccess, setCodeSuccess] = useState(false)
   const { seniorsList, selectedSenior, selectedSeniorId, switchSenior, isIntervenant, intervenantName, loading } = useIntervenant()
   const router = useRouter()
 
@@ -23,10 +28,7 @@ export default function IntervenantDashboard() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      if (!selectedSeniorId) {
-        setDataLoading(false)
-        return
-      }
+      if (!selectedSeniorId) { setDataLoading(false); return }
 
       const debutSemaine = new Date()
       debutSemaine.setHours(0, 0, 0, 0)
@@ -59,7 +61,6 @@ export default function IntervenantDashboard() {
   async function addNote() {
     if (!newNote.trim()) return
     setSaving(true)
-
     await supabase.from('notes').insert({
       senior_id: selectedSeniorId,
       content: newNote,
@@ -67,19 +68,49 @@ export default function IntervenantDashboard() {
       intervenant_name: intervenantName,
       created_at: new Date().toISOString()
     })
-
     setNewNote('')
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
-
     const { data } = await supabase
-      .from('notes')
-      .select('*')
+      .from('notes').select('*')
       .eq('senior_id', selectedSeniorId)
       .order('created_at', { ascending: false })
       .limit(5)
     setNotes(data || [])
     setSaving(false)
+  }
+
+  async function activateCode() {
+    if (!newCode.trim()) return
+    setCodeLoading(true)
+    setCodeError('')
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: intervenantData } = await supabase
+      .from('intervenants')
+      .select('*')
+      .eq('code_acces', newCode.trim().toUpperCase())
+      .limit(1)
+
+    if (!intervenantData?.length) {
+      setCodeError('Code invalide.')
+      setCodeLoading(false)
+      return
+    }
+
+    const intervenant = intervenantData[0]
+    if (intervenant.user_id && intervenant.user_id !== user.id) {
+      setCodeError('Ce code a déjà été utilisé.')
+      setCodeLoading(false)
+      return
+    }
+
+    await supabase.from('intervenants').update({ user_id: user.id }).eq('id', intervenant.id)
+    if (intervenant.email) {
+      await supabase.from('intervenants').update({ user_id: user.id }).eq('email', intervenant.email)
+    }
+
+    setCodeSuccess(true)
+    setTimeout(() => window.location.reload(), 1500)
   }
 
   async function logout() {
@@ -96,14 +127,12 @@ export default function IntervenantDashboard() {
 
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
 
-  // Attendre que le hook soit chargé
   if (loading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
       <div style={{ color: '#888' }}>Chargement...</div>
     </div>
   )
 
-  // Pas intervenant → onboarding
   if (!isIntervenant) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#1E2820' }}>
       <div style={{ textAlign: 'center', color: '#e8f0eb', maxWidth: 400, padding: 24 }}>
@@ -152,17 +181,45 @@ export default function IntervenantDashboard() {
 
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>
 
-        {seniorsList.length > 1 && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>DOSSIER ACTIF</label>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>DOSSIER ACTIF</label>
+          {seniorsList.length > 1 && (
             <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #2ecc71', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #2ecc71', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff', marginBottom: 10 }}>
               {seniorsList.map(s => (
                 <option key={s.id} value={s.id}>{s.name} · {s.age} ans · {s.city}</option>
               ))}
             </select>
-          </div>
-        )}
+          )}
+          {!showCodeInput ? (
+            <button onClick={() => setShowCodeInput(true)}
+              style={{ background: 'none', border: '1px dashed #ccc', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#888', cursor: 'pointer', width: '100%' }}>
+              + Ajouter un senior avec un code
+            </button>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  placeholder="Code d'accès"
+                  value={newCode}
+                  onChange={e => setNewCode(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === 'Enter' && activateCode()}
+                  style={{ flex: 1, padding: '9px 12px', border: '1px solid #2ecc71', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'monospace', letterSpacing: '0.15em' }}
+                />
+                <button onClick={activateCode} disabled={codeLoading || !newCode.trim()}
+                  style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer' }}>
+                  {codeLoading ? '...' : 'Activer'}
+                </button>
+                <button onClick={() => { setShowCodeInput(false); setNewCode(''); setCodeError('') }}
+                  style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 13, cursor: 'pointer' }}>
+                  ✕
+                </button>
+              </div>
+              {codeError && <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 6 }}>{codeError}</div>}
+              {codeSuccess && <div style={{ fontSize: 12, color: '#27ae60', marginTop: 6 }}>✅ Senior ajouté ! Rechargement...</div>}
+            </div>
+          )}
+        </div>
 
         <div style={{ background: '#12201a', borderRadius: 12, padding: 20, marginBottom: 20, color: '#e8f0eb' }}>
           <div style={{ fontSize: 11, color: '#5a8a6a', letterSpacing: 1, marginBottom: 8 }}>VOTRE PATIENT</div>
