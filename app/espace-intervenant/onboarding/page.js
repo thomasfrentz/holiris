@@ -56,8 +56,7 @@ export default function OnboardingIntervenant() {
     }
 
     // Délai pour que Supabase propage la mise à jour
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    window.location.href = '/espace-intervenant'
+    window.location.href = '/espace-intervenant/success'
   }
 
   return (
