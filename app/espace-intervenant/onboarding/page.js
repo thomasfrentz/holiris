@@ -22,11 +22,11 @@ export default function OnboardingIntervenant() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    // Chercher l'intervenant avec ce code
+    // Chercher avec le code exact
     const { data: intervenantData } = await supabase
       .from('intervenants')
       .select('*')
-      .eq('code_acces', code.toUpperCase().trim())
+      .eq('code_acces', code.trim())
       .limit(1)
 
     if (!intervenantData?.length) {
@@ -37,14 +37,12 @@ export default function OnboardingIntervenant() {
 
     const intervenant = intervenantData[0]
 
-    // Vérifier que le code n'est pas déjà utilisé
     if (intervenant.user_id && intervenant.user_id !== user.id) {
       setError('Ce code a déjà été utilisé.')
       setLoading(false)
       return
     }
 
-    // Lier le compte
     await supabase
       .from('intervenants')
       .update({ user_id: user.id })
@@ -79,12 +77,15 @@ export default function OnboardingIntervenant() {
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 8 }}>Code d'accès</label>
           <input
-            placeholder="Ex: A3B9F2"
+            placeholder="Collez votre code ici"
             value={code}
-            onChange={e => setCode(e.target.value.toUpperCase())}
+            onChange={e => setCode(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && linkAccount()}
-            style={{ width: '100%', padding: '14px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 20, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.3em', textAlign: 'center', textTransform: 'uppercase' }}
+            style={{ width: '100%', padding: '14px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 16, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.2em', textAlign: 'center' }}
           />
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 6, textAlign: 'center' }}>
+            Le code est sensible à la casse — copiez-collez depuis l'email
+          </div>
         </div>
 
         {error && (
@@ -93,11 +94,8 @@ export default function OnboardingIntervenant() {
           </div>
         )}
 
-        <button
-          onClick={linkAccount}
-          disabled={loading || !code.trim()}
-          style={{ width: '100%', background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer' }}
-        >
+        <button onClick={linkAccount} disabled={loading || !code.trim()}
+          style={{ width: '100%', background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer' }}>
           {loading ? 'Activation...' : 'Activer mon compte'}
         </button>
 
