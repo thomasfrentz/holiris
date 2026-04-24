@@ -56,7 +56,6 @@ export function useSenior() {
       .from('famille')
       .update({ selected_senior_id: seniorId })
       .eq('user_id', user.id)
-    window.location.reload()
   }
 
   const selectedSenior = seniors.find(s => s.id === selectedSeniorId)

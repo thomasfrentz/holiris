@@ -21,13 +21,11 @@ export default function Agenda() {
   const [recurrence, setRecurrence] = useState('none')
   const [recurrenceDays, setRecurrenceDays] = useState([])
 
-  const { seniors, selectedSenior: adminSenior, selectedSeniorId: adminSeniorId, switchSenior: adminSwitch, isAdmin } = useSenior()
+  const { seniors, selectedSenior: adminSenior, selectedSeniorId: adminSeniorId, switchSenior: adminSwitch, isAdmin, loading: seniorLoading } = useSenior()
   const { selectedSenior: intervenantSenior, selectedSeniorId: intervenantSeniorId, switchSenior: intervenantSwitch, seniorsList, isIntervenant, loading: intervenantLoading } = useIntervenant()
 
-  // Résoudre qui est actif
-  const selectedSenior = isAdmin ? adminSenior : intervenantSenior
-  const selectedSeniorId = isAdmin ? adminSeniorId : intervenantSeniorId
-  const canEdit = isAdmin || isIntervenant
+  const selectedSenior = isIntervenant ? intervenantSenior : adminSenior
+  const selectedSeniorId = isIntervenant ? intervenantSeniorId : adminSeniorId
 
   const router = useRouter()
   const supabase = createBrowserClient(
@@ -56,7 +54,7 @@ export default function Agenda() {
     { icon: '📅', label: 'Agenda', href: '/agenda' },
   ]
 
-  const navItems = isAdmin ? navItemsAdmin : navItemsIntervenant
+  const navItems = isIntervenant ? navItemsIntervenant : navItemsAdmin
 
   useEffect(() => {
     async function loadData() {
@@ -89,7 +87,7 @@ export default function Agenda() {
   }
 
   async function generateRecurringEvents(baseEvent) {
-    const events = []
+    const evts = []
     const startDate = new Date(baseEvent.scheduled_at)
     const endDate = new Date(startDate)
     endDate.setMonth(endDate.getMonth() + 3)
@@ -98,7 +96,7 @@ export default function Agenda() {
       let current = new Date(startDate)
       current.setDate(current.getDate() + 1)
       while (current <= endDate) {
-        events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
+        evts.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         current.setDate(current.getDate() + 1)
       }
     } else if (recurrence === 'weekly' && recurrenceDays.length > 0) {
@@ -106,7 +104,7 @@ export default function Agenda() {
       current.setDate(current.getDate() + 1)
       while (current <= endDate) {
         if (recurrenceDays.includes(String(current.getDay()))) {
-          events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
+          evts.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         }
         current.setDate(current.getDate() + 1)
       }
@@ -114,18 +112,18 @@ export default function Agenda() {
       let current = new Date(startDate)
       current.setDate(current.getDate() + 14)
       while (current <= endDate) {
-        events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
+        evts.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         current.setDate(current.getDate() + 14)
       }
     } else if (recurrence === 'monthly') {
       let current = new Date(startDate)
       current.setMonth(current.getMonth() + 1)
       while (current <= endDate) {
-        events.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
+        evts.push({ ...baseEvent, scheduled_at: new Date(current).toISOString() })
         current.setMonth(current.getMonth() + 1)
       }
     }
-    return events
+    return evts
   }
 
   async function addEvent() {
@@ -189,15 +187,21 @@ export default function Agenda() {
   }
 
   const groupedEvents = events.reduce((acc, e) => {
-    const date = new Date(e.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-    if (!acc[date]) acc[date] = []
-    acc[date].push(e)
+    const d = new Date(e.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+    if (!acc[d]) acc[d] = []
+    acc[d].push(e)
     return acc
   }, {})
 
-  if (loading || intervenantLoading || !selectedSenior) return (
+  if (seniorLoading || intervenantLoading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
       <div style={{ color: '#888' }}>Chargement...</div>
+    </div>
+  )
+
+  if (!selectedSenior) return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
+      <div style={{ color: '#888' }}>Aucun dossier accessible.</div>
     </div>
   )
 
@@ -209,7 +213,7 @@ export default function Agenda() {
           <div>
             <div style={{ fontWeight: 'bold', fontSize: 18 }}>Holiris</div>
             <div style={{ fontSize: 10, color: '#5a8a6a', letterSpacing: 1 }}>
-              {isAdmin ? 'PYRÉNÉES-ORIENTALES' : 'ESPACE INTERVENANT'}
+              {isIntervenant ? 'ESPACE INTERVENANT' : 'PYRÉNÉES-ORIENTALES'}
             </div>
           </div>
         </div>
@@ -271,15 +275,13 @@ export default function Agenda() {
             <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>📅 Agenda</h1>
             <p style={{ color: '#888', fontSize: 13 }}>{events.length} événement{events.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
           </div>
-          {canEdit && (
-            <button onClick={() => setShowForm(!showForm)}
-              style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-              + Ajouter
-            </button>
-          )}
+          <button onClick={() => setShowForm(!showForm)}
+            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+            + Ajouter
+          </button>
         </div>
 
-        {showForm && canEdit && (
+        {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel événement</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -361,16 +363,16 @@ export default function Agenda() {
           </div>
         )}
 
-        {Object.keys(groupedEvents).length === 0 && (
+        {Object.keys(groupedEvents).length === 0 && !loading && (
           <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
             <div>Aucun événement pour le moment</div>
           </div>
         )}
 
-        {Object.entries(groupedEvents).map(([date, dayEvents]) => (
-          <div key={date} style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{date}</div>
+        {Object.entries(groupedEvents).map(([d, dayEvents]) => (
+          <div key={d} style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{d}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {dayEvents.map(e => {
                 const cfg = statusConfig[e.status] ?? { color: '#999', label: e.status }
