@@ -48,7 +48,7 @@ export default function OnboardingIntervenant() {
       .update({ user_id: user.id })
       .eq('id', intervenant.id)
 
-    router.push('/espace-intervenant')
+    window.location.href = '/espace-intervenant'
   }
 
   return (
