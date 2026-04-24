@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useIntervenant } from '../lib/useIntervenant'
 
 export default function IntervenantDashboard() {
@@ -226,6 +227,8 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
 
   return (
     <div style={{ minHeight: '100vh', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
+
+      {/* Header */}
       <div style={{ background: '#12201a', color: '#e8f0eb', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, background: '#2ecc71', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#12201a', fontSize: 16 }}>H</div>
@@ -234,8 +237,11 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
             <div style={{ fontSize: 10, color: '#5a8a6a', letterSpacing: 1 }}>ESPACE INTERVENANT</div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontSize: 13, color: '#9abaa8' }}>👤 {intervenantName}</span>
+          <Link href="/agenda" style={{ textDecoration: 'none' }}>
+            <span style={{ fontSize: 13, color: '#2ecc71', fontWeight: 'bold', cursor: 'pointer' }}>📅 Agenda</span>
+          </Link>
           <button onClick={logout}
             style={{ background: 'rgba(231,76,60,0.15)', color: '#ff8070', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
             Déconnexion
@@ -402,6 +408,7 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
             </div>
           )}
         </div>
+
       </div>
     </div>
   )
