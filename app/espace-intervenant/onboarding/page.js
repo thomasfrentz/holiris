@@ -43,11 +43,20 @@ export default function OnboardingIntervenant() {
       return
     }
 
-    await supabase
+    // Lier le compte
+    const { error: updateError } = await supabase
       .from('intervenants')
       .update({ user_id: user.id })
       .eq('id', intervenant.id)
 
+    if (updateError) {
+      setError('Erreur lors de l\'activation. Réessayez.')
+      setLoading(false)
+      return
+    }
+
+    // Délai pour que Supabase propage la mise à jour
+    await new Promise(resolve => setTimeout(resolve, 1000))
     window.location.href = '/espace-intervenant'
   }
 
@@ -84,7 +93,7 @@ export default function OnboardingIntervenant() {
             style={{ width: '100%', padding: '14px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 16, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.2em', textAlign: 'center' }}
           />
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 6, textAlign: 'center' }}>
-            Le code est sensible à la casse — copiez-collez depuis l'email
+            Copiez-collez le code depuis votre email
           </div>
         </div>
 
@@ -96,7 +105,7 @@ export default function OnboardingIntervenant() {
 
         <button onClick={linkAccount} disabled={loading || !code.trim()}
           style={{ width: '100%', background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer' }}>
-          {loading ? 'Activation...' : 'Activer mon compte'}
+          {loading ? 'Activation en cours...' : 'Activer mon compte'}
         </button>
 
         <div style={{ marginTop: 24, textAlign: 'center' }}>
