@@ -21,9 +21,34 @@ export default function Login() {
     setError('')
 
     if (isSignup) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
-      setError('Vérifiez votre email pour confirmer votre compte.')
+
+      if (data.user) {
+        // Confirmer automatiquement l'email
+        await fetch('/api/confirm-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: data.user.id })
+        })
+
+        // Connecter directement
+        const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
+
+        if (signInData?.user) {
+          const { data: intervenantData } = await supabase
+            .from('intervenants')
+            .select('id')
+            .eq('user_id', signInData.user.id)
+            .limit(1)
+
+          if (intervenantData?.length > 0) {
+            router.push('/espace-intervenant')
+          } else {
+            router.push('/app')
+          }
+        }
+      }
       setLoading(false)
       return
     }
@@ -31,7 +56,6 @@ export default function Login() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError('Email ou mot de passe incorrect.'); setLoading(false); return }
 
-    // Vérifier si c'est un intervenant
     const { data: intervenantData } = await supabase
       .from('intervenants')
       .select('id')
@@ -91,7 +115,7 @@ export default function Login() {
           </div>
 
           {error && (
-            <div style={{ background: error.includes('Vérifiez') ? 'rgba(107,143,113,0.15)' : 'rgba(196,122,130,0.15)', border: '1px solid ' + (error.includes('Vérifiez') ? 'rgba(107,143,113,0.3)' : 'rgba(196,122,130,0.3)'), borderRadius: 2, padding: '10px 14px', fontSize: 13, color: error.includes('Vérifiez') ? '#9AB89F' : '#e0939a' }}>
+            <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 2, padding: '10px 14px', fontSize: 13, color: '#e0939a' }}>
               {error}
             </div>
           )}
