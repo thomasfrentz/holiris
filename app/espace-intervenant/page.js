@@ -60,34 +60,37 @@ export default function IntervenantDashboard() {
           .order('created_at', { ascending: false })
       ])
 
+      const notesData = notesRes.data || []
+      const alertesData = alertesRes.data || []
+
       setEvents(eventsRes.data || [])
-      setNotes(notesRes.data || [])
-      setAlertes(alertesRes.data || [])
+      setNotes(notesData)
+      setAlertes(alertesData)
       setDataLoading(false)
+
+      // Générer le résumé directement ici, une fois les données disponibles
+      if (notesData.length > 0 && selectedSenior) {
+        generateResumeWith(notesData, alertesData, selectedSenior)
+      }
     }
     loadData()
-  }, [selectedSeniorId])
+  }, [selectedSeniorId, selectedSenior])
 
-  useEffect(() => {
-    if (!selectedSeniorId || notes.length === 0) return
-    generateResume()
-  }, [notes, alertes])
-
-  async function generateResume() {
+  async function generateResumeWith(notesData, alertesData, senior) {
     setResumeLoading(true)
     try {
-      const notesText = notes.map(n =>
+      const notesText = notesData.map(n =>
         `[${new Date(n.created_at).toLocaleDateString('fr-FR')}] ${n.intervenant_name || n.source || 'Inconnu'} : ${n.content}`
       ).join('\n')
 
-      const alertesText = alertes.length > 0
-        ? alertes.map(a => `- [${a.niveau?.toUpperCase() || 'INFO'}] ${a.message}`).join('\n')
+      const alertesText = alertesData.length > 0
+        ? alertesData.map(a => `- [${a.niveau?.toUpperCase() || 'INFO'}] ${a.message}`).join('\n')
         : 'Aucune alerte active.'
 
-      const prompt = `Tu es un assistant médico-social. Voici les notes de suivi de ${selectedSenior?.name} (${selectedSenior?.age} ans) sur le dernier mois, ainsi que les alertes actives.
+      const prompt = `Tu es un assistant médico-social. Voici les notes de suivi de ${senior?.name} (${senior?.age} ans) sur le dernier mois, ainsi que les alertes actives.
 
 NOTES DU MOIS :
-${notesText || 'Aucune note ce mois-ci.'}
+${notesText}
 
 ALERTES ACTIVES :
 ${alertesText}
@@ -116,6 +119,11 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
       console.error('Erreur résumé:', e)
     }
     setResumeLoading(false)
+  }
+
+  async function generateResume() {
+    if (notes.length === 0) return
+    generateResumeWith(notes, alertes, selectedSenior)
   }
 
   async function addNote() {
@@ -228,7 +236,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
   return (
     <div style={{ minHeight: '100vh', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
 
-      {/* Header */}
       <div style={{ background: '#12201a', color: '#e8f0eb', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, background: '#2ecc71', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#12201a', fontSize: 16 }}>H</div>
@@ -251,7 +258,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
 
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>
 
-        {/* Sélecteur senior + ajout code */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>DOSSIER ACTIF</label>
           {seniorsList.length > 1 && (
@@ -287,7 +293,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
           )}
         </div>
 
-        {/* Carte patient */}
         <div style={{ background: '#12201a', borderRadius: 12, padding: 20, marginBottom: 20, color: '#e8f0eb' }}>
           <div style={{ fontSize: 11, color: '#5a8a6a', letterSpacing: 1, marginBottom: 8 }}>VOTRE PATIENT</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -299,7 +304,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
           </div>
         </div>
 
-        {/* Alertes actives */}
         {alertes.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             {alertes.map(a => {
@@ -318,7 +322,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
           </div>
         )}
 
-        {/* Résumé IA */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', margin: 0 }}>🤖 État général — 30 derniers jours</h2>
@@ -336,7 +339,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
           )}
         </div>
 
-        {/* Ajouter une note */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>📝 Ajouter une note</h2>
           <textarea
@@ -358,7 +360,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
           </button>
         </div>
 
-        {/* Passages cette semaine */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>📅 Passages cette semaine</h2>
           {events.length === 0 ? (
@@ -387,7 +388,6 @@ Sois factuel, bienveillant et professionnel. Ne mentionne pas de diagnostics mé
           )}
         </div>
 
-        {/* Dernières notes */}
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>📋 Dernières notes</h2>
           {notes.length === 0 ? (
