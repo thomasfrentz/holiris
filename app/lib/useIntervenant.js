@@ -17,12 +17,11 @@ export function useIntervenant() {
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
-      console.log('User:', user?.id)
       if (!user) { setLoading(false); return }
 
       const { data: intervenantsData, error } = await supabase
         .from('intervenants')
-        .select('*, seniors(*)')
+        .select('*, seniors!intervenants_senior_id_fkey(*)')
         .eq('user_id', user.id)
 
       console.log('Intervenants:', intervenantsData)
