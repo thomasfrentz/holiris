@@ -10,7 +10,7 @@ export default function Intervenants() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [inviteSent, setInviteSent] = useState(null)
+  const [copied, setCopied] = useState(null)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
 
   const [prenom, setPrenom] = useState('')
@@ -63,16 +63,6 @@ export default function Intervenants() {
     })
 
     if (!error) {
-      try {
-        const response = await fetch('/api/invite-intervenant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ whatsapp, prenom, nom, role, seniorName: selectedSenior?.name })
-        })
-        const data = await response.json()
-        if (data.success) setInviteSent(prenom + ' ' + nom)
-      } catch (e) { console.error('Erreur invitation:', e) }
-
       setPrenom(''); setNom(''); setRole(''); setTelephone('')
       setShowForm(false)
 
@@ -81,7 +71,6 @@ export default function Intervenants() {
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
       setIntervenants(data || [])
-      setTimeout(() => setInviteSent(null), 5000)
     }
     setSaving(false)
   }
@@ -90,6 +79,15 @@ export default function Intervenants() {
     if (!isAdmin) return
     await supabase.from('intervenants').delete().eq('id', id)
     setIntervenants(prev => prev.filter(i => i.id !== id))
+  }
+
+  function copyInvitation(intervenant) {
+    const message = 'Bonjour ' + intervenant.name.split(' ')[0] + ' 👋\n\nJe vous invite à utiliser Holiris pour le suivi de ' + selectedSenior?.name + '.\n\nAprès chaque passage, envoyez simplement un message vocal ou texte sur WhatsApp au +15556480002.\n\n✅ Partagez : état général, humeur, activités\n❌ Ne partagez pas : diagnostics, ordonnances, données médicales\n\nPour créer votre compte : https://holiris.fr/login\n\nMerci pour votre accompagnement 🌸'
+
+    navigator.clipboard.writeText(message).then(() => {
+      setCopied(intervenant.id)
+      setTimeout(() => setCopied(null), 3000)
+    })
   }
 
   const roleIcons = {
@@ -170,12 +168,6 @@ export default function Intervenants() {
           </button>
         </div>
 
-        {inviteSent && (
-          <div style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#27ae60', fontWeight: 'bold' }}>
-            ✅ Message d'invitation envoyé à {inviteSent} sur WhatsApp !
-          </div>
-        )}
-
         {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel intervenant</h2>
@@ -198,12 +190,12 @@ export default function Intervenants() {
                 style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
             </div>
             <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
-              💡 Un message de bienvenue sera automatiquement envoyé sur WhatsApp.
+              💡 Après l'ajout, copiez le message d'invitation et envoyez-le par SMS ou WhatsApp.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
                 style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-                {saving ? 'Ajout...' : 'Ajouter et inviter'}
+                {saving ? 'Ajout...' : 'Ajouter'}
               </button>
               <button onClick={() => setShowForm(false)}
                 style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
@@ -215,24 +207,33 @@ export default function Intervenants() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {intervenants.map((i) => (
-            <div key={i.id} style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ fontSize: 32 }}>{roleIcons[i.role] ?? '👤'}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: 15, color: '#12201a' }}>{i.name}</div>
-                <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{i.role}</div>
-                <div style={{ fontSize: 12, color: '#5a8a6a', marginTop: 4 }}>
-                  📱 {i.phone}
-                  {i.whatsapp && <span style={{ marginLeft: 8, color: '#25D366' }}>· WhatsApp ✓</span>}
+            <div key={i.id} style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ fontSize: 32 }}>{roleIcons[i.role] ?? '👤'}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#12201a' }}>{i.name}</div>
+                  <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{i.role}</div>
+                  <div style={{ fontSize: 12, color: '#5a8a6a', marginTop: 4 }}>
+                    📱 {i.phone}
+                    {i.whatsapp && <span style={{ marginLeft: 8, color: '#25D366' }}>· WhatsApp ✓</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => copyInvitation(i)}
+                    style={{ background: copied === i.id ? '#eafaf1' : '#f0f9f4', color: copied === i.id ? '#27ae60' : '#2d5a47', border: '1px solid ' + (copied === i.id ? '#2ecc71' : '#b8d8bc'), borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
+                    {copied === i.id ? '✅ Copié !' : '📋 Copier invitation'}
+                  </button>
+                  {isAdmin && (
+                    <button onClick={() => deleteIntervenant(i.id)}
+                      style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
+                      🗑️
+                    </button>
+                  )}
                 </div>
               </div>
-              {isAdmin && (
-                <button onClick={() => deleteIntervenant(i.id)}
-                  style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-                  🗑️ Supprimer
-                </button>
-              )}
             </div>
           ))}
+
           {intervenants.length === 0 && (
             <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
