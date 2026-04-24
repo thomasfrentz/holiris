@@ -24,6 +24,30 @@ export default function App() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+
+      // Vérifier si l'utilisateur a un profil famille
+      const { data: familleData } = await supabase
+        .from('famille')
+        .select('senior_id')
+        .eq('user_id', user.id)
+        .limit(1)
+
+      if (!familleData?.length) {
+        // Pas de profil famille — vérifier si intervenant
+        const { data: intervenantData } = await supabase
+          .from('intervenants')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+
+        if (intervenantData?.length > 0) {
+          router.push('/espace-intervenant')
+        } else {
+          router.push('/espace-intervenant')
+        }
+        return
+      }
+
       if (!selectedSeniorId) return
 
       const debutSemaine = new Date()
