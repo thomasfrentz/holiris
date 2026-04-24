@@ -24,22 +24,19 @@ export function useIntervenant() {
         .select('*, seniors!intervenants_senior_id_fkey(*)')
         .eq('user_id', user.id)
 
-      console.log('Intervenants:', intervenantsData)
-      console.log('Error:', error)
+      if (error || !intervenantsData?.length) { setLoading(false); return }
 
-      if (!intervenantsData?.length) { setLoading(false); return }
+      const seniorIds = intervenantsData.map(i => i.senior_id)
 
       setIsIntervenant(true)
       setIntervenants(intervenantsData)
       setIntervenantName(intervenantsData[0].name)
 
       const saved = intervenantsData[0].selected_senior_id
-      const firstSeniorId = intervenantsData[0].senior_id
-      const activeSeniorId = saved || firstSeniorId
+      const activeSeniorId = seniorIds.includes(saved) ? saved : seniorIds[0]
 
       setSelectedSeniorId(activeSeniorId)
-      const activeSenior = intervenantsData.find(i => i.senior_id === activeSeniorId)?.seniors
-      setSelectedSenior(activeSenior)
+      setSelectedSenior(intervenantsData.find(i => i.senior_id === activeSeniorId)?.seniors ?? null)
 
       setLoading(false)
     }
@@ -48,12 +45,13 @@ export function useIntervenant() {
 
   async function switchSenior(seniorId) {
     setSelectedSeniorId(seniorId)
+    setSelectedSenior(intervenants.find(i => i.senior_id === seniorId)?.seniors ?? null)
+
     const { data: { user } } = await supabase.auth.getUser()
     await supabase
       .from('intervenants')
       .update({ selected_senior_id: seniorId })
       .eq('user_id', user.id)
-    window.location.reload()
   }
 
   const seniorsList = intervenants.map(i => i.seniors).filter(Boolean)
