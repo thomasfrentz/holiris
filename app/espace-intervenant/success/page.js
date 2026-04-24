@@ -1,11 +1,21 @@
 'use client'
 import { useEffect } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function Success() {
   useEffect(() => {
-    setTimeout(() => {
+    async function refreshAndRedirect() {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      )
+      // Rafraîchir la session
+      await supabase.auth.refreshSession()
+      // Attendre 1 seconde
+      await new Promise(resolve => setTimeout(resolve, 1000))
       window.location.replace('/espace-intervenant')
-    }, 2000)
+    }
+    refreshAndRedirect()
   }, [])
 
   return (
