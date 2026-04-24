@@ -17,13 +17,16 @@ export function useIntervenant() {
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('User:', user?.id)
       if (!user) { setLoading(false); return }
 
-      // Chercher si cet utilisateur est un intervenant
-      const { data: intervenantsData } = await supabase
+      const { data: intervenantsData, error } = await supabase
         .from('intervenants')
         .select('*, seniors(*)')
         .eq('user_id', user.id)
+
+      console.log('Intervenants:', intervenantsData)
+      console.log('Error:', error)
 
       if (!intervenantsData?.length) { setLoading(false); return }
 
@@ -31,7 +34,6 @@ export function useIntervenant() {
       setIntervenants(intervenantsData)
       setIntervenantName(intervenantsData[0].name)
 
-      // Senior sélectionné
       const saved = intervenantsData[0].selected_senior_id
       const firstSeniorId = intervenantsData[0].senior_id
       const activeSeniorId = saved || firstSeniorId
