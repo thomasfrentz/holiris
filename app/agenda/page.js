@@ -28,13 +28,19 @@ export default function Agenda() {
   )
 
   const joursOptions = [
-    { value: '1', label: 'Lun' },
-    { value: '2', label: 'Mar' },
-    { value: '3', label: 'Mer' },
-    { value: '4', label: 'Jeu' },
-    { value: '5', label: 'Ven' },
-    { value: '6', label: 'Sam' },
+    { value: '1', label: 'Lun' }, { value: '2', label: 'Mar' },
+    { value: '3', label: 'Mer' }, { value: '4', label: 'Jeu' },
+    { value: '5', label: 'Ven' }, { value: '6', label: 'Sam' },
     { value: '0', label: 'Dim' },
+  ]
+
+  const navItems = [
+    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+    { icon: '📅', label: 'Agenda', href: '/agenda' },
+    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+    { icon: '👤', label: 'Mon profil', href: '/profil' },
   ]
 
   useEffect(() => {
@@ -209,14 +215,7 @@ export default function Agenda() {
         )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[
-            { icon: '⚡', label: 'Flux en temps réel', href: '/' },
-            { icon: '📅', label: 'Agenda', href: '/agenda' },
-            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-            { icon: '👤', label: 'Mon profil', href: '/profil' },
-          ].map((item) => (
+          {navItems.map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -343,9 +342,7 @@ export default function Agenda() {
 
         {Object.entries(groupedEvents).map(([date, dayEvents]) => (
           <div key={date} style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-              {date}
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{date}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {dayEvents.map(e => {
                 const cfg = statusConfig[e.status] ?? { color: '#999', label: e.status }
@@ -363,14 +360,10 @@ export default function Agenda() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>
-                        {cfg.label}
-                      </div>
+                      <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>{cfg.label}</div>
                       {isAdmin && (
                         <button onClick={() => deleteEvent(e.id)}
-                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
-                          🗑️
-                        </button>
+                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>🗑️</button>
                       )}
                     </div>
                   </div>

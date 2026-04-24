@@ -48,9 +48,7 @@ export default function Carnet() {
   async function addNote() {
     if (!newNote.trim()) return
     setSaving(true)
-
     const authorName = famille?.name || famille?.email?.split('@')[0] || 'Famille'
-
     const { data, error } = await supabase.from('notes').insert({
       senior_id: selectedSeniorId,
       content: newNote,
@@ -58,7 +56,6 @@ export default function Carnet() {
       intervenant_name: authorName + (famille?.role ? ' · ' + famille.role : ''),
       created_at: new Date().toISOString()
     }).select()
-
     if (!error && data) {
       setNotes(prev => [data[0], ...prev])
       setNewNote('')
@@ -87,6 +84,15 @@ export default function Carnet() {
     if (source === 'famille') return { icon: '👨‍👩‍👧', label: 'Note famille', color: '#3498db' }
     return { icon: '📝', label: 'Note', color: '#3498db' }
   }
+
+  const navItems = [
+    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+    { icon: '📅', label: 'Agenda', href: '/agenda' },
+    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+    { icon: '👤', label: 'Mon profil', href: '/profil' },
+  ]
 
   if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
@@ -123,14 +129,7 @@ export default function Carnet() {
         )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[
-            { icon: '⚡', label: 'Flux en temps réel', href: '/' },
-            { icon: '📅', label: 'Agenda', href: '/agenda' },
-            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-            { icon: '👤', label: 'Mon profil', href: '/profil' },
-          ].map((item) => (
+          {navItems.map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -209,13 +208,9 @@ export default function Carnet() {
                     {isAdmin && (
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => editNote(n.id, n.content)}
-                          style={{ background: '#f0f9ff', color: '#3498db', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
-                          ✏️
-                        </button>
+                          style={{ background: '#f0f9ff', color: '#3498db', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>✏️</button>
                         <button onClick={() => deleteNote(n.id)}
-                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
-                          🗑️
-                        </button>
+                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>🗑️</button>
                       </div>
                     )}
                   </div>

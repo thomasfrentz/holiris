@@ -23,6 +23,15 @@ export default function Assistant() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
+  const navItems = [
+    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+    { icon: '📅', label: 'Agenda', href: '/agenda' },
+    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+    { icon: '👤', label: 'Mon profil', href: '/profil' },
+  ]
+
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -112,14 +121,7 @@ export default function Assistant() {
         )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[
-            { icon: '⚡', label: 'Flux en temps réel', href: '/' },
-            { icon: '📅', label: 'Agenda', href: '/agenda' },
-            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-            { icon: '👤', label: 'Mon profil', href: '/profil' },
-          ].map((item) => (
+          {navItems.map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,

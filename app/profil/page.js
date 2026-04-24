@@ -3,14 +3,15 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSenior } from '../lib/useSenior'
 
 export default function Profil() {
   const [user, setUser] = useState(null)
-  const [senior, setSenior] = useState(null)
   const [famille, setFamille] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
 
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
@@ -23,6 +24,15 @@ export default function Profil() {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
+
+  const navItems = [
+    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+    { icon: '📅', label: 'Agenda', href: '/agenda' },
+    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+    { icon: '👤', label: 'Mon profil', href: '/profil' },
+  ]
 
   useEffect(() => {
     async function loadData() {
@@ -46,12 +56,6 @@ export default function Profil() {
         setWhatsapp(f.whatsapp || '')
       }
 
-      const { data: seniors } = await supabase
-        .from('seniors')
-        .select('*')
-        .eq('id', familleData?.[0]?.senior_id)
-      setSenior(seniors?.[0])
-
       setLoading(false)
     }
     loadData()
@@ -73,7 +77,6 @@ export default function Profil() {
       .eq('user_id', user.id)
 
     if (!error) {
-      // Envoyer message de bienvenue si numéro renseigné pour la première fois
       if (whatsappFormatted && !famille?.whatsapp) {
         try {
           await fetch('/api/invite-famille', {
@@ -82,15 +85,11 @@ export default function Profil() {
             body: JSON.stringify({
               whatsapp: whatsappFormatted,
               prenom,
-              seniorName: senior?.name
+              seniorName: selectedSenior?.name
             })
           })
-          console.log('Message de bienvenue envoyé')
-        } catch (e) {
-          console.error('Erreur envoi message bienvenue:', e)
-        }
+        } catch (e) { console.error('Erreur envoi message bienvenue:', e) }
       }
-
       setSaved(true)
       setFamille(prev => ({ ...prev, whatsapp: whatsappFormatted }))
       setTimeout(() => setSaved(false), 3000)
@@ -100,7 +99,7 @@ export default function Profil() {
 
   async function logout() {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    window.location.href = '/'
   }
 
   const liens = [
@@ -125,21 +124,25 @@ export default function Profil() {
           </div>
         </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-          <div style={{ fontWeight: 'bold' }}>{senior?.name}</div>
-          <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{senior?.age} ans · {senior?.city}</div>
-        </div>
+        {isAdmin && seniors.length > 1 ? (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
+            <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
+              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
+              {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
+          </div>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
+            <div style={{ fontWeight: 'bold' }}>{selectedSenior?.name}</div>
+            <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
+          </div>
+        )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[
-            { icon: '⚡', label: 'Flux en temps réel', href: '/' },
-            { icon: '📅', label: 'Agenda', href: '/agenda' },
-            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-            { icon: '👤', label: 'Mon profil', href: '/profil' },
-          ].map((item) => (
+          {navItems.map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -185,7 +188,7 @@ export default function Profil() {
 
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>
-              Lien avec {senior?.name}
+              Lien avec {selectedSenior?.name}
             </label>
             <select value={lien} onChange={e => setLien(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
@@ -195,15 +198,9 @@ export default function Profil() {
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>
-              📱 Numéro WhatsApp
-            </label>
-            <input
-              placeholder="Ex: 06 12 34 56 78"
-              value={whatsapp}
-              onChange={e => setWhatsapp(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #25D366', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }}
-            />
+            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>📱 Numéro WhatsApp</label>
+            <input placeholder="Ex: 06 12 34 56 78" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #25D366', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
               💡 Renseignez votre numéro pour envoyer et recevoir des notes via WhatsApp
             </div>
@@ -226,8 +223,8 @@ export default function Profil() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ fontSize: 36 }}>👵</div>
             <div>
-              <div style={{ fontWeight: 'bold', color: '#12201a' }}>{senior?.name}</div>
-              <div style={{ fontSize: 13, color: '#888' }}>{senior?.age} ans · {senior?.city}</div>
+              <div style={{ fontWeight: 'bold', color: '#12201a' }}>{selectedSenior?.name}</div>
+              <div style={{ fontSize: 13, color: '#888' }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
               {lien && <div style={{ fontSize: 12, color: '#2ecc71', marginTop: 4 }}>Votre lien : {lien}</div>}
             </div>
           </div>
