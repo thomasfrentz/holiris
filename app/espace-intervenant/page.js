@@ -11,6 +11,7 @@ export default function IntervenantDashboard() {
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const { seniorsList, selectedSenior, selectedSeniorId, switchSenior, isIntervenant, intervenantName } = useIntervenant()
   const router = useRouter()
 
@@ -23,6 +24,32 @@ export default function IntervenantDashboard() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+
+      // Vérifier si l'utilisateur est un intervenant
+      const { data: intervenantsData } = await supabase
+        .from('intervenants')
+        .select('*')
+        .eq('user_id', user.id)
+        .limit(1)
+
+      // Si pas intervenant, vérifier si c'est un nouveau compte qui a besoin d'onboarding
+      if (!intervenantsData?.length) {
+        // Vérifier si c'est une famille
+        const { data: familleData } = await supabase
+          .from('famille')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+
+        if (familleData?.length) {
+          router.push('/app')
+        } else {
+          setNeedsOnboarding(true)
+        }
+        setLoading(false)
+        return
+      }
+
       if (!selectedSeniorId) return
 
       const debutSemaine = new Date()
@@ -99,14 +126,25 @@ export default function IntervenantDashboard() {
     </div>
   )
 
-  if (!isIntervenant) return (
-    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-      <div style={{ textAlign: 'center', color: '#888' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
-        <div>Accès non autorisé</div>
-        <button onClick={logout} style={{ marginTop: 16, background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', cursor: 'pointer' }}>
-          Se déconnecter
+  if (needsOnboarding) return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#1E2820' }}>
+      <div style={{ textAlign: 'center', color: '#e8f0eb', maxWidth: 400, padding: 24 }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🔑</div>
+        <h2 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 28, fontWeight: 300, marginBottom: 12 }}>Activez votre compte</h2>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, marginBottom: 24 }}>
+          Vous avez reçu un code d'accès par email. Entrez-le pour activer votre espace intervenant.
+        </p>
+        <button
+          onClick={() => router.push('/espace-intervenant/onboarding')}
+          style={{ background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 32px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+        >
+          Entrer mon code d'accès
         </button>
+        <div style={{ marginTop: 16 }}>
+          <button onClick={logout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+            Se déconnecter
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -137,11 +175,8 @@ export default function IntervenantDashboard() {
         {seniorsList.length > 1 && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>DOSSIER ACTIF</label>
-            <select
-              value={selectedSeniorId || ''}
-              onChange={e => switchSenior(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', border: '1px solid #2ecc71', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}
-            >
+            <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #2ecc71', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
               {seniorsList.map(s => (
                 <option key={s.id} value={s.id}>{s.name} · {s.age} ans · {s.city}</option>
               ))}
@@ -236,7 +271,6 @@ export default function IntervenantDashboard() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   )
