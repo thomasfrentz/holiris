@@ -30,17 +30,17 @@ export default function IntervenantDashboard() {
   )
 
   useEffect(() => {
+    if (!selectedSeniorId || !selectedSenior) return
+
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      if (!selectedSeniorId) { setDataLoading(false); return }
 
       const debutSemaine = new Date()
       debutSemaine.setHours(0, 0, 0, 0)
       const finSemaine = new Date()
       finSemaine.setDate(finSemaine.getDate() + (7 - finSemaine.getDay()))
       finSemaine.setHours(23, 59, 59, 999)
-
       const unMoisAvant = new Date()
       unMoisAvant.setMonth(unMoisAvant.getMonth() - 1)
 
@@ -62,17 +62,17 @@ export default function IntervenantDashboard() {
 
       const notesData = notesRes.data || []
       const alertesData = alertesRes.data || []
-      const seniorData = selectedSenior
 
       setEvents(eventsRes.data || [])
       setNotes(notesData)
       setAlertes(alertesData)
       setDataLoading(false)
 
-      if (notesData.length > 0 && seniorData) {
-        generateResumeWith(notesData, alertesData, seniorData)
+      if (notesData.length > 0) {
+        generateResumeWith(notesData, alertesData, selectedSenior)
       }
     }
+
     loadData()
   }, [selectedSeniorId, selectedSenior])
 
