@@ -33,17 +33,17 @@ export default function Ordonnances() {
     { icon: '👤', label: 'Mon profil', href: '/profil' },
   ]
 
-  const typesOrdonnance = [
-    'Médecin généraliste',
-    'Cardiologue',
-    'Neurologue',
-    'Rhumatologue',
-    'Ophtalmologue',
-    'Dermatologue',
-    'Endocrinologue',
-    'Pneumologue',
-    'Autre spécialiste',
-  ]
+const typesOrdonnance = [
+  'Médicaments',
+  'Examens biologiques',
+  'Imagerie (radio, scanner, IRM)',
+  'Infirmière (IDE)',
+  'Kinésithérapie',
+  'Orthophonie',
+  'Ergothérapie',
+  'Appareillage',
+  'Autre',
+]
 
   useEffect(() => {
     async function loadData() {
