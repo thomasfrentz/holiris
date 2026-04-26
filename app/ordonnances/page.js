@@ -11,8 +11,7 @@ export default function Ordonnances() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState(null)
-
-  const [medicament, setMedicament] = useState('')
+  const [typeOrdonnance, setTypeOrdonnance] = useState('')
   const [dateRenouvellement, setDateRenouvellement] = useState('')
   const [notes, setNotes] = useState('')
 
@@ -34,6 +33,18 @@ export default function Ordonnances() {
     { icon: '👤', label: 'Mon profil', href: '/profil' },
   ]
 
+  const typesOrdonnance = [
+    'Médecin généraliste',
+    'Cardiologue',
+    'Neurologue',
+    'Rhumatologue',
+    'Ophtalmologue',
+    'Dermatologue',
+    'Endocrinologue',
+    'Pneumologue',
+    'Autre spécialiste',
+  ]
+
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -52,7 +63,7 @@ export default function Ordonnances() {
   }, [selectedSeniorId])
 
   function resetForm() {
-    setMedicament('')
+    setTypeOrdonnance('')
     setDateRenouvellement('')
     setNotes('')
     setEditingId(null)
@@ -60,7 +71,7 @@ export default function Ordonnances() {
   }
 
   function startEdit(o) {
-    setMedicament(o.medicament)
+    setTypeOrdonnance(o.type_ordonnance)
     setDateRenouvellement(o.date_renouvellement)
     setNotes(o.notes || '')
     setEditingId(o.id)
@@ -68,26 +79,29 @@ export default function Ordonnances() {
   }
 
   async function saveOrdonnance() {
-    if (!medicament || !dateRenouvellement) return
+    if (!typeOrdonnance || !dateRenouvellement) return
     setSaving(true)
 
     if (editingId) {
       await supabase.from('ordonnances').update({
-        medicament, date_renouvellement: dateRenouvellement, notes: notes || null
+        type_ordonnance: typeOrdonnance,
+        date_renouvellement: dateRenouvellement,
+        notes: notes || null
       }).eq('id', editingId)
       setOrdonnances(prev => prev.map(o =>
-        o.id === editingId ? { ...o, medicament, date_renouvellement: dateRenouvellement, notes } : o
+        o.id === editingId ? { ...o, type_ordonnance: typeOrdonnance, date_renouvellement: dateRenouvellement, notes } : o
       ))
     } else {
       const { data } = await supabase.from('ordonnances').insert({
         senior_id: selectedSeniorId,
-        medicament, date_renouvellement: dateRenouvellement, notes: notes || null
+        type_ordonnance: typeOrdonnance,
+        date_renouvellement: dateRenouvellement,
+        notes: notes || null
       }).select()
       if (data) setOrdonnances(prev => [...prev, data[0]].sort((a, b) =>
         new Date(a.date_renouvellement) - new Date(b.date_renouvellement)
       ))
     }
-
     resetForm()
     setSaving(false)
   }
@@ -98,15 +112,14 @@ export default function Ordonnances() {
   }
 
   function joursRestants(date) {
-    const diff = Math.ceil((new Date(date) - new Date()) / (1000 * 60 * 60 * 24))
-    return diff
+    return Math.ceil((new Date(date) - new Date()) / (1000 * 60 * 60 * 24))
   }
 
   function statutCouleur(jours) {
-    if (jours < 0) return { color: '#e74c3c', bg: '#fdf0f0', label: 'Expiré' }
-    if (jours <= 3) return { color: '#e74c3c', bg: '#fdf0f0', label: `${jours}j` }
-    if (jours <= 7) return { color: '#f39c12', bg: '#fef9ec', label: `${jours}j` }
-    return { color: '#2ecc71', bg: '#eafaf1', label: `${jours}j` }
+    if (jours < 0) return { color: '#e74c3c', bg: '#fdf0f0' }
+    if (jours <= 3) return { color: '#e74c3c', bg: '#fdf0f0' }
+    if (jours <= 7) return { color: '#f39c12', bg: '#fef9ec' }
+    return { color: '#2ecc71', bg: '#eafaf1' }
   }
 
   if (loading || !selectedSenior) return (
@@ -183,13 +196,16 @@ export default function Ordonnances() {
         {showForm && (
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>
-              {editingId ? 'Modifier l\'ordonnance' : 'Nouvelle ordonnance'}
+              {editingId ? "Modifier l'ordonnance" : 'Nouvelle ordonnance'}
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Médicament / Ordonnance</label>
-                <input placeholder="Ex: Metformine 500mg" value={medicament} onChange={e => setMedicament(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
+                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Type d'ordonnance</label>
+                <select value={typeOrdonnance} onChange={e => setTypeOrdonnance(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
+                  <option value="">Sélectionner...</option>
+                  {typesOrdonnance.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
               <div>
                 <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Date de renouvellement</label>
@@ -199,11 +215,11 @@ export default function Ordonnances() {
             </div>
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Notes (optionnel)</label>
-              <input placeholder="Ex: Pharmacie Roca, boîte de 30" value={notes} onChange={e => setNotes(e.target.value)}
+              <input placeholder="Ex: Dr Martin, renouvellement tous les 3 mois" value={notes} onChange={e => setNotes(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={saveOrdonnance} disabled={saving || !medicament || !dateRenouvellement}
+              <button onClick={saveOrdonnance} disabled={saving || !typeOrdonnance || !dateRenouvellement}
                 style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
                 {saving ? 'Enregistrement...' : editingId ? 'Modifier' : 'Ajouter'}
               </button>
@@ -216,14 +232,20 @@ export default function Ordonnances() {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {ordonnances.map(o => {
+          {ordonnances.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>💊</div>
+              <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Aucune ordonnance</div>
+              <div style={{ fontSize: 13 }}>Ajoutez les ordonnances de {selectedSenior?.name}</div>
+            </div>
+          ) : ordonnances.map(o => {
             const jours = joursRestants(o.date_renouvellement)
             const statut = statutCouleur(jours)
             return (
               <div key={o.id} style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{ fontSize: 32 }}>💊</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#12201a' }}>{o.medicament}</div>
+                  <div style={{ fontWeight: 'bold', fontSize: 15, color: '#12201a' }}>{o.type_ordonnance}</div>
                   <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>
                     Renouvellement le {new Date(o.date_renouvellement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
                   </div>
@@ -231,7 +253,7 @@ export default function Ordonnances() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ background: statut.bg, color: statut.color, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 'bold' }}>
-                    {jours < 0 ? 'Expiré' : `Dans ${statut.label}`}
+                    {jours < 0 ? 'Expiré' : `Dans ${jours}j`}
                   </div>
                   <button onClick={() => startEdit(o)}
                     style={{ background: '#f0f4f0', color: '#5a8a6a', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
@@ -245,14 +267,6 @@ export default function Ordonnances() {
               </div>
             )
           })}
-
-          {ordonnances.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>💊</div>
-              <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Aucune ordonnance</div>
-              <div style={{ fontSize: 13 }}>Ajoutez les médicaments de {selectedSenior?.name}</div>
-            </div>
-          )}
         </div>
       </main>
     </div>

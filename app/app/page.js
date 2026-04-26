@@ -90,7 +90,7 @@ export default function App() {
         const jours = Math.ceil((new Date(o.date_renouvellement) - aujourd_hui) / (1000 * 60 * 60 * 24))
         return {
           id: 'ordonnance-' + o.id,
-          message: `Renouvellement ordonnance "${o.medicament}" dans ${jours} jour${jours > 1 ? 's' : ''}`,
+          message: `Renouvellement ordonnance "${o.type_ordonnance}" dans ${jours} jour${jours > 1 ? 's' : ''}`,
           niveau: jours <= 2 ? 'danger' : 'warning',
           created_at: new Date().toISOString(),
           lu: false,

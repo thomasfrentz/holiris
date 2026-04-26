@@ -161,7 +161,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                 {joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance} jour${joursOrdonnance > 1 ? 's' : ''}`}
               </div>
               <div style={{ fontSize: 13, color: '#888' }}>Avant renouvellement</div>
-              <div style={{ fontSize: 11, color: '#5a8a6a', marginTop: 2 }}>{prochaineOrdonnance.medicament}</div>
+              <div style={{ fontSize: 11, color: '#5a8a6a', marginTop: 2 }}>{prochaineOrdonnance.type_ordonnance}</div>
             </>
           ) : (
             <div style={{ fontSize: 14, color: '#aaa' }}>Aucune ordonnance</div>
