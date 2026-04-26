@@ -151,12 +151,14 @@ export default function App() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
-            { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-            { icon: '📅', label: 'Agenda', href: '/agenda' },
-            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-            { icon: '👤', label: 'Mon profil', href: '/profil' },
+          { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+          { icon: '📅', label: 'Agenda', href: '/agenda' },
+          { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+          { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
+          { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+          { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+          { icon: '👤', label: 'Mon profil', href: '/profil' },
+
           ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
