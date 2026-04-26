@@ -11,6 +11,7 @@ export default function App() {
   const [notes, setNotes] = useState([])
   const [totalNotes, setTotalNotes] = useState(0)
   const [alertes, setAlertes] = useState([])
+  const [ordonnances, setOrdonnances] = useState([])
   const [loading, setLoading] = useState(true)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
@@ -25,7 +26,6 @@ export default function App() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      // Vérifier si l'utilisateur a un profil famille
       const { data: familleData } = await supabase
         .from('famille')
         .select('senior_id')
@@ -33,7 +33,6 @@ export default function App() {
         .limit(1)
 
       if (!familleData?.length) {
-        // Pas de profil famille — vérifier si intervenant
         const { data: intervenantData } = await supabase
           .from('intervenants')
           .select('id')
@@ -56,37 +55,50 @@ export default function App() {
       finSemaine.setDate(finSemaine.getDate() + (7 - finSemaine.getDay()))
       finSemaine.setHours(23, 59, 59, 999)
 
-      const { data: eventsData } = await supabase
-        .from('events')
-        .select('*, intervenants(*)')
-        .eq('senior_id', selectedSeniorId)
-        .gte('scheduled_at', debutSemaine.toISOString())
-        .lte('scheduled_at', finSemaine.toISOString())
-        .order('scheduled_at', { ascending: true })
-      setEvents(eventsData || [])
+      const [eventsRes, notesRes, notesCountRes, alertesRes, ordonnancesRes] = await Promise.all([
+        supabase.from('events').select('*, intervenants(*)')
+          .eq('senior_id', selectedSeniorId)
+          .gte('scheduled_at', debutSemaine.toISOString())
+          .lte('scheduled_at', finSemaine.toISOString())
+          .order('scheduled_at', { ascending: true }),
+        supabase.from('notes').select('*')
+          .eq('senior_id', selectedSeniorId)
+          .order('created_at', { ascending: false })
+          .limit(3),
+        supabase.from('notes').select('*', { count: 'exact', head: true })
+          .eq('senior_id', selectedSeniorId),
+        supabase.from('alertes').select('*')
+          .eq('senior_id', selectedSeniorId)
+          .eq('lu', false)
+          .order('created_at', { ascending: false }),
+        supabase.from('ordonnances').select('*')
+          .eq('senior_id', selectedSeniorId)
+          .order('date_renouvellement', { ascending: true })
+      ])
 
-      const { data: notesData } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('senior_id', selectedSeniorId)
-        .order('created_at', { ascending: false })
-        .limit(3)
-      setNotes(notesData || [])
+      setEvents(eventsRes.data || [])
+      setNotes(notesRes.data || [])
+      setTotalNotes(notesCountRes.count || 0)
+      setOrdonnances(ordonnancesRes.data || [])
 
-      const { count } = await supabase
-        .from('notes')
-        .select('*', { count: 'exact', head: true })
-        .eq('senior_id', selectedSeniorId)
-      setTotalNotes(count || 0)
+      // Générer alertes renouvellement automatiquement
+      const aujourd_hui = new Date()
+      const alertesOrdonnances = (ordonnancesRes.data || []).filter(o => {
+        const jours = Math.ceil((new Date(o.date_renouvellement) - aujourd_hui) / (1000 * 60 * 60 * 24))
+        return jours <= 7 && jours >= 0
+      }).map(o => {
+        const jours = Math.ceil((new Date(o.date_renouvellement) - aujourd_hui) / (1000 * 60 * 60 * 24))
+        return {
+          id: 'ordonnance-' + o.id,
+          message: `Renouvellement ordonnance "${o.medicament}" dans ${jours} jour${jours > 1 ? 's' : ''}`,
+          niveau: jours <= 2 ? 'danger' : 'warning',
+          created_at: new Date().toISOString(),
+          lu: false,
+          type: 'ordonnance'
+        }
+      })
 
-      const { data: alertesData } = await supabase
-        .from('alertes')
-        .select('*')
-        .eq('senior_id', selectedSeniorId)
-        .eq('lu', false)
-        .order('created_at', { ascending: false })
-      setAlertes(alertesData || [])
-
+      setAlertes([...alertesOrdonnances, ...(alertesRes.data || [])])
       setLoading(false)
     }
     loadData()
@@ -189,6 +201,7 @@ export default function App() {
         initialNotes={notes}
         initialTotalNotes={totalNotes}
         initialAlertes={alertes}
+        initialOrdonnances={ordonnances}
         supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL}
         supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       />
