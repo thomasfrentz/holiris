@@ -44,6 +44,7 @@ export default function Agenda() {
     { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
     { icon: '📅', label: 'Agenda', href: '/agenda' },
     { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+    { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
     { icon: '👥', label: 'Intervenants', href: '/intervenants' },
     { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
     { icon: '👤', label: 'Mon profil', href: '/profil' },
@@ -375,12 +376,15 @@ export default function Agenda() {
             <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{d}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {dayEvents.map(e => {
-                const cfg = statusConfig[e.status] ?? { color: '#999', label: e.status }
+                const estPasse = new Date(e.scheduled_at) < new Date() && e.status === 'a_venir'
+                const cfg = estPasse
+                  ? { color: '#bbb', label: '⏱ Passé' }
+                  : statusConfig[e.status] ?? { color: '#999', label: e.status }
                 return (
                   <div key={e.id} style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', borderLeft: '4px solid ' + cfg.color, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
                     <div style={{ fontSize: 24 }}>{typeIcon[e.type] ?? '📋'}</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold', fontSize: 14, color: '#12201a' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: 14, color: estPasse ? '#aaa' : '#12201a' }}>
                         {e.label}
                         {e.recurrence && <span style={{ fontSize: 11, color: '#2ecc71', marginLeft: 8 }}>🔄 {recurrenceLabel[e.recurrence]}</span>}
                       </div>
