@@ -12,6 +12,7 @@ export default function Intervenants() {
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(null)
   const [emailSent, setEmailSent] = useState(null)
+  const [whatsappSent, setWhatsappSent] = useState(null)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
 
   const [prenom, setPrenom] = useState('')
@@ -30,6 +31,7 @@ export default function Intervenants() {
     { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
     { icon: '📅', label: 'Agenda', href: '/agenda' },
     { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+    { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
     { icon: '👥', label: 'Intervenants', href: '/intervenants' },
     { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
     { icon: '👤', label: 'Mon profil', href: '/profil' },
@@ -66,7 +68,6 @@ export default function Intervenants() {
     }).select()
 
     if (!error && data) {
-      // Envoyer email si renseigné
       if (email && data[0]) {
         try {
           const res = await fetch('/api/invite-intervenant-email', {
@@ -78,12 +79,16 @@ export default function Intervenants() {
               prenom,
               nom,
               role,
-              seniorName: selectedSenior?.name
+              seniorName: selectedSenior?.name,
+              phone: telephone
             })
           })
           const result = await res.json()
-          if (result.success) setEmailSent(prenom + ' ' + nom)
-        } catch (e) { console.error('Erreur email:', e) }
+          if (result.success) {
+            setEmailSent(prenom + ' ' + nom)
+            setWhatsappSent(prenom + ' ' + nom)
+          }
+        } catch (e) { console.error('Erreur invitation:', e) }
       }
 
       setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
@@ -94,7 +99,7 @@ export default function Intervenants() {
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
       setIntervenants(updated || [])
-      setTimeout(() => setEmailSent(null), 5000)
+      setTimeout(() => { setEmailSent(null); setWhatsappSent(null) }, 5000)
     }
     setSaving(false)
   }
@@ -191,9 +196,9 @@ export default function Intervenants() {
           </button>
         </div>
 
-        {emailSent && (
+        {(emailSent || whatsappSent) && (
           <div style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#27ae60', fontWeight: 'bold' }}>
-            ✅ Email d'invitation envoyé à {emailSent} !
+            ✅ Email et WhatsApp envoyés à {emailSent} !
           </div>
         )}
 
@@ -222,7 +227,7 @@ export default function Intervenants() {
               <input placeholder="Email (optionnel — pour envoyer l'invitation)" value={email} onChange={e => setEmail(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #b8d8bc', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
               <div style={{ fontSize: 11, color: '#5a8a6a', marginTop: 4 }}>
-                💡 Un email avec un code d'accès sera envoyé automatiquement
+                💡 Un email + WhatsApp avec le code d'accès seront envoyés automatiquement
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
