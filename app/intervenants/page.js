@@ -27,16 +27,6 @@ export default function Intervenants() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const navItems = [
-    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-    { icon: '📅', label: 'Agenda', href: '/agenda' },
-    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-    { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
-    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-    { icon: '👤', label: 'Mon profil', href: '/profil' },
-  ]
-
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -75,10 +65,7 @@ export default function Intervenants() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               intervenantId: data[0].id,
-              email,
-              prenom,
-              nom,
-              role,
+              email, prenom, nom, role,
               seniorName: selectedSenior?.name,
               phone: telephone
             })
@@ -160,7 +147,16 @@ export default function Intervenants() {
         )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {navItems.map((item) => (
+          {[
+            { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+            { icon: '📅', label: 'Agenda', href: '/agenda' },
+            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
+            { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
+            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
+          ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -198,7 +194,7 @@ export default function Intervenants() {
 
         {(emailSent || whatsappSent) && (
           <div style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#27ae60', fontWeight: 'bold' }}>
-            ✅ Email et WhatsApp envoyés à {emailSent} !
+            ✅ Email et SMS envoyés à {emailSent} !
           </div>
         )}
 
@@ -227,7 +223,7 @@ export default function Intervenants() {
               <input placeholder="Email (optionnel — pour envoyer l'invitation)" value={email} onChange={e => setEmail(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #b8d8bc', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
               <div style={{ fontSize: 11, color: '#5a8a6a', marginTop: 4 }}>
-                💡 Un email + WhatsApp avec le code d'accès seront envoyés automatiquement
+                💡 Un email + SMS avec le code d'accès seront envoyés automatiquement
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>

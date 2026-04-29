@@ -23,27 +23,17 @@ export default function Ordonnances() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const navItems = [
-    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-    { icon: '📅', label: 'Agenda', href: '/agenda' },
-    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-    { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
-    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-    { icon: '👤', label: 'Mon profil', href: '/profil' },
+  const typesOrdonnance = [
+    'Médicaments',
+    'Examens biologiques',
+    'Imagerie (radio, scanner, IRM)',
+    'Infirmière (IDE)',
+    'Kinésithérapie',
+    'Orthophonie',
+    'Ergothérapie',
+    'Appareillage',
+    'Autre',
   ]
-
-const typesOrdonnance = [
-  'Médicaments',
-  'Examens biologiques',
-  'Imagerie (radio, scanner, IRM)',
-  'Infirmière (IDE)',
-  'Kinésithérapie',
-  'Orthophonie',
-  'Ergothérapie',
-  'Appareillage',
-  'Autre',
-]
 
   useEffect(() => {
     async function loadData() {
@@ -157,7 +147,16 @@ const typesOrdonnance = [
         )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {navItems.map((item) => (
+          {[
+            { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+            { icon: '📅', label: 'Agenda', href: '/agenda' },
+            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
+            { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
+            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
+          ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -256,13 +255,9 @@ const typesOrdonnance = [
                     {jours < 0 ? 'Expiré' : `Dans ${jours}j`}
                   </div>
                   <button onClick={() => startEdit(o)}
-                    style={{ background: '#f0f4f0', color: '#5a8a6a', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-                    ✏️
-                  </button>
+                    style={{ background: '#f0f4f0', color: '#5a8a6a', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>✏️</button>
                   <button onClick={() => deleteOrdonnance(o.id)}
-                    style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-                    🗑️
-                  </button>
+                    style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>🗑️</button>
                 </div>
               </div>
             )

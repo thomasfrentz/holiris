@@ -23,15 +23,6 @@ export default function Assistant() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const navItems = [
-    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-    { icon: '📅', label: 'Agenda', href: '/agenda' },
-    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-    { icon: '👤', label: 'Mon profil', href: '/profil' },
-  ]
-
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -39,16 +30,14 @@ export default function Assistant() {
       if (!selectedSeniorId) return
 
       const { data: notesData } = await supabase
-        .from('notes')
-        .select('*')
+        .from('notes').select('*')
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
         .limit(10)
       setNotes(notesData || [])
 
       const { data: eventsData } = await supabase
-        .from('events')
-        .select('*, intervenants(*)')
+        .from('events').select('*, intervenants(*)')
         .eq('senior_id', selectedSeniorId)
         .order('scheduled_at', { ascending: false })
         .limit(10)
@@ -121,7 +110,16 @@ export default function Assistant() {
         )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {navItems.map((item) => (
+          {[
+            { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+            { icon: '📅', label: 'Agenda', href: '/agenda' },
+            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
+            { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
+            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
+          ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,

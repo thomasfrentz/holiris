@@ -25,15 +25,6 @@ export default function Profil() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const navItems = [
-    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-    { icon: '📅', label: 'Agenda', href: '/agenda' },
-    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-    { icon: '👤', label: 'Mon profil', href: '/profil' },
-  ]
-
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -41,8 +32,7 @@ export default function Profil() {
       setUser(user)
 
       const { data: familleData } = await supabase
-        .from('famille')
-        .select('*')
+        .from('famille').select('*')
         .eq('user_id', user.id)
         .limit(1)
 
@@ -69,11 +59,7 @@ export default function Profil() {
 
     const { error } = await supabase
       .from('famille')
-      .update({
-        name: prenom + ' ' + nom,
-        role: lien,
-        whatsapp: whatsappFormatted || null
-      })
+      .update({ name: prenom + ' ' + nom, role: lien, whatsapp: whatsappFormatted || null })
       .eq('user_id', user.id)
 
     if (!error) {
@@ -82,11 +68,7 @@ export default function Profil() {
           await fetch('/api/invite-famille', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              whatsapp: whatsappFormatted,
-              prenom,
-              seniorName: selectedSenior?.name
-            })
+            body: JSON.stringify({ whatsapp: whatsappFormatted, prenom, seniorName: selectedSenior?.name })
           })
         } catch (e) { console.error('Erreur envoi message bienvenue:', e) }
       }
@@ -142,7 +124,16 @@ export default function Profil() {
         )}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {navItems.map((item) => (
+          {[
+            { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+            { icon: '📅', label: 'Agenda', href: '/agenda' },
+            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
+            { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
+            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
+          ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -172,7 +163,6 @@ export default function Profil() {
 
         <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', maxWidth: 500 }}>
           <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 20 }}>Mes informations</h2>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Prénom</label>
@@ -185,18 +175,14 @@ export default function Profil() {
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
             </div>
           </div>
-
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>
-              Lien avec {selectedSenior?.name}
-            </label>
+            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Lien avec {selectedSenior?.name}</label>
             <select value={lien} onChange={e => setLien(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
               <option value="">Sélectionnez votre lien</option>
               {liens.map(l => <option key={l}>{l}</option>)}
             </select>
           </div>
-
           <div style={{ marginBottom: 20 }}>
             <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>📱 Numéro WhatsApp</label>
             <input placeholder="Ex: 06 12 34 56 78" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
@@ -205,13 +191,11 @@ export default function Profil() {
               💡 Renseignez votre numéro pour envoyer et recevoir des notes via WhatsApp
             </div>
           </div>
-
           {saved && (
             <div style={{ background: '#eafaf1', color: '#27ae60', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 'bold' }}>
               ✅ Profil sauvegardé !
             </div>
           )}
-
           <button onClick={saveProfil} disabled={saving || !prenom || !nom}
             style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
             {saving ? 'Sauvegarde...' : 'Sauvegarder'}
