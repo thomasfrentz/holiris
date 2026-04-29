@@ -25,14 +25,12 @@ export default function Login() {
       if (error) { setError(error.message); setLoading(false); return }
 
       if (data.user) {
-        // Confirmer automatiquement l'email
         await fetch('/api/confirm-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: data.user.id })
         })
 
-        // Connecter directement
         const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
 
         if (signInData?.user) {
@@ -45,7 +43,8 @@ export default function Login() {
           if (intervenantData?.length > 0) {
             router.push('/espace-intervenant')
           } else {
-            router.push('/app')
+            // Nouveau compte — vérifier si proche ou intervenant
+            router.push('/famille-onboarding')
           }
         }
       }
@@ -64,8 +63,19 @@ export default function Login() {
 
     if (intervenantData?.length > 0) {
       router.push('/espace-intervenant')
-    } else {
+      return
+    }
+
+    const { data: familleData } = await supabase
+      .from('famille')
+      .select('id')
+      .eq('user_id', data.user.id)
+      .limit(1)
+
+    if (familleData?.length > 0) {
       router.push('/app')
+    } else {
+      router.push('/famille-onboarding')
     }
   }
 
@@ -135,6 +145,13 @@ export default function Login() {
             >
               {isSignup ? 'Déjà un compte ? Se connecter' : 'Créer un compte'}
             </button>
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 4 }}>
+            <a href="/famille-onboarding"
+              style={{ fontSize: 12, color: 'rgba(154,184,159,0.6)', textDecoration: 'none' }}>
+              J'ai un code d'accès famille →
+            </a>
           </div>
         </div>
 
