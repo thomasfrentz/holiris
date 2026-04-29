@@ -42,7 +42,7 @@ export default function App() {
         if (intervenantData?.length > 0) {
           router.push('/espace-intervenant')
         } else {
-          router.push('/espace-intervenant')
+          router.push('/famille-onboarding')
         }
         return
       }
@@ -81,7 +81,6 @@ export default function App() {
       setTotalNotes(notesCountRes.count || 0)
       setOrdonnances(ordonnancesRes.data || [])
 
-      // Générer alertes renouvellement automatiquement
       const aujourd_hui = new Date()
       const alertesOrdonnances = (ordonnancesRes.data || []).filter(o => {
         const jours = Math.ceil((new Date(o.date_renouvellement) - aujourd_hui) / (1000 * 60 * 60 * 24))
@@ -151,14 +150,14 @@ export default function App() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
-          { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-          { icon: '📅', label: 'Agenda', href: '/agenda' },
-          { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-          { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
-          { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-          { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-          { icon: '👤', label: 'Mon profil', href: '/profil' },
-
+            { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
+            { icon: '📅', label: 'Agenda', href: '/agenda' },
+            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
+            { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
+            { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
+            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
+            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
+            { icon: '👤', label: 'Mon profil', href: '/profil' },
           ].map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
               <div style={{

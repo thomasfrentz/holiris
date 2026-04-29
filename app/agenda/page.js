@@ -45,6 +45,7 @@ export default function Agenda() {
     { icon: '📅', label: 'Agenda', href: '/agenda' },
     { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
     { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
+    { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
     { icon: '👥', label: 'Intervenants', href: '/intervenants' },
     { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
     { icon: '👤', label: 'Mon profil', href: '/profil' },
