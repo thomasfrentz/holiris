@@ -1,4 +1,3 @@
-// app/components/Layout.js
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -30,7 +29,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #FCFDFC; }
+        body { background: #FCFDFC; font-size: 16px; }
 
         .hl-wrap { display: flex; height: 100vh; font-family: 'Inter', system-ui, sans-serif; background: #FCFDFC; color: #1F2A24; }
         .hl-sidebar { display: flex; }
@@ -39,14 +38,14 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         @media (max-width: 768px) {
           .hl-sidebar { display: none !important; }
           .hl-bottom { display: flex !important; }
-          .hl-main { padding: 24px 20px 88px !important; }
+          .hl-main { padding: 24px 20px 96px !important; }
           .hl-wrap { min-height: 100vh; height: auto !important; }
         }
 
         .hl-navlink { text-decoration: none; display: block; }
         .hl-navlink-inner {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 9px 12px; border-radius: 8px;
+          padding: 11px 14px; border-radius: 9px;
           transition: all 0.15s; cursor: pointer;
         }
         .hl-navlink:hover .hl-navlink-inner { background: #EAF4EF; }
@@ -65,10 +64,10 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
 
         {/* ───── Sidebar ───── */}
         <aside className="hl-sidebar hl-scroll" style={{
-          width: 240,
+          width: 256,
           background: '#fff',
           borderRight: '1px solid #EBF0EC',
-          padding: '28px 16px',
+          padding: '32px 18px',
           flexDirection: 'column',
           gap: 0,
           flexShrink: 0,
@@ -76,18 +75,18 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         }}>
 
           {/* Logo */}
-          <Link href="/app" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '4px 12px', marginBottom: 32 }}>
-            <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+          <Link href="/app" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '4px 10px', marginBottom: 36 }}>
+            <svg width="38" height="38" viewBox="0 0 64 64" fill="none">
               <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="2" fill="none"/>
               <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="2" fill="none"/>
               <circle cx="32" cy="32" r="4" fill="#7FAF9B"/>
               <circle cx="32" cy="32" r="1.8" fill="#fff"/>
             </svg>
             <div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, letterSpacing: '0.05em', color: '#1F2A24', lineHeight: 1 }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 500, letterSpacing: '0.05em', color: '#1F2A24', lineHeight: 1 }}>
                 Holiris
               </div>
-              <div style={{ fontSize: 8, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 2 }}>
+              <div style={{ fontSize: 9, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 3 }}>
                 {isIntervenant ? 'Intervenant' : 'Pyrénées-Orientales'}
               </div>
             </div>
@@ -95,39 +94,37 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
 
           {/* Senior card */}
           {senior && (
-            <div style={{ background: '#EAF4EF', borderRadius: 10, padding: '12px 14px', marginBottom: 24 }}>
-              <div style={{ fontSize: 9, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ background: '#EAF4EF', borderRadius: 10, padding: '14px 16px', marginBottom: 28 }}>
+              <div style={{ fontSize: 10, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>
                 Dossier actif
               </div>
               {isAdmin && seniors?.length > 1 ? (
                 <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', color: '#1F2A24', border: 'none', fontSize: 14, cursor: 'pointer', outline: 'none', fontFamily: "'Cormorant Garamond', serif", fontWeight: 500 }}>
+                  style={{ width: '100%', background: 'transparent', color: '#1F2A24', border: 'none', fontSize: 15, cursor: 'pointer', outline: 'none', fontFamily: "'Cormorant Garamond', serif", fontWeight: 500 }}>
                   {seniors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               ) : (
-                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 500, color: '#1F2A24' }}>{senior.name}</div>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17, fontWeight: 500, color: '#1F2A24' }}>{senior.name}</div>
               )}
-              <div style={{ fontSize: 11, color: '#6F7C75', marginTop: 3 }}>{senior.age} ans · {senior.city}</div>
+              <div style={{ fontSize: 12, color: '#6F7C75', marginTop: 3 }}>{senior.age} ans · {senior.city}</div>
             </div>
           )}
 
           {/* Nav */}
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             {navItems.map((item) => {
               const active = pathname === item.href
               return (
                 <Link key={item.href} href={item.href} className="hl-navlink">
-                  <div className="hl-navlink-inner" style={{
-                    background: active ? '#EAF4EF' : 'transparent',
-                  }}>
+                  <div className="hl-navlink-inner" style={{ background: active ? '#EAF4EF' : 'transparent' }}>
                     <span className="hl-navlink-text" style={{
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: active ? 500 : 400,
                       color: active ? '#4A8870' : '#6F7C75',
                     }}>
                       {item.label}
                     </span>
-                    {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#7FAF9B' }} />}
+                    {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7FAF9B', flexShrink: 0 }} />}
                   </div>
                 </Link>
               )
@@ -135,15 +132,15 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
           </nav>
 
           {isAdmin && (
-            <div style={{ marginTop: 16, padding: '8px 12px', background: '#FEF0F1', borderRadius: 8 }}>
-              <div style={{ fontSize: 10, color: '#C47A82', fontWeight: 500 }}>Mode Admin actif</div>
+            <div style={{ marginTop: 20, padding: '9px 14px', background: '#FEF0F1', borderRadius: 8 }}>
+              <div style={{ fontSize: 11, color: '#C47A82', fontWeight: 500 }}>Mode Admin actif</div>
             </div>
           )}
         </aside>
 
         {/* ───── Main ───── */}
         <main className="hl-main hl-scroll" style={{
-          flex: 1, padding: '36px 40px', overflowY: 'auto',
+          flex: 1, padding: '40px 44px', overflowY: 'auto',
           background: '#F7F9F8',
         }}>
           {children}
@@ -156,8 +153,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
           borderTop: '1px solid #EBF0EC',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          paddingBottom: 'env(safe-area-inset-bottom, 8px)',
-          paddingTop: 6,
+          paddingBottom: 'env(safe-area-inset-bottom, 10px)',
+          paddingTop: 8,
           zIndex: 100,
           justifyContent: 'space-around', alignItems: 'center',
         }}>
@@ -166,15 +163,15 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
             return (
               <Link key={item.href} href={item.href} className="hl-bottom-item">
                 <div style={{
-                  width: 32, height: 32, borderRadius: 9,
+                  width: 36, height: 36, borderRadius: 10,
                   background: active ? '#EAF4EF' : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'background 0.2s',
                 }}>
-                  <div style={{ width: 16, height: 2, borderRadius: 1, background: active ? '#7FAF9B' : '#C8D4CD' }} />
+                  <div style={{ width: 18, height: 2, borderRadius: 1, background: active ? '#7FAF9B' : '#C8D4CD' }} />
                 </div>
                 <span style={{
-                  fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
                   color: active ? '#4A8870' : '#9BB5AA',
                   fontWeight: active ? 600 : 400,
                 }}>
