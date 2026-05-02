@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
+function calculerAge(dateNaissance) {
+  if (!dateNaissance) return null
+  return Math.floor((new Date() - new Date(dateNaissance)) / (365.25 * 24 * 60 * 60 * 1000))
+}
+
+function enrichirSenior(senior) {
+  if (!senior) return senior
+  return {
+    ...senior,
+    age: senior.date_naissance ? calculerAge(senior.date_naissance) : senior.age
+  }
+}
+
 export function useSenior() {
   const [seniors, setSeniors] = useState([])
   const [selectedSeniorId, setSelectedSeniorId] = useState(null)
@@ -33,14 +46,16 @@ export function useSenior() {
           .from('seniors')
           .select('*')
           .order('name')
-        setSeniors(allSeniors || [])
-        setSelectedSeniorId(famille.selected_senior_id || allSeniors?.[0]?.id)
+        const enrichis = (allSeniors || []).map(enrichirSenior)
+        setSeniors(enrichis)
+        setSelectedSeniorId(famille.selected_senior_id || enrichis?.[0]?.id)
       } else {
         const { data: seniorData } = await supabase
           .from('seniors')
           .select('*')
           .eq('id', famille.senior_id)
-        setSeniors(seniorData || [])
+        const enrichis = (seniorData || []).map(enrichirSenior)
+        setSeniors(enrichis)
         setSelectedSeniorId(famille.senior_id)
       }
 
