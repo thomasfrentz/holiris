@@ -40,8 +40,12 @@ export default function App() {
 
       if (!selectedSeniorId) return
 
-      const debutSemaine = new Date()
-      debutSemaine.setHours(0, 0, 0, 0)
+      // 30 jours en arrière pour capturer les derniers passages
+      const debutPeriode = new Date()
+      debutPeriode.setDate(debutPeriode.getDate() - 30)
+      debutPeriode.setHours(0, 0, 0, 0)
+
+      // Fin de la semaine courante pour les prochains RDV
       const finSemaine = new Date()
       finSemaine.setDate(finSemaine.getDate() + (7 - finSemaine.getDay()))
       finSemaine.setHours(23, 59, 59, 999)
@@ -49,7 +53,7 @@ export default function App() {
       const [eventsRes, notesRes, notesCountRes, alertesRes, ordonnancesRes] = await Promise.all([
         supabase.from('events').select('*, intervenants(*)')
           .eq('senior_id', selectedSeniorId)
-          .gte('scheduled_at', debutSemaine.toISOString())
+          .gte('scheduled_at', debutPeriode.toISOString())
           .lte('scheduled_at', finSemaine.toISOString())
           .order('scheduled_at', { ascending: true }),
         supabase.from('notes').select('*')
@@ -94,8 +98,8 @@ export default function App() {
   }, [selectedSeniorId])
 
   if (loading || !selectedSenior) return (
-    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-      <div style={{ color: '#888', fontSize: 16 }}>Chargement...</div>
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", background: '#F7F9F8' }}>
+      <div style={{ color: '#9BB5AA', fontSize: 14 }}>Chargement...</div>
     </div>
   )
 
