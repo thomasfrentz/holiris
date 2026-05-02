@@ -1,205 +1,311 @@
+// app/landing/page.js
 'use client'
 import Link from 'next/link'
 
-const Logo = ({ size = 32 }) => (
+const Logo = ({ size = 28 }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
-      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
-      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
-      <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
-      <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
+      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="2" fill="none"/>
+      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="2" fill="none"/>
+      <circle cx="32" cy="32" r="4" fill="#7FAF9B"/>
+      <circle cx="32" cy="32" r="1.8" fill="#fff"/>
     </svg>
-    <span style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: size * 0.75, fontWeight: 300, letterSpacing: '0.12em' }}>
-      Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
+    <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: size * 0.85, fontWeight: 500, letterSpacing: '0.05em', color: '#1F2A24' }}>
+      Holiris
     </span>
   </div>
 )
 
 export default function Landing() {
   return (
-    <div style={{ fontFamily: 'var(--font-body, DM Sans, sans-serif)', background: '#1E2820', color: '#FAFCFA', margin: 0 }}>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: '#FCFDFC', color: '#1F2A24', margin: 0 }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #FCFDFC; }
+        .landing-btn-primary {
+          background: #7FAF9B; color: #fff; text-decoration: none;
+          padding: 13px 32px; border-radius: 8px; font-size: 14px;
+          font-weight: 500; letter-spacing: 0.03em; display: inline-block;
+          transition: background 0.2s, transform 0.15s;
+          font-family: 'Inter', sans-serif;
+        }
+        .landing-btn-primary:hover { background: #4A8870; transform: translateY(-1px); }
+        .landing-btn-outline {
+          background: transparent; color: #4A8870; text-decoration: none;
+          padding: 13px 32px; border-radius: 8px; font-size: 14px;
+          font-weight: 500; letter-spacing: 0.03em; display: inline-block;
+          border: 1.5px solid #7FAF9B; transition: all 0.2s;
+          font-family: 'Inter', sans-serif;
+        }
+        .landing-btn-outline:hover { background: #EAF4EF; transform: translateY(-1px); }
+        .feature-card {
+          background: #fff; border: 1px solid #E8EFEB; border-radius: 14px;
+          padding: 28px 24px; transition: box-shadow 0.2s, border-color 0.2s;
+        }
+        .feature-card:hover { box-shadow: 0 8px 32px rgba(127,175,155,0.12); border-color: #C8DDD4; }
+        .nav-link { color: #6F7C75; text-decoration: none; font-size: 14px; font-weight: 400; transition: color 0.15s; }
+        .nav-link:hover { color: #1F2A24; }
+        @media (max-width: 768px) {
+          .hero-title { font-size: 48px !important; }
+          .hero-desc { font-size: 15px !important; }
+          .features-grid { grid-template-columns: 1fr !important; }
+          .steps-grid { grid-template-columns: 1fr 1fr !important; }
+          .pricing-grid { grid-template-columns: 1fr !important; }
+          .nav-links { display: none !important; }
+          .hero-btns { flex-direction: column !important; align-items: stretch !important; }
+          .hero-btns a { text-align: center !important; }
+          .footer-inner { flex-direction: column !important; gap: 16px !important; }
+        }
+      `}</style>
 
-      {/* NAV */}
-      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 48px', background: 'rgba(30,40,32,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(107,143,113,0.15)' }}>
-        <Logo size={32} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <a href="#fonctionnalites" style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: 14 }}>Fonctionnalités</a>
-          <a href="#tarifs" style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: 14 }}>Tarifs</a>
-          <Link href="/login" style={{ background: '#6B8F71', color: '#FAFCFA', textDecoration: 'none', padding: '10px 24px', borderRadius: 2, fontSize: 13, fontWeight: 500, letterSpacing: '0.06em' }}>
+      {/* ── NAV ── */}
+      <nav style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 48px',
+        background: 'rgba(252,253,252,0.92)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: '1px solid #EBF0EC',
+      }}>
+        <Logo size={28} />
+        <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          <a href="#fonctionnalites" className="nav-link">Fonctionnalités</a>
+          <a href="#comment" className="nav-link">Comment ça marche</a>
+          <a href="#tarifs" className="nav-link">Tarifs</a>
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Link href="/login" style={{ fontSize: 14, color: '#4A8870', fontWeight: 500, textDecoration: 'none' }}>
             Se connecter
+          </Link>
+          <Link href="/login?signup=true" className="landing-btn-primary" style={{ padding: '9px 22px', fontSize: 13 }}>
+            Essayer gratuitement
           </Link>
         </div>
       </nav>
 
-      {/* HERO */}
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', paddingTop: 80 }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 50% at 30% 60%, rgba(107,143,113,0.28) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 75% 35%, rgba(122,111,168,0.22) 0%, transparent 65%)' }} />
+      {/* ── HERO ── */}
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        paddingTop: 80, paddingBottom: 80, paddingLeft: 24, paddingRight: 24,
+        position: 'relative', overflow: 'hidden',
+        background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 50%, #F5F0FA 100%)',
+      }}>
+        {/* Décor */}
+        <div style={{ position: 'absolute', top: '10%', right: '8%', width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(188,132,198,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: '15%', left: '5%', width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(127,175,155,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#9AB89F', marginBottom: 32, position: 'relative' }}>
-          Plateforme de coordination familiale
-        </p>
+        <div style={{ textAlign: 'center', maxWidth: 720, position: 'relative' }}>
+          {/* Badge */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 20, padding: '5px 14px', marginBottom: 32 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7FAF9B' }} />
+            <span style={{ fontSize: 11, fontWeight: 500, color: '#4A8870', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              Plateforme de coordination familiale
+            </span>
+          </div>
 
-        <div style={{ textAlign: 'center', position: 'relative', maxWidth: 800, padding: '0 24px' }}>
-          <svg width="80" height="80" viewBox="0 0 80 80" fill="none" style={{ marginBottom: 32 }}>
-            <ellipse cx="40" cy="40" rx="22" ry="30" transform="rotate(-15 40 40)" stroke="#9AB89F" strokeWidth="1.5" fill="none"/>
-            <ellipse cx="40" cy="40" rx="22" ry="30" transform="rotate(15 40 40)" stroke="#A89FCC" strokeWidth="1.5" fill="none"/>
-            <circle cx="40" cy="40" r="6" fill="#9AB89F"/>
-            <circle cx="40" cy="40" r="3" fill="#1E2820"/>
-          </svg>
+          {/* Logo hero */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+            <svg width="72" height="72" viewBox="0 0 64 64" fill="none">
+              <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="1.5" fill="none"/>
+              <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="1.5" fill="none"/>
+              <circle cx="32" cy="32" r="5" fill="#7FAF9B"/>
+              <circle cx="32" cy="32" r="2.2" fill="#FCFDFC"/>
+            </svg>
+          </div>
 
-          <h1 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(56px, 10vw, 96px)', fontWeight: 300, letterSpacing: '0.06em', lineHeight: 1, marginBottom: 24, color: '#FAFCFA' }}>
-            Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
+          <h1 className="hero-title" style={{
+            fontFamily: "'Cormorant Garamond', serif",
+            fontSize: 72, fontWeight: 400, lineHeight: 1.05,
+            color: '#1F2A24', letterSpacing: '-0.01em', marginBottom: 12,
+          }}>
+            Prendre soin,
+            <br />
+            <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>ensemble.</span>
           </h1>
 
-          <p style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(18px, 2.5vw, 26px)', fontWeight: 300, fontStyle: 'italic', color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em', marginBottom: 48 }}>
-            Prendre soin de ceux qui nous sont chers
+          <p className="hero-desc" style={{
+            fontSize: 17, color: '#6F7C75', lineHeight: 1.7,
+            maxWidth: 520, margin: '0 auto 40px', fontWeight: 300,
+          }}>
+            Holiris connecte les familles et les intervenants autour du suivi du bien-être des personnes âgées à domicile.
           </p>
 
-          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)', lineHeight: 1.7, maxWidth: 560, margin: '0 auto 48px', fontWeight: 300 }}>
-            Holiris connecte les familles et les intervenants autour du suivi du bien-être des personnes âgées à domicile. Notes vocales, alertes IA, agenda partagé — tout en un.
-          </p>
-
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/login" style={{ background: '#6B8F71', color: '#FAFCFA', textDecoration: 'none', padding: '14px 36px', borderRadius: 2, fontSize: 14, fontWeight: 500, letterSpacing: '0.06em' }}>
-              Commencer gratuitement
+          <div className="hero-btns" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link href="/login?signup=true" className="landing-btn-primary">
+              Commencer gratuitement →
             </Link>
-            <a href="#fonctionnalites" style={{ background: 'transparent', color: '#9AB89F', textDecoration: 'none', padding: '14px 36px', borderRadius: 2, fontSize: 14, fontWeight: 500, letterSpacing: '0.06em', border: '1.5px solid #6B8F71' }}>
+            <a href="#fonctionnalites" className="landing-btn-outline">
               Découvrir
             </a>
           </div>
-        </div>
 
-        <div style={{ position: 'absolute', bottom: 36, display: 'flex', gap: 48 }}>
-          {['Familles', 'Intervenants', 'Sérénité'].map(item => (
-            <span key={item} style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>{item}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* FEATURES */}
-      <div id="fonctionnalites" style={{ padding: '96px 48px', maxWidth: 1100, margin: '0 auto' }}>
-        <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.3em', textTransform: 'uppercase', color: '#9AB89F', marginBottom: 12 }}>Fonctionnalités</p>
-        <h2 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(36px, 5vw, 56px)', fontWeight: 400, color: '#FAFCFA', lineHeight: 1.1, marginBottom: 64 }}>
-          Tout ce dont votre famille a besoin
-        </h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 2 }}>
-          {[
-            { icon: '💬', color: '#6B8F71', bg: 'rgba(107,143,113,0.12)', title: 'Notes WhatsApp', desc: 'Les intervenants envoient un message vocal ou texte après chaque passage. L\'IA le transforme en note professionnelle automatiquement.' },
-            { icon: '🤖', color: '#7A6FA8', bg: 'rgba(122,111,168,0.12)', title: 'Alertes IA', desc: 'L\'intelligence artificielle détecte les signaux faibles dans les notes — douleurs, moral bas, problèmes alimentaires — et vous alerte en temps réel.' },
-            { icon: '📅', color: '#C4844A', bg: 'rgba(196,132,74,0.12)', title: 'Agenda partagé', desc: 'Planifiez les passages, consultations et soins. Suivez les présences et recevez des relances automatiques si un intervenant ne donne pas de nouvelles.' },
-            { icon: '👨‍👩‍👧', color: '#9AB89F', bg: 'rgba(154,184,159,0.12)', title: 'Coordination famille', desc: 'Tous les membres de la famille accèdent au même tableau de bord. Chacun peut ajouter des notes et consulter l\'historique.' },
-            { icon: '✦', color: '#7A6FA8', bg: 'rgba(122,111,168,0.12)', title: 'Assistant IA', desc: 'Posez vos questions à notre assistant qui connaît toute la situation de votre proche. Résumés de semaine, conseils, informations sur les aides disponibles.' },
-            { icon: '🔔', color: '#C47A82', bg: 'rgba(196,122,130,0.12)', title: 'Relances automatiques', desc: 'Si un intervenant ne donne pas de nouvelles après un passage prévu, Holiris lui envoie automatiquement un rappel bienveillant.' },
-          ].map((f, i) => (
-            <div key={i} style={{ background: f.bg, padding: '48px 36px' }}>
-              <div style={{ fontSize: 32, marginBottom: 20 }}>{f.icon}</div>
-              <h3 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 24, fontWeight: 400, color: f.color, marginBottom: 12 }}>{f.title}</h3>
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* COMMENT CA MARCHE */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(107,143,113,0.15)', borderBottom: '1px solid rgba(107,143,113,0.15)', padding: '96px 48px' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.3em', textTransform: 'uppercase', color: '#9AB89F', marginBottom: 12 }}>Comment ça marche</p>
-          <h2 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(36px, 5vw, 56px)', fontWeight: 400, color: '#FAFCFA', lineHeight: 1.1, marginBottom: 64 }}>
-            Simple pour tout le monde
-          </h2>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 48 }}>
-            {[
-              { num: '01', color: '#9AB89F', title: 'Créez le dossier', desc: 'Renseignez les informations de votre proche et invitez les intervenants et membres de la famille.' },
-              { num: '02', color: '#A89FCC', title: 'Les intervenants envoient', desc: 'Après chaque passage, ils envoient un simple message vocal ou texte sur WhatsApp. 20 secondes suffisent.' },
-              { num: '03', color: '#C4844A', title: 'L\'IA analyse', desc: 'Holiris transforme les messages en notes professionnelles et détecte automatiquement les signaux importants.' },
-              { num: '04', color: '#9AB89F', title: 'La famille suit', desc: 'Vous recevez les informations en temps réel sur votre tableau de bord, depuis n\'importe quel appareil.' },
-            ].map((step, i) => (
-              <div key={i}>
-                <div style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 48, fontWeight: 300, color: step.color, opacity: 0.4, marginBottom: 16 }}>{step.num}</div>
-                <h3 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 22, fontWeight: 400, color: '#FAFCFA', marginBottom: 10 }}>{step.title}</h3>
-                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>{step.desc}</p>
+          {/* Social proof */}
+          <div style={{ marginTop: 48, display: 'flex', gap: 32, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {['Familles', 'Intervenants', 'Sérénité'].map(item => (
+              <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#C8DDD4' }} />
+                <span style={{ fontSize: 12, color: '#9BB5AA', letterSpacing: '0.08em' }}>{item}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* TARIFS */}
-      <div id="tarifs" style={{ padding: '96px 48px', maxWidth: 1100, margin: '0 auto' }}>
-        <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.3em', textTransform: 'uppercase', color: '#9AB89F', marginBottom: 12 }}>Tarifs</p>
-        <h2 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(36px, 5vw, 56px)', fontWeight: 400, color: '#FAFCFA', lineHeight: 1.1, marginBottom: 64 }}>
-          Un tarif simple et transparent
-        </h2>
+      {/* ── FEATURES ── */}
+      <div id="fonctionnalites" style={{ padding: '96px 48px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ marginBottom: 56 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: 12 }}>Fonctionnalités</div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(36px, 4vw, 52px)', fontWeight: 400, color: '#1F2A24', lineHeight: 1.1 }}>
+            Tout ce dont votre famille<br />
+            <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>a besoin</span>
+          </h2>
+        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2 }}>
-          <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.2)', padding: '48px 36px' }}>
-            <p style={{ fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#9AB89F', marginBottom: 16 }}>Famille</p>
-            <div style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 48, fontWeight: 300, color: '#FAFCFA', marginBottom: 8 }}>
-              29€<span style={{ fontSize: 18, opacity: 0.5 }}>/mois</span>
+        <div className="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {[
+            { color: '#7FAF9B', bg: '#EAF4EF', title: 'Notes WhatsApp', desc: 'Les intervenants envoient un message vocal ou texte après chaque passage. L\'IA le transforme en note structurée automatiquement.' },
+            { color: '#BC84C6', bg: '#F3EDF7', title: 'Alertes intelligentes', desc: 'L\'IA détecte les signaux faibles — douleurs, moral bas, alimentation — et vous alerte en temps réel.' },
+            { color: '#E6B98A', bg: '#FDF3E7', title: 'Agenda partagé', desc: 'Planifiez les passages et consultations. Suivez les présences et recevez des relances automatiques.' },
+            { color: '#4A8870', bg: '#EAF4EF', title: 'Coordination famille', desc: 'Tous les membres de la famille accèdent au même tableau de bord. Chacun peut ajouter des notes.' },
+            { color: '#8B6FAA', bg: '#F3EDF7', title: 'Assistant IA', desc: 'Posez vos questions à notre assistant qui connaît toute la situation de votre proche. Résumés, conseils, aides disponibles.' },
+            { color: '#D98992', bg: '#FBECED', title: 'Relances automatiques', desc: 'Si un intervenant ne donne pas de nouvelles, Holiris lui envoie un rappel bienveillant.' },
+          ].map((f, i) => (
+            <div key={i} className="feature-card">
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: f.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <div style={{ width: 14, height: 14, borderRadius: '50%', background: f.color }} />
+              </div>
+              <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24', marginBottom: 10 }}>{f.title}</h3>
+              <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.7, fontWeight: 300 }}>{f.desc}</p>
             </div>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 32, lineHeight: 1.6 }}>Pour les familles qui souhaitent suivre le bien-être d'un proche à domicile.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 36 }}>
-              {['Tableau de bord temps réel', 'Notes WhatsApp illimitées', 'Alertes IA signaux faibles', 'Agenda et relances auto', 'Assistant IA', 'Membres famille illimités'].map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6B8F71', flexShrink: 0 }} />
-                  {f}
-                </div>
-              ))}
-            </div>
-            <Link href="/login" style={{ display: 'block', textAlign: 'center', background: '#6B8F71', color: '#FAFCFA', textDecoration: 'none', padding: '13px 0', borderRadius: 2, fontSize: 13, fontWeight: 500, letterSpacing: '0.06em' }}>
-              Commencer gratuitement
-            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* ── COMMENT ÇA MARCHE ── */}
+      <div id="comment" style={{ background: '#F0F7F4', borderTop: '1px solid #E0EDEA', borderBottom: '1px solid #E0EDEA', padding: '96px 48px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ marginBottom: 56 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: 12 }}>Comment ça marche</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(36px, 4vw, 52px)', fontWeight: 400, color: '#1F2A24', lineHeight: 1.1 }}>
+              Simple pour<br />
+              <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>tout le monde</span>
+            </h2>
           </div>
 
-          <div style={{ background: 'rgba(107,143,113,0.15)', border: '1px solid rgba(107,143,113,0.4)', padding: '48px 36px', position: 'relative' }}>
-            <div style={{ position: 'absolute', top: 20, right: 20, background: '#6B8F71', color: '#FAFCFA', fontSize: 10, fontWeight: 500, letterSpacing: '0.15em', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 2 }}>Populaire</div>
-            <p style={{ fontSize: 10, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#9AB89F', marginBottom: 16 }}>Structure</p>
-            <div style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 48, fontWeight: 300, color: '#FAFCFA', marginBottom: 8 }}>
-              149€<span style={{ fontSize: 18, opacity: 0.5 }}>/mois</span>
-            </div>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 32, lineHeight: 1.6 }}>Pour les CCAS, SSIAD et structures d'aide à domicile.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 36 }}>
-              {['Jusqu\'à 20 dossiers seniors', 'Tout le plan Famille', 'Tableau de bord multi-seniors', 'Rapports hebdomadaires', 'Support prioritaire', 'Formation incluse'].map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9AB89F', flexShrink: 0 }} />
-                  {f}
-                </div>
-              ))}
-            </div>
-            <Link href="/login" style={{ display: 'block', textAlign: 'center', background: '#6B8F71', color: '#FAFCFA', textDecoration: 'none', padding: '13px 0', borderRadius: 2, fontSize: 13, fontWeight: 500, letterSpacing: '0.06em' }}>
-              Nous contacter
-            </Link>
+          <div className="steps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 40 }}>
+            {[
+              { num: '01', color: '#7FAF9B', title: 'Créez le dossier', desc: 'Renseignez les informations de votre proche et invitez les intervenants et la famille.' },
+              { num: '02', color: '#BC84C6', title: 'Les intervenants envoient', desc: 'Après chaque passage, un simple message vocal sur WhatsApp. 20 secondes suffisent.' },
+              { num: '03', color: '#E6B98A', title: "L'IA analyse", desc: 'Holiris transforme les messages en notes et détecte les signaux importants.' },
+              { num: '04', color: '#4A8870', title: 'La famille suit', desc: 'Vous recevez les informations en temps réel sur votre tableau de bord.' },
+            ].map((step, i) => (
+              <div key={i}>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 300, color: step.color, opacity: 0.5, lineHeight: 1, marginBottom: 16 }}>{step.num}</div>
+                <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24', marginBottom: 10 }}>{step.title}</h3>
+                <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.7, fontWeight: 300 }}>{step.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* CTA FINAL */}
-      <div style={{ background: 'rgba(107,143,113,0.12)', borderTop: '1px solid rgba(107,143,113,0.2)', padding: '96px 48px', textAlign: 'center' }}>
-        <svg width="48" height="48" viewBox="0 0 64 64" fill="none" style={{ marginBottom: 24 }}>
-          <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
-          <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
-          <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
-          <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
-        </svg>
-        <h2 style={{ fontFamily: 'var(--font-display, Cormorant Garamond, Georgia, serif)', fontSize: 'clamp(36px, 5vw, 56px)', fontWeight: 300, color: '#FAFCFA', marginBottom: 20 }}>
-          Commencez dès aujourd'hui
+      {/* ── TARIFS ── */}
+      <div id="tarifs" style={{ padding: '96px 48px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ marginBottom: 56 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: 12 }}>Tarifs</div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(36px, 4vw, 52px)', fontWeight: 400, color: '#1F2A24', lineHeight: 1.1 }}>
+            Simple et<br />
+            <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>transparent</span>
+          </h2>
+        </div>
+
+        <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, maxWidth: 720 }}>
+          {[
+            {
+              name: 'Famille',
+              price: '29',
+              desc: 'Pour les familles qui souhaitent suivre le bien-être d\'un proche à domicile.',
+              features: ['Tableau de bord temps réel', 'Notes WhatsApp illimitées', 'Alertes IA signaux faibles', 'Agenda et relances auto', 'Assistant IA', 'Membres famille illimités'],
+              cta: 'Commencer gratuitement',
+              highlight: false,
+            },
+            {
+              name: 'Structure',
+              price: '149',
+              desc: 'Pour les CCAS, SSIAD et structures d\'aide à domicile.',
+              features: ["Jusqu'à 20 dossiers seniors", 'Tout le plan Famille', 'Tableau multi-seniors', 'Rapports hebdomadaires', 'Support prioritaire', 'Formation incluse'],
+              cta: 'Nous contacter',
+              highlight: true,
+            },
+          ].map((plan) => (
+            <div key={plan.name} style={{
+              background: plan.highlight ? '#EAF4EF' : '#fff',
+              border: '1px solid ' + (plan.highlight ? '#C8DDD4' : '#E8EFEB'),
+              borderRadius: 16, padding: '36px 32px',
+              position: 'relative',
+              boxShadow: plan.highlight ? '0 8px 32px rgba(127,175,155,0.15)' : 'none',
+            }}>
+              {plan.highlight && (
+                <div style={{ position: 'absolute', top: 20, right: 20, background: '#7FAF9B', color: '#fff', fontSize: 9, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: 20 }}>
+                  Populaire
+                </div>
+              )}
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>{plan.name}</div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 48, fontWeight: 400, color: '#1F2A24', marginBottom: 6, lineHeight: 1 }}>
+                {plan.price}€<span style={{ fontSize: 18, color: '#9BB5AA', fontWeight: 300 }}>/mois</span>
+              </div>
+              <p style={{ fontSize: 13, color: '#6F7C75', marginBottom: 24, lineHeight: 1.6, fontWeight: 300 }}>{plan.desc}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
+                {plan.features.map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#3A4A40' }}>
+                    <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#EAF4EF', border: '1.5px solid #7FAF9B', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#7FAF9B' }} />
+                    </div>
+                    {f}
+                  </div>
+                ))}
+              </div>
+              <Link href="/login?signup=true" className="landing-btn-primary" style={{ display: 'block', textAlign: 'center' }}>
+                {plan.cta}
+              </Link>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── CTA FINAL ── */}
+      <div style={{ background: 'linear-gradient(135deg, #EAF4EF 0%, #F3EDF7 100%)', borderTop: '1px solid #E0EDEA', padding: '96px 48px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+          <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="1.5" fill="none"/>
+            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="1.5" fill="none"/>
+            <circle cx="32" cy="32" r="5" fill="#7FAF9B"/>
+            <circle cx="32" cy="32" r="2.2" fill="#FCFDFC"/>
+          </svg>
+        </div>
+        <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(36px, 4vw, 52px)', fontWeight: 400, color: '#1F2A24', marginBottom: 16, lineHeight: 1.1 }}>
+          Commencez<br />
+          <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>dès aujourd'hui</span>
         </h2>
-        <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.55)', maxWidth: 480, margin: '0 auto 40px', lineHeight: 1.7, fontWeight: 300 }}>
+        <p style={{ fontSize: 15, color: '#6F7C75', maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.7, fontWeight: 300 }}>
           Rejoignez les familles des Pyrénées-Orientales qui font confiance à Holiris pour le suivi de leurs proches.
         </p>
-        <Link href="/login" style={{ background: '#6B8F71', color: '#FAFCFA', textDecoration: 'none', padding: '16px 48px', borderRadius: 2, fontSize: 14, fontWeight: 500, letterSpacing: '0.06em' }}>
-          Créer un compte gratuit
+        <Link href="/login?signup=true" className="landing-btn-primary" style={{ fontSize: 15, padding: '14px 40px' }}>
+          Créer un compte gratuit →
         </Link>
       </div>
 
-      {/* FOOTER */}
-      <div style={{ borderTop: '1px solid rgba(107,143,113,0.15)', padding: '32px 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-        <Logo size={24} />
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-          <Link href="/privacy" style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textDecoration: 'none', letterSpacing: '0.1em' }}>Confidentialité</Link>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>© 2026 Holiris · Pyrénées-Orientales</span>
+      {/* ── FOOTER ── */}
+      <div style={{ background: '#fff', borderTop: '1px solid #EBF0EC', padding: '28px 48px' }}>
+        <div className="footer-inner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <Logo size={24} />
+          <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Link href="/privacy" style={{ fontSize: 12, color: '#9BB5AA', textDecoration: 'none' }}>Confidentialité</Link>
+            <span style={{ fontSize: 12, color: '#C8D4CD' }}>© 2026 Holiris · Pyrénées-Orientales</span>
+          </div>
         </div>
       </div>
 
