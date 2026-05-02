@@ -1,26 +1,50 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [isSignup, setIsSignup] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+  const [showReset, setShowReset] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
 
   const router = useRouter()
+  const searchParams = useSearchParams()
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
+
+  useEffect(() => {
+    // Si ?signup=true dans l'URL, ouvrir directement la création de compte
+    if (searchParams.get('signup') === 'true') {
+      setIsSignup(true)
+    }
+  }, [searchParams])
 
   async function handleAuth() {
     setLoading(true)
     setError('')
 
     if (isSignup) {
+      if (password !== confirmPassword) {
+        setError('Les mots de passe ne correspondent pas.')
+        setLoading(false)
+        return
+      }
+      if (password.length < 6) {
+        setError('Le mot de passe doit contenir au moins 6 caractères.')
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
 
@@ -35,15 +59,12 @@ export default function Login() {
 
         if (signInData?.user) {
           const { data: intervenantData } = await supabase
-            .from('intervenants')
-            .select('id')
-            .eq('user_id', signInData.user.id)
-            .limit(1)
+            .from('intervenants').select('id')
+            .eq('user_id', signInData.user.id).limit(1)
 
           if (intervenantData?.length > 0) {
             router.push('/espace-intervenant')
           } else {
-            // Nouveau compte — vérifier si proche ou intervenant
             router.push('/famille-onboarding')
           }
         }
@@ -56,10 +77,8 @@ export default function Login() {
     if (error) { setError('Email ou mot de passe incorrect.'); setLoading(false); return }
 
     const { data: intervenantData } = await supabase
-      .from('intervenants')
-      .select('id')
-      .eq('user_id', data.user.id)
-      .limit(1)
+      .from('intervenants').select('id')
+      .eq('user_id', data.user.id).limit(1)
 
     if (intervenantData?.length > 0) {
       router.push('/espace-intervenant')
@@ -67,16 +86,28 @@ export default function Login() {
     }
 
     const { data: familleData } = await supabase
-      .from('famille')
-      .select('id')
-      .eq('user_id', data.user.id)
-      .limit(1)
+      .from('famille').select('id')
+      .eq('user_id', data.user.id).limit(1)
 
     if (familleData?.length > 0) {
       router.push('/app')
     } else {
       router.push('/famille-onboarding')
     }
+  }
+
+  async function handleReset() {
+    if (!resetEmail) return
+    setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: 'https://holiris.fr/login'
+    })
+    if (error) {
+      setError('Erreur lors de l\'envoi. Vérifiez l\'email.')
+    } else {
+      setResetSent(true)
+    }
+    setLoading(false)
   }
 
   return (
@@ -96,64 +127,126 @@ export default function Login() {
             Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
           </h1>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>
-            {isSignup ? 'CRÉER UN COMPTE' : 'CONNEXION'}
+            {showReset ? 'MOT DE PASSE OUBLIÉ' : isSignup ? 'CRÉER UN COMPTE' : 'CONNEXION'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Email</label>
-            <input
-              type="email"
-              placeholder="votre@email.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAuth()}
-              style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Mot de passe</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAuth()}
-              style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-            />
-          </div>
-
-          {error && (
-            <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 2, padding: '10px 14px', fontSize: 13, color: '#e0939a' }}>
-              {error}
+        {showReset ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {resetSent ? (
+              <div style={{ background: 'rgba(107,143,113,0.2)', border: '1px solid rgba(107,143,113,0.4)', borderRadius: 2, padding: '12px 14px', fontSize: 13, color: '#9AB89F', textAlign: 'center' }}>
+                ✅ Un email de réinitialisation a été envoyé à {resetEmail}
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Email</label>
+                  <input
+                    type="email"
+                    placeholder="votre@email.com"
+                    value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleReset()}
+                    style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  />
+                </div>
+                {error && (
+                  <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 2, padding: '10px 14px', fontSize: 13, color: '#e0939a' }}>
+                    {error}
+                  </div>
+                )}
+                <button onClick={handleReset} disabled={loading || !resetEmail}
+                  style={{ background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer' }}>
+                  {loading ? 'Envoi...' : 'Envoyer le lien'}
+                </button>
+              </>
+            )}
+            <div style={{ textAlign: 'center' }}>
+              <button onClick={() => { setShowReset(false); setResetSent(false); setError('') }}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
+                ← Retour à la connexion
+              </button>
             </div>
-          )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Email</label>
+              <input
+                type="email"
+                placeholder="votre@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAuth()}
+                style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Mot de passe</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !isSignup && handleAuth()}
+                style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              />
+            </div>
 
-          <button
-            onClick={handleAuth}
-            disabled={loading || !email || !password}
-            style={{ background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer', marginTop: 8 }}
-          >
-            {loading ? 'Connexion...' : isSignup ? 'Créer mon compte' : 'Se connecter'}
-          </button>
+            {isSignup && (
+              <div>
+                <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Confirmer le mot de passe</label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAuth()}
+                  style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                />
+              </div>
+            )}
 
-          <div style={{ textAlign: 'center', marginTop: 8 }}>
+            {error && (
+              <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 2, padding: '10px 14px', fontSize: 13, color: '#e0939a' }}>
+                {error}
+              </div>
+            )}
+
             <button
-              onClick={() => { setIsSignup(!isSignup); setError('') }}
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={handleAuth}
+              disabled={loading || !email || !password || (isSignup && !confirmPassword)}
+              style={{ background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer', marginTop: 8 }}
             >
-              {isSignup ? 'Déjà un compte ? Se connecter' : 'Créer un compte'}
+              {loading ? 'Chargement...' : isSignup ? 'Créer mon compte' : 'Se connecter'}
             </button>
-          </div>
 
-          <div style={{ textAlign: 'center', marginTop: 4 }}>
-            <a href="/famille-onboarding"
-              style={{ fontSize: 12, color: 'rgba(154,184,159,0.6)', textDecoration: 'none' }}>
-              J'ai un code d'accès famille →
-            </a>
+            {!isSignup && (
+              <div style={{ textAlign: 'center' }}>
+                <button onClick={() => { setShowReset(true); setError(''); setResetEmail(email) }}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                  Mot de passe oublié ?
+                </button>
+              </div>
+            )}
+
+            <div style={{ textAlign: 'center' }}>
+              <button
+                onClick={() => { setIsSignup(!isSignup); setError(''); setConfirmPassword('') }}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                {isSignup ? 'Déjà un compte ? Se connecter' : 'Créer un compte'}
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <a href="/famille-onboarding"
+                style={{ fontSize: 12, color: 'rgba(154,184,159,0.6)', textDecoration: 'none' }}>
+                J'ai un code d'accès famille →
+              </a>
+            </div>
           </div>
-        </div>
+        )}
 
         <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid rgba(107,143,113,0.15)', textAlign: 'center' }}>
           <a href="/" style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', textDecoration: 'none' }}>← Retour à l'accueil</a>
