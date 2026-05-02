@@ -1,4 +1,3 @@
-// app/landing/page.js
 'use client'
 import Link from 'next/link'
 
@@ -51,8 +50,8 @@ export default function Landing() {
 
         @media (max-width: 768px) {
           .nav-links { display: none !important; }
-          .hero-title { font-size: 44px !important; }
-          .hero-sub { font-size: 15px !important; }
+          .hero-title { font-size: 72px !important; }
+          .hero-sub { font-size: 17px !important; }
           .hero-btns { flex-direction: column !important; align-items: stretch !important; }
           .hero-btns a { text-align: center !important; }
           .features-grid { grid-template-columns: 1fr !important; }
@@ -100,7 +99,7 @@ export default function Landing() {
         <div style={{ position: 'absolute', top: '12%', right: '10%', width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(188,132,198,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '12%', left: '6%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(127,175,155,0.09) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        <div style={{ textAlign: 'center', maxWidth: 680, position: 'relative' }}>
+        <div style={{ textAlign: 'center', maxWidth: 720, position: 'relative' }}>
 
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 20, padding: '5px 14px', marginBottom: 36 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7FAF9B' }} />
@@ -109,8 +108,9 @@ export default function Landing() {
             </span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
-            <svg width="68" height="68" viewBox="0 0 64 64" fill="none">
+          {/* Symbole agrandi */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+            <svg width="110" height="110" viewBox="0 0 64 64" fill="none">
               <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="1.5" fill="none"/>
               <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="1.5" fill="none"/>
               <circle cx="32" cy="32" r="5" fill="#7FAF9B"/>
@@ -118,21 +118,21 @@ export default function Landing() {
             </svg>
           </div>
 
+          {/* Titre Holiris en grand */}
           <h1 className="hero-title" style={{
             fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 68, fontWeight: 400, lineHeight: 1.05,
-            color: '#1F2A24', letterSpacing: '-0.01em', marginBottom: 10,
+            fontSize: 'clamp(80px, 14vw, 140px)',
+            fontWeight: 400, lineHeight: 0.95,
+            color: '#1F2A24', letterSpacing: '-0.02em', marginBottom: 20,
           }}>
-            Prendre soin,
-            <br />
-            <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>ensemble.</span>
+            Holiris
           </h1>
 
           <p className="hero-sub" style={{
             fontFamily: "'Cormorant Garamond', serif",
             fontSize: 22, fontWeight: 300, fontStyle: 'italic',
             color: '#6F7C75', lineHeight: 1.5,
-            maxWidth: 480, margin: '0 auto 40px',
+            maxWidth: 480, margin: '0 auto 44px',
           }}>
             Prendre soin de ceux qui nous sont chers
           </p>
@@ -282,8 +282,8 @@ export default function Landing() {
 
       {/* ── CTA FINAL ── */}
       <div className="section-pad" style={{ background: 'linear-gradient(135deg, #EAF4EF 0%, #F3EDF7 100%)', borderTop: '1px solid #E0EDEA', padding: '96px 48px', textAlign: 'center' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-          <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+          <svg width="72" height="72" viewBox="0 0 64 64" fill="none">
             <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="1.5" fill="none"/>
             <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="1.5" fill="none"/>
             <circle cx="32" cy="32" r="5" fill="#7FAF9B"/>
