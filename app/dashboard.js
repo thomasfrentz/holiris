@@ -2,24 +2,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-const Card = ({ children, style = {} }) => (
-  <div style={{
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(107,143,113,0.15)',
-    borderRadius: 12,
-    padding: 20,
-    ...style
-  }}>
-    {children}
-  </div>
-)
-
-const Label = ({ children }) => (
-  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 12, fontWeight: 500 }}>
-    {children}
-  </div>
-)
-
 export default function Dashboard({ initialSenior, initialEvents, initialNotes, initialTotalNotes, initialAlertes, initialOrdonnances, supabaseUrl, supabaseKey }) {
   const [events] = useState(initialEvents || [])
   const [notes, setNotes] = useState(initialNotes || [])
@@ -31,44 +13,20 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
   const relanceCount = events.filter(e => e.status === 'relance_envoyee').length
   const now = new Date()
 
-  const prochainEvent = events
-    .filter(e => new Date(e.scheduled_at) >= now)
-    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0]
-
-  const dernierPassage = events
-    .filter(e => e.status === 'note_received' && new Date(e.scheduled_at) < now)
-    .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0]
-
+  const prochainEvent = events.filter(e => new Date(e.scheduled_at) >= now).sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0]
+  const dernierPassage = events.filter(e => e.status === 'note_received' && new Date(e.scheduled_at) < now).sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0]
   const derniereNote = notes[0]
-  const derniereNoteTemps = derniereNote ? (() => {
-    const diff = Math.floor((now - new Date(derniereNote.created_at)) / 60000)
-    if (diff < 60) return `${diff}min`
-    if (diff < 1440) return `${Math.floor(diff / 60)}h`
-    return `${Math.floor(diff / 1440)}j`
-  })() : null
-
-  const prochaineOrdonnance = ordonnances
-    .filter(o => new Date(o.date_renouvellement) >= now)
-    .sort((a, b) => new Date(a.date_renouvellement) - new Date(b.date_renouvellement))[0]
-
-  const joursOrdonnance = prochaineOrdonnance
-    ? Math.ceil((new Date(prochaineOrdonnance.date_renouvellement) - now) / 86400000)
-    : null
+  const prochaineOrdonnance = ordonnances.filter(o => new Date(o.date_renouvellement) >= now).sort((a, b) => new Date(a.date_renouvellement) - new Date(b.date_renouvellement))[0]
+  const joursOrdonnance = prochaineOrdonnance ? Math.ceil((new Date(prochaineOrdonnance.date_renouvellement) - now) / 86400000) : null
 
   const typeLabel = { care: 'Aide à domicile', kine: 'Kiné', medical: 'Médical', pharmacy: 'Pharmacie' }
 
   useEffect(() => {
     if (!supabaseUrl || !supabaseKey) return
     const supabase = createClient(supabaseUrl, supabaseKey)
-    const notesChannel = supabase.channel('db-notes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notes' },
-        (payload) => { setNotes(prev => [payload.new, ...prev].slice(0, 3)); setTotalNotes(prev => prev + 1) }
-      ).subscribe()
-    const alertesChannel = supabase.channel('db-alertes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alertes' },
-        (payload) => { setAlertes(prev => [payload.new, ...prev]) }
-      ).subscribe()
-    return () => { notesChannel.unsubscribe(); alertesChannel.unsubscribe() }
+    const ch1 = supabase.channel('db-notes').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notes' }, (p) => { setNotes(prev => [p.new, ...prev].slice(0, 3)); setTotalNotes(prev => prev + 1) }).subscribe()
+    const ch2 = supabase.channel('db-alertes').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alertes' }, (p) => { setAlertes(prev => [p.new, ...prev]) }).subscribe()
+    return () => { ch1.unsubscribe(); ch2.unsubscribe() }
   }, [supabaseUrl, supabaseKey])
 
   async function marquerLu(id) {
@@ -80,200 +38,186 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   const alertesNonLues = alertes.filter(a => !a.lu)
 
-  const statusColors = {
-    note_received: '#6B8F71',
-    silence: '#C47A82',
-    relance_envoyee: '#C4844A',
-    a_venir: '#7A9FA8',
-  }
+  const statusColors = { note_received: '#9AB89F', silence: '#C47A82', relance_envoyee: '#C4844A', a_venir: 'rgba(255,255,255,0.2)' }
+  const statusLabels = { note_received: 'Reçu', silence: 'Silence', relance_envoyee: 'Relancé', a_venir: 'À venir' }
 
-  const statusLabels = {
-    note_received: 'Note reçue',
-    silence: 'Silence',
-    relance_envoyee: 'Relancé',
-    a_venir: 'À venir',
-  }
+  const D = ({ children }) => (
+    <div style={{ fontSize: 9, letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(154,184,159,0.5)', fontWeight: 500, marginBottom: 16 }}>{children}</div>
+  )
 
-  const sourceLabel = (source) => {
-    if (source === 'whatsapp_audio') return 'Note vocale'
-    if (source === 'whatsapp_text') return 'WhatsApp'
-    return 'Note'
+  const formatRelative = (date) => {
+    const d = Math.floor((now - new Date(date)) / 86400000)
+    if (d === 0) return "Aujourd'hui"
+    if (d === 1) return 'Hier'
+    return `Il y a ${d} jours`
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ maxWidth: 800, margin: '0 auto' }}>
 
-      {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 9, color: 'rgba(154,184,159,0.6)', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: 8 }}>
-          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+      {/* ── En-tête ── */}
+      <div style={{ marginBottom: 48, paddingBottom: 32, borderBottom: '1px solid rgba(154,184,159,0.1)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(154,184,159,0.5)', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: 12 }}>
+          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </div>
-        <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 300, color: '#FAFCFA', letterSpacing: '0.02em', lineHeight: 1 }}>
+        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(40px, 6vw, 64px)', fontWeight: 300, color: '#FAFCFA', letterSpacing: '0.02em', lineHeight: 1, marginBottom: 12 }}>
           Flux en temps réel
         </h1>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#6B8F71', animation: 'pulse 2s infinite' }} />
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em' }}>Temps réel</span>
+          </div>
+          {alertesNonLues.length > 0 && (
+            <div style={{ fontSize: 11, color: '#C47A82', letterSpacing: '0.08em' }}>
+              {alertesNonLues.length} alerte{alertesNonLues.length > 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Alertes */}
+      {/* ── Alertes ── */}
       {alertesNonLues.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 40 }}>
           {alertesNonLues.map(a => {
-            const isD = a.niveau === 'danger'
-            const color = isD ? '#C47A82' : '#C4844A'
+            const danger = a.niveau === 'danger'
+            const color = danger ? '#C47A82' : '#C4844A'
             return (
               <div key={a.id} style={{
-                background: isD ? 'rgba(196,122,130,0.08)' : 'rgba(196,132,74,0.08)',
-                border: '1px solid ' + (isD ? 'rgba(196,122,130,0.25)' : 'rgba(196,132,74,0.25)'),
-                borderLeft: '3px solid ' + color,
-                borderRadius: 8, padding: '12px 16px',
-                display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6
+                display: 'flex', alignItems: 'flex-start', gap: 16,
+                padding: '16px 0', borderBottom: '1px solid rgba(154,184,159,0.08)',
               }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                <div style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 300 }}>{a.message}</div>
+                <div style={{ width: 1, alignSelf: 'stretch', background: color, flexShrink: 0, marginTop: 4 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 9, color: color, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>
+                    {danger ? 'Urgent' : 'Attention'}
+                  </div>
+                  <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.6 }}>{a.message}</div>
+                </div>
                 <button onClick={() => marquerLu(a.id)} style={{
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
-                  color: 'rgba(255,255,255,0.4)', borderRadius: 4, padding: '3px 10px',
-                  fontSize: 10, cursor: 'pointer', letterSpacing: '0.08em', textTransform: 'uppercase'
-                }}>Vu</button>
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.3)', padding: '4px 12px', fontSize: 9,
+                  letterSpacing: '0.15em', textTransform: 'uppercase', cursor: 'pointer',
+                  borderRadius: 1, fontFamily: 'inherit',
+                }}>Lu</button>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* Cards résumé — 2x2 sur mobile */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 16 }}>
+      {/* ── 4 KPIs ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'rgba(154,184,159,0.1)', marginBottom: 40, border: '1px solid rgba(154,184,159,0.1)' }}>
         {[
           {
             label: 'Prochain RDV',
-            value: prochainEvent
-              ? (new Date(prochainEvent.scheduled_at).toDateString() === now.toDateString() ? "Aujourd'hui" : new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }))
-              : '—',
-            sub: prochainEvent
-              ? new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + (prochainEvent.intervenants ? ' · ' + prochainEvent.intervenants.name.split(' ')[0] : '')
-              : 'Aucun rendez-vous',
+            value: prochainEvent ? (new Date(prochainEvent.scheduled_at).toDateString() === now.toDateString() ? "Aujourd'hui" : new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long' })) : 'Aucun',
+            detail: prochainEvent ? new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + (prochainEvent.intervenants ? ' — ' + prochainEvent.intervenants.name.split(' ')[0] : '') : 'Aucun rendez-vous prévu',
             accent: '#9AB89F',
-            dot: !!prochainEvent,
           },
           {
             label: 'Dernier passage',
-            value: dernierPassage
-              ? (() => { const d = Math.floor((now - new Date(dernierPassage.scheduled_at)) / 86400000); return d === 0 ? "Aujourd'hui" : d === 1 ? 'Hier' : `Il y a ${d}j` })()
-              : '—',
-            sub: dernierPassage ? (typeLabel[dernierPassage.type] || dernierPassage.label) : 'Aucun passage',
+            value: dernierPassage ? formatRelative(dernierPassage.scheduled_at) : 'Aucun',
+            detail: dernierPassage ? (typeLabel[dernierPassage.type] || dernierPassage.label) : 'Aucun passage enregistré',
             accent: '#A89FCC',
-            dot: !!dernierPassage,
           },
           {
             label: 'Renouvellement',
-            value: prochaineOrdonnance ? (joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance} jour${joursOrdonnance > 1 ? 's' : ''}`) : '—',
-            sub: prochaineOrdonnance ? prochaineOrdonnance.type_ordonnance : 'Aucune ordonnance',
+            value: prochaineOrdonnance ? (joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance} j`) : 'RAS',
+            detail: prochaineOrdonnance ? prochaineOrdonnance.type_ordonnance : 'Aucune ordonnance',
             accent: joursOrdonnance !== null && joursOrdonnance <= 3 ? '#C47A82' : joursOrdonnance !== null && joursOrdonnance <= 7 ? '#C4844A' : '#9AB89F',
-            dot: !!prochaineOrdonnance,
           },
           {
             label: 'Dernière note',
-            value: derniereNote ? `Il y a ${derniereNoteTemps}` : '—',
-            sub: derniereNote ? (derniereNote.intervenant_name || 'Famille') : 'Aucune note',
+            value: derniereNote ? (() => { const d = Math.floor((now - new Date(derniereNote.created_at)) / 60000); return d < 60 ? `${d}min` : d < 1440 ? `${Math.floor(d/60)}h` : `${Math.floor(d/1440)}j` })() : '—',
+            detail: derniereNote ? (derniereNote.intervenant_name || 'Famille') : 'Aucune note',
             accent: '#9AB89F',
-            dot: !!derniereNote,
           },
-        ].map((card) => (
-          <Card key={card.label}>
-            <Label>{card.label}</Label>
-            <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 400, color: card.accent, lineHeight: 1.2, marginBottom: 6 }}>
-              {card.value}
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 300, lineHeight: 1.4 }}>{card.sub}</div>
-          </Card>
+        ].map(card => (
+          <div key={card.label} style={{ background: '#0F1610', padding: '24px 20px' }}>
+            <div style={{ fontSize: 9, color: 'rgba(154,184,159,0.4)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>{card.label}</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 300, color: card.accent, lineHeight: 1, marginBottom: 8 }}>{card.value}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 300, lineHeight: 1.4 }}>{card.detail}</div>
+          </div>
         ))}
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 24 }}>
+      {/* ── Stats ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, borderTop: '1px solid rgba(154,184,159,0.1)', marginBottom: 48 }}>
         {[
-          { label: 'Notes', value: totalNotes, color: '#6B8F71' },
+          { label: 'Notes reçues', value: totalNotes, color: '#9AB89F' },
           { label: 'Silences', value: silenceCount, color: '#C47A82' },
           { label: 'Relances', value: relanceCount, color: '#C4844A' },
-        ].map((s) => (
-          <Card key={s.label} style={{ padding: '16px', borderTop: '2px solid ' + s.color, textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 300, color: s.color, lineHeight: 1 }}>{s.value}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 6, letterSpacing: '0.15em', textTransform: 'uppercase' }}>{s.label}</div>
-          </Card>
+        ].map((s, i) => (
+          <div key={s.label} style={{
+            padding: '28px 20px',
+            borderRight: i < 2 ? '1px solid rgba(154,184,159,0.1)' : 'none',
+          }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 300, color: s.color, lineHeight: 1, marginBottom: 8 }}>{s.value}</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>{s.label}</div>
+          </div>
         ))}
       </div>
 
-      {/* Events */}
+      {/* ── Événements ── */}
       {events.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <Label>Événements de la semaine</Label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {events.map((e) => {
-              const color = statusColors[e.status] || '#666'
-              const estPasse = new Date(e.scheduled_at) < now && e.status === 'a_venir'
-              return (
-                <div key={e.id} style={{
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(107,143,113,0.1)',
-                  borderLeft: '3px solid ' + (estPasse ? 'rgba(255,255,255,0.1)' : color),
-                  borderRadius: 8, padding: '10px 14px',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  opacity: estPasse ? 0.5 : 1,
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: '#FAFCFA', fontWeight: 300 }}>{e.label}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                      {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      {e.intervenants && ' · ' + e.intervenants.name}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: 9, padding: '3px 8px', borderRadius: 4,
-                    background: (estPasse ? 'rgba(255,255,255,0.05)' : color + '20'),
-                    color: estPasse ? 'rgba(255,255,255,0.25)' : color,
-                    letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 500
-                  }}>
-                    {estPasse ? 'Passé' : statusLabels[e.status] || e.status}
-                  </div>
+        <div style={{ marginBottom: 48 }}>
+          <D>Événements</D>
+          {events.map((e, i) => {
+            const color = statusColors[e.status] || 'rgba(255,255,255,0.2)'
+            const estPasse = new Date(e.scheduled_at) < now && e.status === 'a_venir'
+            return (
+              <div key={e.id} style={{
+                display: 'flex', alignItems: 'center', gap: 16,
+                padding: '14px 0',
+                borderBottom: '1px solid rgba(154,184,159,0.07)',
+                opacity: estPasse ? 0.4 : 1,
+              }}>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', width: 40, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                  {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </div>
-              )
-            })}
-          </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', fontWeight: 300 }}>{e.label}</div>
+                  {e.intervenants && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 2 }}>{e.intervenants.name}</div>}
+                </div>
+                <div style={{ fontSize: 9, color: color, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+                  {estPasse ? 'Passé' : statusLabels[e.status]}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* Notes */}
+      {/* ── Notes ── */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Label>Dernières notes</Label>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6B8F71', marginBottom: 12 }} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {notes.length === 0 && (
-            <Card>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', textAlign: 'center', padding: '20px 0' }}>Aucune note pour le moment</div>
-            </Card>
-          )}
-          {notes.map((n, index) => (
-            <Card key={n.id || index} style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: n.source === 'whatsapp_audio' ? '#A89FCC' : n.source === 'whatsapp_text' ? '#6B8F71' : '#7A9FA8' }} />
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{sourceLabel(n.source)}</span>
+        <D>Dernières notes</D>
+        {notes.length === 0 && (
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)', fontWeight: 300, padding: '24px 0' }}>Aucune note pour le moment.</div>
+        )}
+        {notes.map((n, i) => (
+          <div key={n.id || i} style={{
+            padding: '24px 0',
+            borderBottom: '1px solid rgba(154,184,159,0.07)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'rgba(154,184,159,0.5)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  {n.source === 'whatsapp_audio' ? 'Note vocale' : n.source === 'whatsapp_text' ? 'WhatsApp' : 'Note'}
                 </div>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
-                  {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                </span>
+                {n.intervenant_name && (
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>{n.intervenant_name}</div>
+                )}
               </div>
-              {n.intervenant_name && (
-                <div style={{ fontSize: 11, color: 'rgba(154,184,159,0.6)', marginBottom: 8, fontStyle: 'italic' }}>
-                  {n.intervenant_name}
-                </div>
-              )}
-              <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.7, fontWeight: 300 }}>{n.content}</p>
-            </Card>
-          ))}
-        </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
+                {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, fontWeight: 300 }}>{n.content}</p>
+          </div>
+        ))}
       </div>
+
     </div>
   )
 }
