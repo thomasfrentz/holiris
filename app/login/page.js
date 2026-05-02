@@ -1,9 +1,9 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function Login() {
+function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -23,7 +23,6 @@ export default function Login() {
   )
 
   useEffect(() => {
-    // Si ?signup=true dans l'URL, ouvrir directement la création de compte
     if (searchParams.get('signup') === 'true') {
       setIsSignup(true)
     }
@@ -253,5 +252,13 @@ export default function Login() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function Login() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }
