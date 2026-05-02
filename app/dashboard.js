@@ -1,6 +1,23 @@
+// app/dashboard.js
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+
+const Tag = ({ children, color = '#7FAF9B', bg = '#EAF4EF' }) => (
+  <span style={{ fontSize: 10, fontWeight: 500, color, background: bg, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.05em' }}>
+    {children}
+  </span>
+)
+
+const Section = ({ title, children, action }) => (
+  <div style={{ marginBottom: 32 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase' }}>{title}</div>
+      {action}
+    </div>
+    {children}
+  </div>
+)
 
 export default function Dashboard({ initialSenior, initialEvents, initialNotes, initialTotalNotes, initialAlertes, initialOrdonnances, supabaseUrl, supabaseKey }) {
   const [events] = useState(initialEvents || [])
@@ -38,67 +55,76 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   const alertesNonLues = alertes.filter(a => !a.lu)
 
-  const statusColors = { note_received: '#9AB89F', silence: '#C47A82', relance_envoyee: '#C4844A', a_venir: 'rgba(255,255,255,0.2)' }
-  const statusLabels = { note_received: 'Reçu', silence: 'Silence', relance_envoyee: 'Relancé', a_venir: 'À venir' }
-
-  const D = ({ children }) => (
-    <div style={{ fontSize: 9, letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(154,184,159,0.5)', fontWeight: 500, marginBottom: 16 }}>{children}</div>
-  )
+  const statusColors = { note_received: '#7FAF9B', silence: '#D98992', relance_envoyee: '#E6B98A', a_venir: '#BC84C6' }
+  const statusBgs = { note_received: '#EAF4EF', silence: '#FBECED', relance_envoyee: '#FDF3E7', a_venir: '#F3EDF7' }
+  const statusLabels = { note_received: 'Bien', silence: 'Silence', relance_envoyee: 'Relancé', a_venir: 'À venir' }
 
   const formatRelative = (date) => {
     const d = Math.floor((now - new Date(date)) / 86400000)
     if (d === 0) return "Aujourd'hui"
     if (d === 1) return 'Hier'
-    return `Il y a ${d} jours`
+    return `Il y a ${d}j`
+  }
+
+  const noteSourceLabel = (source) => {
+    if (source === 'whatsapp_audio') return 'Note vocale'
+    if (source === 'whatsapp_text') return 'WhatsApp'
+    return 'Note'
+  }
+
+  const noteSourceColor = (source) => {
+    if (source === 'whatsapp_audio') return { color: '#BC84C6', bg: '#F3EDF7' }
+    if (source === 'whatsapp_text') return { color: '#7FAF9B', bg: '#EAF4EF' }
+    return { color: '#6F7C75', bg: '#F4F5F5' }
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ maxWidth: 860, margin: '0 auto' }}>
 
-      {/* ── En-tête ── */}
-      <div style={{ marginBottom: 48, paddingBottom: 32, borderBottom: '1px solid rgba(154,184,159,0.1)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(154,184,159,0.5)', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: 12 }}>
-          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+      {/* ── Header ── */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>
+          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </div>
-        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(40px, 6vw, 64px)', fontWeight: 300, color: '#FAFCFA', letterSpacing: '0.02em', lineHeight: 1, marginBottom: 12 }}>
+        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 400, color: '#1F2A24', letterSpacing: '0.01em', lineHeight: 1.1, marginBottom: 10 }}>
           Flux en temps réel
         </h1>
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#6B8F71', animation: 'pulse 2s infinite' }} />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em' }}>Temps réel</span>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7FAF9B' }} />
+            <span style={{ fontSize: 12, color: '#9BB5AA' }}>Mis à jour en direct</span>
           </div>
           {alertesNonLues.length > 0 && (
-            <div style={{ fontSize: 11, color: '#C47A82', letterSpacing: '0.08em' }}>
-              {alertesNonLues.length} alerte{alertesNonLues.length > 1 ? 's' : ''}
-            </div>
+            <Tag color="#D98992" bg="#FBECED">{alertesNonLues.length} alerte{alertesNonLues.length > 1 ? 's' : ''}</Tag>
           )}
         </div>
       </div>
 
       {/* ── Alertes ── */}
       {alertesNonLues.length > 0 && (
-        <div style={{ marginBottom: 40 }}>
+        <div style={{ marginBottom: 28 }}>
           {alertesNonLues.map(a => {
             const danger = a.niveau === 'danger'
-            const color = danger ? '#C47A82' : '#C4844A'
+            const color = danger ? '#D98992' : '#E6B98A'
+            const bg = danger ? '#FBECED' : '#FDF3E7'
+            const border = danger ? '#F2C4C8' : '#F0D9B5'
             return (
               <div key={a.id} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 16,
-                padding: '16px 0', borderBottom: '1px solid rgba(154,184,159,0.08)',
+                background: bg, border: '1px solid ' + border,
+                borderRadius: 10, padding: '14px 16px',
+                display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8
               }}>
-                <div style={{ width: 1, alignSelf: 'stretch', background: color, flexShrink: 0, marginTop: 4 }} />
+                <div style={{ width: 3, height: 36, borderRadius: 2, background: color, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 9, color: color, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>
+                  <div style={{ fontSize: 9, color: color, letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>
                     {danger ? 'Urgent' : 'Attention'}
                   </div>
-                  <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', fontWeight: 300, lineHeight: 1.6 }}>{a.message}</div>
+                  <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 400, lineHeight: 1.5 }}>{a.message}</div>
                 </div>
                 <button onClick={() => marquerLu(a.id)} style={{
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'rgba(255,255,255,0.3)', padding: '4px 12px', fontSize: 9,
-                  letterSpacing: '0.15em', textTransform: 'uppercase', cursor: 'pointer',
-                  borderRadius: 1, fontFamily: 'inherit',
+                  background: '#fff', border: '1px solid ' + border,
+                  color: '#6F7C75', padding: '5px 12px', fontSize: 11,
+                  fontWeight: 500, cursor: 'pointer', borderRadius: 6, fontFamily: 'inherit',
                 }}>Lu</button>
               </div>
             )
@@ -107,116 +133,123 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       )}
 
       {/* ── 4 KPIs ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'rgba(154,184,159,0.1)', marginBottom: 40, border: '1px solid rgba(154,184,159,0.1)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 28 }}>
         {[
           {
             label: 'Prochain RDV',
             value: prochainEvent ? (new Date(prochainEvent.scheduled_at).toDateString() === now.toDateString() ? "Aujourd'hui" : new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long' })) : 'Aucun',
             detail: prochainEvent ? new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + (prochainEvent.intervenants ? ' — ' + prochainEvent.intervenants.name.split(' ')[0] : '') : 'Aucun rendez-vous prévu',
-            accent: '#9AB89F',
+            accent: '#4A8870',
+            accentBg: '#EAF4EF',
           },
           {
             label: 'Dernier passage',
             value: dernierPassage ? formatRelative(dernierPassage.scheduled_at) : 'Aucun',
             detail: dernierPassage ? (typeLabel[dernierPassage.type] || dernierPassage.label) : 'Aucun passage enregistré',
-            accent: '#A89FCC',
+            accent: '#8B6FAA',
+            accentBg: '#F3EDF7',
           },
           {
             label: 'Renouvellement',
             value: prochaineOrdonnance ? (joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance} j`) : 'RAS',
             detail: prochaineOrdonnance ? prochaineOrdonnance.type_ordonnance : 'Aucune ordonnance',
-            accent: joursOrdonnance !== null && joursOrdonnance <= 3 ? '#C47A82' : joursOrdonnance !== null && joursOrdonnance <= 7 ? '#C4844A' : '#9AB89F',
+            accent: joursOrdonnance !== null && joursOrdonnance <= 3 ? '#C4606A' : joursOrdonnance !== null && joursOrdonnance <= 7 ? '#C4844A' : '#4A8870',
+            accentBg: joursOrdonnance !== null && joursOrdonnance <= 7 ? '#FDF3E7' : '#EAF4EF',
           },
           {
             label: 'Dernière note',
-            value: derniereNote ? (() => { const d = Math.floor((now - new Date(derniereNote.created_at)) / 60000); return d < 60 ? `${d}min` : d < 1440 ? `${Math.floor(d/60)}h` : `${Math.floor(d/1440)}j` })() : '—',
+            value: derniereNote ? (() => { const d = Math.floor((now - new Date(derniereNote.created_at)) / 60000); return d < 60 ? `${d} min` : d < 1440 ? `${Math.floor(d/60)}h` : `${Math.floor(d/1440)}j` })() : '—',
             detail: derniereNote ? (derniereNote.intervenant_name || 'Famille') : 'Aucune note',
-            accent: '#9AB89F',
+            accent: '#4A8870',
+            accentBg: '#EAF4EF',
           },
         ].map(card => (
-          <div key={card.label} style={{ background: '#0F1610', padding: '24px 20px' }}>
-            <div style={{ fontSize: 9, color: 'rgba(154,184,159,0.4)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>{card.label}</div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 300, color: card.accent, lineHeight: 1, marginBottom: 8 }}>{card.value}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 300, lineHeight: 1.4 }}>{card.detail}</div>
+          <div key={card.label} className="hl-card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: 9, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 10 }}>{card.label}</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, color: card.accent, lineHeight: 1.1, marginBottom: 6 }}>{card.value}</div>
+            <div style={{ fontSize: 11, color: '#9BB5AA', lineHeight: 1.4 }}>{card.detail}</div>
           </div>
         ))}
       </div>
 
       {/* ── Stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, borderTop: '1px solid rgba(154,184,159,0.1)', marginBottom: 48 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 32 }}>
         {[
-          { label: 'Notes reçues', value: totalNotes, color: '#9AB89F' },
-          { label: 'Silences', value: silenceCount, color: '#C47A82' },
-          { label: 'Relances', value: relanceCount, color: '#C4844A' },
-        ].map((s, i) => (
+          { label: 'Notes reçues', value: totalNotes, color: '#4A8870', bg: '#EAF4EF', border: '#C8DDD4' },
+          { label: 'Silences détectés', value: silenceCount, color: '#C4606A', bg: '#FBECED', border: '#F2C4C8' },
+          { label: 'Relances envoyées', value: relanceCount, color: '#C4844A', bg: '#FDF3E7', border: '#F0D9B5' },
+        ].map((s) => (
           <div key={s.label} style={{
-            padding: '28px 20px',
-            borderRight: i < 2 ? '1px solid rgba(154,184,159,0.1)' : 'none',
+            background: s.bg, border: '1px solid ' + s.border,
+            borderRadius: 12, padding: '16px 18px', textAlign: 'center'
           }}>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 300, color: s.color, lineHeight: 1, marginBottom: 8 }}>{s.value}</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>{s.label}</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 44, fontWeight: 400, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: s.color, opacity: 0.7, marginTop: 6, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* ── Événements ── */}
       {events.length > 0 && (
-        <div style={{ marginBottom: 48 }}>
-          <D>Événements</D>
-          {events.map((e, i) => {
-            const color = statusColors[e.status] || 'rgba(255,255,255,0.2)'
-            const estPasse = new Date(e.scheduled_at) < now && e.status === 'a_venir'
+        <Section title="Événements de la semaine">
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8EFEB', overflow: 'hidden' }}>
+            {events.map((e, i) => {
+              const color = statusColors[e.status] || '#9BB5AA'
+              const bg = statusBgs[e.status] || '#F4F5F5'
+              const estPasse = new Date(e.scheduled_at) < now && e.status === 'a_venir'
+              return (
+                <div key={e.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '14px 18px',
+                  borderBottom: i < events.length - 1 ? '1px solid #F0F4F1' : 'none',
+                  opacity: estPasse ? 0.45 : 1,
+                }}>
+                  <div style={{ fontSize: 12, color: '#9BB5AA', width: 42, flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
+                    {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, color: '#1F2A24', fontWeight: 400 }}>{e.label}</div>
+                    {e.intervenants && <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 2 }}>{e.intervenants.name}</div>}
+                  </div>
+                  <Tag color={estPasse ? '#9BB5AA' : color} bg={estPasse ? '#F4F5F5' : bg}>
+                    {estPasse ? 'Passé' : statusLabels[e.status]}
+                  </Tag>
+                </div>
+              )
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Notes ── */}
+      <Section title="Dernières notes">
+        {notes.length === 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8EFEB', padding: '32px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 14, color: '#9BB5AA' }}>Aucune note pour le moment.</div>
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {notes.map((n, i) => {
+            const src = noteSourceColor(n.source)
             return (
-              <div key={e.id} style={{
-                display: 'flex', alignItems: 'center', gap: 16,
-                padding: '14px 0',
-                borderBottom: '1px solid rgba(154,184,159,0.07)',
-                opacity: estPasse ? 0.4 : 1,
-              }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', width: 40, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                  {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              <div key={n.id || i} className="hl-card" style={{ padding: '18px 20px', background: '#fff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Tag color={src.color} bg={src.bg}>{noteSourceLabel(n.source)}</Tag>
+                    {n.intervenant_name && (
+                      <span style={{ fontSize: 12, color: '#6F7C75', fontStyle: 'italic' }}>{n.intervenant_name}</span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 11, color: '#9BB5AA' }}>
+                    {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', fontWeight: 300 }}>{e.label}</div>
-                  {e.intervenants && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 2 }}>{e.intervenants.name}</div>}
-                </div>
-                <div style={{ fontSize: 9, color: color, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-                  {estPasse ? 'Passé' : statusLabels[e.status]}
-                </div>
+                <p style={{ fontSize: 14, color: '#3A4A40', lineHeight: 1.7, fontWeight: 400 }}>{n.content}</p>
               </div>
             )
           })}
         </div>
-      )}
-
-      {/* ── Notes ── */}
-      <div>
-        <D>Dernières notes</D>
-        {notes.length === 0 && (
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)', fontWeight: 300, padding: '24px 0' }}>Aucune note pour le moment.</div>
-        )}
-        {notes.map((n, i) => (
-          <div key={n.id || i} style={{
-            padding: '24px 0',
-            borderBottom: '1px solid rgba(154,184,159,0.07)',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-              <div>
-                <div style={{ fontSize: 9, color: 'rgba(154,184,159,0.5)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 4 }}>
-                  {n.source === 'whatsapp_audio' ? 'Note vocale' : n.source === 'whatsapp_text' ? 'WhatsApp' : 'Note'}
-                </div>
-                {n.intervenant_name && (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>{n.intervenant_name}</div>
-                )}
-              </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.05em' }}>
-                {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', lineHeight: 1.75, fontWeight: 300 }}>{n.content}</p>
-          </div>
-        ))}
-      </div>
+      </Section>
 
     </div>
   )

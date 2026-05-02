@@ -1,3 +1,4 @@
+// app/components/Layout.js
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -6,9 +7,9 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
   const pathname = usePathname()
 
   const navItemsAdmin = [
-    { label: 'Flux', href: '/app', short: 'Flux' },
+    { label: 'Flux en temps réel', href: '/app', short: 'Flux' },
     { label: 'Agenda', href: '/agenda', short: 'Agenda' },
-    { label: 'Carnet', href: '/carnet', short: 'Carnet' },
+    { label: 'Carnet de suivi', href: '/carnet', short: 'Carnet' },
     { label: 'Ordonnances', href: '/ordonnances', short: 'Rx' },
     { label: 'Famille', href: '/famille', short: 'Famille' },
     { label: 'Intervenants', href: '/intervenants', short: 'Équipe' },
@@ -22,148 +23,128 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
   ]
 
   const navItems = isIntervenant ? navItemsIntervenant : navItemsAdmin
-  const bottomItems = isIntervenant ? navItemsIntervenant : navItemsAdmin.filter(i => ['Flux','Agenda','Carnet','Famille','Profil'].includes(i.label))
+  const bottomItems = isIntervenant ? navItemsIntervenant : navItemsAdmin.filter(i => ['Flux en temps réel','Agenda','Carnet de suivi','Famille','Profil'].includes(i.label))
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,200;0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0F1610; }
+        body { background: #FCFDFC; }
 
+        .hl-wrap { display: flex; height: 100vh; font-family: 'Inter', system-ui, sans-serif; background: #FCFDFC; color: #1F2A24; }
         .hl-sidebar { display: flex; }
         .hl-bottom { display: none; }
 
         @media (max-width: 768px) {
           .hl-sidebar { display: none !important; }
           .hl-bottom { display: flex !important; }
-          .hl-main { padding: 28px 20px 88px !important; }
+          .hl-main { padding: 24px 20px 88px !important; }
           .hl-wrap { min-height: 100vh; height: auto !important; }
         }
 
         .hl-navlink { text-decoration: none; display: block; }
         .hl-navlink-inner {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 10px 0;
-          border-bottom: 1px solid transparent;
-          transition: all 0.2s;
-          cursor: pointer;
+          padding: 9px 12px; border-radius: 8px;
+          transition: all 0.15s; cursor: pointer;
         }
-        .hl-navlink:hover .hl-navlink-inner {
-          border-bottom-color: rgba(154,184,159,0.3) !important;
-        }
-        .hl-navlink:hover .hl-navlink-text {
-          color: #FAFCFA !important;
-          letter-spacing: 0.04em !important;
-        }
-
-        .hl-card {
-          background: rgba(255,255,255,0.025);
-          border: 1px solid rgba(154,184,159,0.12);
-          border-radius: 2px;
-          transition: border-color 0.2s;
-        }
-        .hl-card:hover { border-color: rgba(154,184,159,0.25); }
+        .hl-navlink:hover .hl-navlink-inner { background: #EAF4EF; }
+        .hl-navlink:hover .hl-navlink-text { color: #1F2A24 !important; }
 
         .hl-scroll::-webkit-scrollbar { width: 3px; }
         .hl-scroll::-webkit-scrollbar-track { background: transparent; }
-        .hl-scroll::-webkit-scrollbar-thumb { background: rgba(154,184,159,0.2); }
+        .hl-scroll::-webkit-scrollbar-thumb { background: #C8DDD4; border-radius: 4px; }
 
-        .hl-bottom-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; text-decoration: none; transition: opacity 0.15s; }
-        .hl-bottom-item:active { opacity: 0.6; }
+        .hl-bottom-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; text-decoration: none; transition: opacity 0.15s; }
+        .hl-card { background: #fff; border: 1px solid #E8EFEB; border-radius: 12px; transition: box-shadow 0.2s, border-color 0.2s; }
+        .hl-card:hover { box-shadow: 0 4px 16px rgba(127,175,155,0.12); border-color: #C8DDD4; }
       `}</style>
 
-      <div className="hl-wrap" style={{
-        display: 'flex', height: '100vh',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: '#0F1610', color: '#FAFCFA',
-      }}>
+      <div className="hl-wrap">
 
         {/* ───── Sidebar ───── */}
         <aside className="hl-sidebar hl-scroll" style={{
-          width: 220,
-          borderRight: '1px solid rgba(154,184,159,0.1)',
-          padding: '32px 28px',
+          width: 240,
+          background: '#fff',
+          borderRight: '1px solid #EBF0EC',
+          padding: '28px 16px',
           flexDirection: 'column',
           gap: 0,
           flexShrink: 0,
           overflowY: 'auto',
-          justifyContent: 'space-between',
         }}>
 
-          <div>
-            {/* Logo */}
-            <Link href="/app" style={{ textDecoration: 'none', display: 'block', marginBottom: 40 }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 300, letterSpacing: '0.08em', color: '#FAFCFA', lineHeight: 1 }}>
-                Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
+          {/* Logo */}
+          <Link href="/app" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '4px 12px', marginBottom: 32 }}>
+            <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+              <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="2" fill="none"/>
+              <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="2" fill="none"/>
+              <circle cx="32" cy="32" r="4" fill="#7FAF9B"/>
+              <circle cx="32" cy="32" r="1.8" fill="#fff"/>
+            </svg>
+            <div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, letterSpacing: '0.05em', color: '#1F2A24', lineHeight: 1 }}>
+                Holiris
               </div>
-              <div style={{ fontSize: 8, color: 'rgba(154,184,159,0.4)', letterSpacing: '0.3em', textTransform: 'uppercase', marginTop: 4 }}>
+              <div style={{ fontSize: 8, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 2 }}>
                 {isIntervenant ? 'Intervenant' : 'Pyrénées-Orientales'}
               </div>
-            </Link>
+            </div>
+          </Link>
 
-            {/* Senior */}
-            {senior && (
-              <div style={{ marginBottom: 36, paddingBottom: 28, borderBottom: '1px solid rgba(154,184,159,0.1)' }}>
-                {isAdmin && seniors?.length > 1 ? (
-                  <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
-                    style={{ width: '100%', background: 'transparent', color: '#FAFCFA', border: 'none', fontSize: 14, cursor: 'pointer', outline: 'none', fontFamily: "'Cormorant Garamond', serif", fontWeight: 400 }}>
-                    {seniors.map(s => <option key={s.id} value={s.id} style={{ background: '#0F1610' }}>{s.name}</option>)}
-                  </select>
-                ) : (
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 400, color: '#FAFCFA', letterSpacing: '0.02em' }}>
-                    {senior.name}
-                  </div>
-                )}
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 3, letterSpacing: '0.1em' }}>
-                  {senior.age} ans · {senior.city}
-                </div>
+          {/* Senior card */}
+          {senior && (
+            <div style={{ background: '#EAF4EF', borderRadius: 10, padding: '12px 14px', marginBottom: 24 }}>
+              <div style={{ fontSize: 9, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>
+                Dossier actif
               </div>
-            )}
+              {isAdmin && seniors?.length > 1 ? (
+                <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', color: '#1F2A24', border: 'none', fontSize: 14, cursor: 'pointer', outline: 'none', fontFamily: "'Cormorant Garamond', serif", fontWeight: 500 }}>
+                  {seniors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : (
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16, fontWeight: 500, color: '#1F2A24' }}>{senior.name}</div>
+              )}
+              <div style={{ fontSize: 11, color: '#6F7C75', marginTop: 3 }}>{senior.age} ans · {senior.city}</div>
+            </div>
+          )}
 
-            {/* Nav */}
-            <nav>
-              {navItems.map((item) => {
-                const active = pathname === item.href
-                return (
-                  <Link key={item.href} href={item.href} className="hl-navlink">
-                    <div className="hl-navlink-inner" style={{
-                      borderBottomColor: active ? 'rgba(154,184,159,0.4)' : 'rgba(154,184,159,0.08)',
+          {/* Nav */}
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
+            {navItems.map((item) => {
+              const active = pathname === item.href
+              return (
+                <Link key={item.href} href={item.href} className="hl-navlink">
+                  <div className="hl-navlink-inner" style={{
+                    background: active ? '#EAF4EF' : 'transparent',
+                  }}>
+                    <span className="hl-navlink-text" style={{
+                      fontSize: 13,
+                      fontWeight: active ? 500 : 400,
+                      color: active ? '#4A8870' : '#6F7C75',
                     }}>
-                      <span className="hl-navlink-text" style={{
-                        fontSize: 12,
-                        fontWeight: active ? 500 : 300,
-                        color: active ? '#9AB89F' : 'rgba(255,255,255,0.35)',
-                        letterSpacing: active ? '0.06em' : '0.02em',
-                        textTransform: 'uppercase',
-                        transition: 'all 0.2s',
-                      }}>
-                        {item.label}
-                      </span>
-                      {active && (
-                        <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#9AB89F' }} />
-                      )}
-                    </div>
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
+                      {item.label}
+                    </span>
+                    {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#7FAF9B' }} />}
+                  </div>
+                </Link>
+              )
+            })}
+          </nav>
 
-          {/* Bottom sidebar */}
-          <div style={{ paddingTop: 28 }}>
-            {isAdmin && (
-              <div style={{ fontSize: 9, color: 'rgba(196,122,130,0.5)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-                Admin
-              </div>
-            )}
-          </div>
+          {isAdmin && (
+            <div style={{ marginTop: 16, padding: '8px 12px', background: '#FEF0F1', borderRadius: 8 }}>
+              <div style={{ fontSize: 10, color: '#C47A82', fontWeight: 500 }}>Mode Admin actif</div>
+            </div>
+          )}
         </aside>
 
         {/* ───── Main ───── */}
         <main className="hl-main hl-scroll" style={{
-          flex: 1, padding: '40px 48px', overflowY: 'auto',
-          background: '#0F1610',
+          flex: 1, padding: '36px 40px', overflowY: 'auto',
+          background: '#F7F9F8',
         }}>
           {children}
         </main>
@@ -171,12 +152,12 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         {/* ───── Bottom nav mobile ───── */}
         <nav className="hl-bottom" style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: 'rgba(10,18,11,0.97)',
-          borderTop: '1px solid rgba(154,184,159,0.1)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          background: 'rgba(255,255,255,0.97)',
+          borderTop: '1px solid #EBF0EC',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           paddingBottom: 'env(safe-area-inset-bottom, 8px)',
-          paddingTop: 4,
+          paddingTop: 6,
           zIndex: 100,
           justifyContent: 'space-around', alignItems: 'center',
         }}>
@@ -185,15 +166,17 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
             return (
               <Link key={item.href} href={item.href} className="hl-bottom-item">
                 <div style={{
-                  width: 28, height: 2, borderRadius: 1,
-                  background: active ? '#9AB89F' : 'transparent',
-                  marginBottom: 4,
+                  width: 32, height: 32, borderRadius: 9,
+                  background: active ? '#EAF4EF' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'background 0.2s',
-                }} />
+                }}>
+                  <div style={{ width: 16, height: 2, borderRadius: 1, background: active ? '#7FAF9B' : '#C8D4CD' }} />
+                </div>
                 <span style={{
-                  fontSize: 9, letterSpacing: '0.15em', textTransform: 'uppercase',
-                  color: active ? '#9AB89F' : 'rgba(255,255,255,0.25)',
-                  fontWeight: active ? 500 : 300,
+                  fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  color: active ? '#4A8870' : '#9BB5AA',
+                  fontWeight: active ? 600 : 400,
                 }}>
                   {item.short}
                 </span>
