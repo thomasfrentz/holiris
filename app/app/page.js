@@ -40,21 +40,21 @@ export default function App() {
 
       if (!selectedSeniorId) return
 
-      // 30 jours en arrière pour capturer les derniers passages
+      // 30 jours en arrière pour les derniers passages
       const debutPeriode = new Date()
       debutPeriode.setDate(debutPeriode.getDate() - 30)
       debutPeriode.setHours(0, 0, 0, 0)
 
-      // Fin de la semaine courante pour les prochains RDV
-      const finSemaine = new Date()
-      finSemaine.setDate(finSemaine.getDate() + (7 - finSemaine.getDay()))
-      finSemaine.setHours(23, 59, 59, 999)
+      // 3 mois en avant pour les prochains RDV
+      const finPeriode = new Date()
+      finPeriode.setMonth(finPeriode.getMonth() + 3)
+      finPeriode.setHours(23, 59, 59, 999)
 
       const [eventsRes, notesRes, notesCountRes, alertesRes, ordonnancesRes] = await Promise.all([
         supabase.from('events').select('*, intervenants(*)')
           .eq('senior_id', selectedSeniorId)
           .gte('scheduled_at', debutPeriode.toISOString())
-          .lte('scheduled_at', finSemaine.toISOString())
+          .lte('scheduled_at', finPeriode.toISOString())
           .order('scheduled_at', { ascending: true }),
         supabase.from('notes').select('*')
           .eq('senior_id', selectedSeniorId)
