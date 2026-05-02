@@ -22,8 +22,6 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
   const [alertes, setAlertes] = useState(initialAlertes || [])
   const [ordonnances] = useState(initialOrdonnances || [])
 
-  const silenceCount = events.filter(e => e.status === 'silence').length
-  const relanceCount = events.filter(e => e.status === 'relance_envoyee').length
   const now = new Date()
 
   const prochainEvent = events.filter(e => new Date(e.scheduled_at) >= now).sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0]
@@ -100,23 +98,17 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
             const bg = danger ? '#FBECED' : '#FDF3E7'
             const border = danger ? '#F2C4C8' : '#F0D9B5'
             return (
-              <div key={a.id} style={{
-                background: bg, border: '1px solid ' + border,
-                borderRadius: 10, padding: '14px 18px',
-                display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8
-              }}>
+              <div key={a.id} style={{ background: bg, border: '1px solid ' + border, borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
                 <div style={{ width: 3, height: 38, borderRadius: 2, background: color, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: color, letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 5 }}>
+                  <div style={{ fontSize: 10, color, letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 5 }}>
                     {danger ? 'Urgent' : 'Attention'}
                   </div>
                   <div style={{ fontSize: 14, color: '#1F2A24', fontWeight: 400, lineHeight: 1.5 }}>{a.message}</div>
                 </div>
-                <button onClick={() => marquerLu(a.id)} style={{
-                  background: '#fff', border: '1px solid ' + border,
-                  color: '#6F7C75', padding: '6px 14px', fontSize: 12,
-                  fontWeight: 500, cursor: 'pointer', borderRadius: 6, fontFamily: 'inherit',
-                }}>Lu</button>
+                <button onClick={() => marquerLu(a.id)} style={{ background: '#fff', border: '1px solid ' + border, color: '#6F7C75', padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: 6, fontFamily: 'inherit' }}>
+                  Lu
+                </button>
               </div>
             )
           })}
@@ -124,7 +116,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       )}
 
       {/* KPIs 2x2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 36 }}>
         {[
           {
             label: 'Prochain RDV',
@@ -160,20 +152,6 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
         ))}
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 36 }}>
-        {[
-          { label: 'Notes reçues', value: totalNotes, color: '#4A8870', bg: '#EAF4EF', border: '#C8DDD4' },
-          { label: 'Silences détectés', value: silenceCount, color: '#C4606A', bg: '#FBECED', border: '#F2C4C8' },
-          { label: 'Relances envoyées', value: relanceCount, color: '#C4844A', bg: '#FDF3E7', border: '#F0D9B5' },
-        ].map((s) => (
-          <div key={s.label} style={{ background: s.bg, border: '1px solid ' + s.border, borderRadius: 12, padding: '18px 20px', textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 400, color: s.color, lineHeight: 1 }}>{s.value}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: s.color, opacity: 0.7, marginTop: 7, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
       {/* Événements */}
       {events.length > 0 && (
         <Section title="Événements de la semaine">
@@ -183,12 +161,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
               const bg = statusBgs[e.status] || '#F4F5F5'
               const estPasse = new Date(e.scheduled_at) < now && e.status === 'a_venir'
               return (
-                <div key={e.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 16,
-                  padding: '15px 20px',
-                  borderBottom: i < events.length - 1 ? '1px solid #F0F4F1' : 'none',
-                  opacity: estPasse ? 0.45 : 1,
-                }}>
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '15px 20px', borderBottom: i < events.length - 1 ? '1px solid #F0F4F1' : 'none', opacity: estPasse ? 0.45 : 1 }}>
                   <div style={{ fontSize: 13, color: '#9BB5AA', width: 44, flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
                     {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                   </div>
@@ -221,9 +194,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Tag color={src.color} bg={src.bg}>{noteSourceLabel(n.source)}</Tag>
-                    {n.intervenant_name && (
-                      <span style={{ fontSize: 13, color: '#6F7C75', fontStyle: 'italic' }}>{n.intervenant_name}</span>
-                    )}
+                    {n.intervenant_name && <span style={{ fontSize: 13, color: '#6F7C75', fontStyle: 'italic' }}>{n.intervenant_name}</span>}
                   </div>
                   <span style={{ fontSize: 12, color: '#9BB5AA' }}>
                     {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
