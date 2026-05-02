@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 import { useIntervenant } from '../lib/useIntervenant'
 
@@ -26,6 +26,8 @@ export default function Agenda() {
 
   const selectedSenior = isIntervenant ? intervenantSenior : adminSenior
   const selectedSeniorId = isIntervenant ? intervenantSeniorId : adminSeniorId
+  const switchSenior = isIntervenant ? intervenantSwitch : adminSwitch
+  const seniorsList2 = isIntervenant ? seniorsList : seniors
 
   const router = useRouter()
   const supabase = createBrowserClient(
@@ -40,24 +42,6 @@ export default function Agenda() {
     { value: '0', label: 'Dim' },
   ]
 
-  const navItemsAdmin = [
-    { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-    { icon: '📅', label: 'Agenda', href: '/agenda' },
-    { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-    { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
-    { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
-    { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-    { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-    { icon: '👤', label: 'Mon profil', href: '/profil' },
-  ]
-
-  const navItemsIntervenant = [
-    { icon: '🏠', label: 'Mon espace', href: '/espace-intervenant' },
-    { icon: '📅', label: 'Agenda', href: '/agenda' },
-  ]
-
-  const navItems = isIntervenant ? navItemsIntervenant : navItemsAdmin
-
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -65,15 +49,13 @@ export default function Agenda() {
       if (!selectedSeniorId) { setLoading(false); return }
 
       const { data: eventsData } = await supabase
-        .from('events')
-        .select('*, intervenants(*)')
+        .from('events').select('*, intervenants(*)')
         .eq('senior_id', selectedSeniorId)
         .order('scheduled_at', { ascending: true })
       setEvents(eventsData || [])
 
       const { data: intervenantsData } = await supabase
-        .from('intervenants')
-        .select('*')
+        .from('intervenants').select('*')
         .eq('senior_id', selectedSeniorId)
       setIntervenants(intervenantsData || [])
 
@@ -208,206 +190,149 @@ export default function Agenda() {
   )
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-      <aside style={{ width: 260, background: '#12201a', color: '#e8f0eb', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 42, height: 42, background: '#2ecc71', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#12201a', fontSize: 18 }}>H</div>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 18 }}>Holiris</div>
-            <div style={{ fontSize: 10, color: '#5a8a6a', letterSpacing: 1 }}>
-              {isIntervenant ? 'ESPACE INTERVENANT' : 'PYRÉNÉES-ORIENTALES'}
-            </div>
-          </div>
+    <Layout
+      senior={selectedSenior}
+      seniors={seniorsList2}
+      selectedSeniorId={selectedSeniorId}
+      switchSenior={switchSenior}
+      isAdmin={isAdmin}
+      isIntervenant={isIntervenant}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>📅 Agenda</h1>
+          <p style={{ color: '#888', fontSize: 13 }}>{events.length} événement{events.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
         </div>
+        <button onClick={() => setShowForm(!showForm)}
+          style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+          + Ajouter
+        </button>
+      </div>
 
-        {isAdmin && seniors.length > 1 ? (
-          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
-            <select value={adminSeniorId || ''} onChange={e => adminSwitch(e.target.value)}
-              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
-              {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
-            </select>
-            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
-          </div>
-        ) : isIntervenant && seniorsList.length > 1 ? (
-          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
-            <select value={intervenantSeniorId || ''} onChange={e => intervenantSwitch(e.target.value)}
-              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
-              {seniorsList.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
-            </select>
-            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
-          </div>
-        ) : (
-          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-            <div style={{ fontWeight: 'bold' }}>{selectedSenior?.name}</div>
-            <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
-          </div>
-        )}
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {navItems.map((item) => (
-            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 8,
-                color: item.href === '/agenda' ? '#2ecc71' : '#9abaa8',
-                background: item.href === '/agenda' ? 'rgba(46,204,113,0.15)' : 'none',
-                fontWeight: item.href === '/agenda' ? 'bold' : 'normal',
-                cursor: 'pointer', fontSize: 14
-              }}>
-                <span>{item.icon}</span>{item.label}
-              </div>
-            </Link>
-          ))}
-        </nav>
-
-        {isAdmin && (
-          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 10, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 'bold', color: '#ff8070' }}>🔐 Mode Admin</div>
-            <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>Suppression activée</div>
-          </div>
-        )}
-      </aside>
-
-      <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>📅 Agenda</h1>
-            <p style={{ color: '#888', fontSize: 13 }}>{events.length} événement{events.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
-          </div>
-          <button onClick={() => setShowForm(!showForm)}
-            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-            + Ajouter
-          </button>
-        </div>
-
-        {showForm && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-            <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel événement</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Description</label>
-                <input placeholder="Ex: Passage infirmière" value={label} onChange={e => setLabel(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Type</label>
-                <select value={type} onChange={e => setType(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
-                  {typeOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
+      {showForm && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+          <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Nouvel événement</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Description</label>
+              <input placeholder="Ex: Passage infirmière" value={label} onChange={e => setLabel(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Intervenant</label>
-                <select value={intervenantId} onChange={e => setIntervenantId(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
-                  <option value="">Aucun</option>
-                  {intervenants.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Date de début</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Heure</label>
-                <input type="time" value={heure} onChange={e => setHeure(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
-              </div>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Récurrence</label>
-              <select value={recurrence} onChange={e => { setRecurrence(e.target.value); setRecurrenceDays([]) }}
+            <div>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Type</label>
+              <select value={type} onChange={e => setType(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
-                <option value="none">Une seule fois</option>
-                <option value="daily">Tous les jours</option>
-                <option value="weekly">Toutes les semaines (choisir les jours)</option>
-                <option value="biweekly">Toutes les 2 semaines</option>
-                <option value="monthly">Tous les mois</option>
+                {typeOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
-            {recurrence === 'weekly' && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Jours de la semaine</label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {joursOptions.map(j => (
-                    <button key={j.value} onClick={() => toggleDay(j.value)}
-                      style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', fontWeight: 'bold',
-                        background: recurrenceDays.includes(j.value) ? '#12201a' : '#f0f4f0',
-                        color: recurrenceDays.includes(j.value) ? '#2ecc71' : '#888',
-                        border: recurrenceDays.includes(j.value) ? '1px solid #12201a' : '1px solid #ddd' }}>
-                      {j.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {recurrence !== 'none' && (
-              <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
-                🔄 {recurrenceLabel[recurrence]} — événements générés sur 3 mois
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={addEvent} disabled={saving || !label || !date || !heure}
-                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-                {saving ? 'Création...' : recurrence !== 'none' ? 'Créer les événements récurrents' : 'Ajouter'}
-              </button>
-              <button onClick={() => setShowForm(false)}
-                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
-                Annuler
-              </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Intervenant</label>
+              <select value={intervenantId} onChange={e => setIntervenantId(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
+                <option value="">Aucun</option>
+                {intervenants.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Date de début</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Heure</label>
+              <input type="time" value={heure} onChange={e => setHeure(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', boxSizing: 'border-box' }} />
             </div>
           </div>
-        )}
-
-        {Object.keys(groupedEvents).length === 0 && !loading && (
-          <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
-            <div>Aucun événement pour le moment</div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Récurrence</label>
+            <select value={recurrence} onChange={e => { setRecurrence(e.target.value); setRecurrenceDays([]) }}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
+              <option value="none">Une seule fois</option>
+              <option value="daily">Tous les jours</option>
+              <option value="weekly">Toutes les semaines (choisir les jours)</option>
+              <option value="biweekly">Toutes les 2 semaines</option>
+              <option value="monthly">Tous les mois</option>
+            </select>
           </div>
-        )}
+          {recurrence === 'weekly' && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Jours de la semaine</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {joursOptions.map(j => (
+                  <button key={j.value} onClick={() => toggleDay(j.value)}
+                    style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', fontWeight: 'bold',
+                      background: recurrenceDays.includes(j.value) ? '#12201a' : '#f0f4f0',
+                      color: recurrenceDays.includes(j.value) ? '#2ecc71' : '#888',
+                      border: recurrenceDays.includes(j.value) ? '1px solid #12201a' : '1px solid #ddd' }}>
+                    {j.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {recurrence !== 'none' && (
+            <div style={{ background: '#f0f9f4', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#2d5a47', marginBottom: 16 }}>
+              🔄 {recurrenceLabel[recurrence]} — événements générés sur 3 mois
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={addEvent} disabled={saving || !label || !date || !heure}
+              style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+              {saving ? 'Création...' : recurrence !== 'none' ? 'Créer les événements récurrents' : 'Ajouter'}
+            </button>
+            <button onClick={() => setShowForm(false)}
+              style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
 
-        {Object.entries(groupedEvents).map(([d, dayEvents]) => (
-          <div key={d} style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{d}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {dayEvents.map(e => {
-                const estPasse = new Date(e.scheduled_at) < new Date() && e.status === 'a_venir'
-                const cfg = estPasse
-                  ? { color: '#bbb', label: '⏱ Passé' }
-                  : statusConfig[e.status] ?? { color: '#999', label: e.status }
-                return (
-                  <div key={e.id} style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', borderLeft: '4px solid ' + cfg.color, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{ fontSize: 24 }}>{typeIcon[e.type] ?? '📋'}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold', fontSize: 14, color: estPasse ? '#aaa' : '#12201a' }}>
-                        {e.label}
-                        {e.recurrence && <span style={{ fontSize: 11, color: '#2ecc71', marginLeft: 8 }}>🔄 {recurrenceLabel[e.recurrence]}</span>}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                        {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                        {e.intervenants && ' · ' + e.intervenants.name}
-                      </div>
+      {Object.keys(groupedEvents).length === 0 && !loading && (
+        <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
+          <div>Aucun événement pour le moment</div>
+        </div>
+      )}
+
+      {Object.entries(groupedEvents).map(([d, dayEvents]) => (
+        <div key={d} style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{d}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {dayEvents.map(e => {
+              const estPasse = new Date(e.scheduled_at) < new Date() && e.status === 'a_venir'
+              const cfg = estPasse
+                ? { color: '#bbb', label: '⏱ Passé' }
+                : statusConfig[e.status] ?? { color: '#999', label: e.status }
+              return (
+                <div key={e.id} style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', borderLeft: '4px solid ' + cfg.color, boxShadow: '0 1px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ fontSize: 24 }}>{typeIcon[e.type] ?? '📋'}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', fontSize: 14, color: estPasse ? '#aaa' : '#12201a' }}>
+                      {e.label}
+                      {e.recurrence && <span style={{ fontSize: 11, color: '#2ecc71', marginLeft: 8 }}>🔄 {recurrenceLabel[e.recurrence]}</span>}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>{cfg.label}</div>
-                      {isAdmin && (
-                        <button onClick={() => deleteEvent(e.id)}
-                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>🗑️</button>
-                      )}
+                    <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                      {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      {e.intervenants && ' · ' + e.intervenants.name}
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>{cfg.label}</div>
+                    {isAdmin && (
+                      <button onClick={() => deleteEvent(e.id)}
+                        style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>🗑️</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        ))}
-      </main>
-    </div>
+        </div>
+      ))}
+    </Layout>
   )
 }

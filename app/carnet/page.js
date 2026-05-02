@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 
 export default function Carnet() {
@@ -27,18 +27,14 @@ export default function Carnet() {
       if (!selectedSeniorId) return
 
       const { data: familleData } = await supabase
-        .from('famille')
-        .select('*')
-        .eq('user_id', user.id)
-        .limit(1)
+        .from('famille').select('*').eq('user_id', user.id).limit(1)
       setFamille(familleData?.[0])
 
-      const { data: notes } = await supabase
-        .from('notes')
-        .select('*')
+      const { data: notesData } = await supabase
+        .from('notes').select('*')
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
-      setNotes(notes || [])
+      setNotes(notesData || [])
 
       setLoading(false)
     }
@@ -92,141 +88,85 @@ export default function Carnet() {
   )
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-      <aside style={{ width: 260, background: '#12201a', color: '#e8f0eb', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 42, height: 42, background: '#2ecc71', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#12201a', fontSize: 18 }}>H</div>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 18 }}>Holiris</div>
-            <div style={{ fontSize: 10, color: '#5a8a6a', letterSpacing: 1 }}>PYRÉNÉES-ORIENTALES</div>
+    <Layout
+      senior={selectedSenior}
+      seniors={seniors}
+      selectedSeniorId={selectedSeniorId}
+      switchSenior={switchSenior}
+      isAdmin={isAdmin}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>📝 Carnet de suivi</h1>
+        <button onClick={() => setShowForm(!showForm)}
+          style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+          + Ajouter une note
+        </button>
+      </div>
+      <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>{notes.length} notes · {selectedSenior?.name}</p>
+
+      {showForm && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
+            Note de <strong>{famille?.name || famille?.email}</strong>
+            {famille?.role && <span> · {famille.role}</span>}
+          </div>
+          <textarea placeholder="Décrivez l'état de votre proche..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={4}
+            style={{ width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', resize: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={addNote} disabled={saving || !newNote.trim()}
+              style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+              {saving ? 'Publication...' : 'Publier'}
+            </button>
+            <button onClick={() => { setShowForm(false); setNewNote('') }}
+              style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
+              Annuler
+            </button>
           </div>
         </div>
+      )}
 
-        {isAdmin && seniors.length > 1 ? (
-          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
-            <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
-              style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
-              {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
-            </select>
-            <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{selectedSenior?.city}</div>
-          </div>
-        ) : (
-          <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-            <div style={{ fontWeight: 'bold' }}>{selectedSenior?.name}</div>
-            <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
-          </div>
-        )}
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[
-            { icon: '⚡', label: 'Flux en temps réel', href: '/app' },
-            { icon: '📅', label: 'Agenda', href: '/agenda' },
-            { icon: '📝', label: 'Carnet de suivi', href: '/carnet' },
-            { icon: '💊', label: 'Ordonnances', href: '/ordonnances' },
-            { icon: '👨‍👩‍👧', label: 'Famille', href: '/famille' },
-            { icon: '👥', label: 'Intervenants', href: '/intervenants' },
-            { icon: '🤖', label: 'Assistant IA', href: '/assistant' },
-            { icon: '👤', label: 'Mon profil', href: '/profil' },
-          ].map((item) => (
-            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 8,
-                color: item.href === '/carnet' ? '#2ecc71' : '#9abaa8',
-                background: item.href === '/carnet' ? 'rgba(46,204,113,0.15)' : 'none',
-                fontWeight: item.href === '/carnet' ? 'bold' : 'normal',
-                cursor: 'pointer', fontSize: 14
-              }}>
-                <span>{item.icon}</span>{item.label}
-              </div>
-            </Link>
-          ))}
-        </nav>
-
-        {isAdmin && (
-          <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 10, padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 'bold', color: '#ff8070' }}>🔐 Mode Admin</div>
-            <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>Modification et suppression activées</div>
-          </div>
-        )}
-      </aside>
-
-      <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>📝 Carnet de suivi</h1>
-          <button onClick={() => setShowForm(!showForm)}
-            style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-            + Ajouter une note
-          </button>
-        </div>
-        <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>{notes.length} notes · {selectedSenior?.name}</p>
-
-        {showForm && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
-              Note de <strong>{famille?.name || famille?.email}</strong>
-              {famille?.role && <span> · {famille.role}</span>}
-            </div>
-            <textarea placeholder="Décrivez l'état de votre proche..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={4}
-              style={{ width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', resize: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={addNote} disabled={saving || !newNote.trim()}
-                style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-                {saving ? 'Publication...' : 'Publier'}
-              </button>
-              <button onClick={() => { setShowForm(false); setNewNote('') }}
-                style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
-                Annuler
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {notes.map((n, index) => {
-            const src = sourceLabel(n.source)
-            return (
-              <div key={n.id || index} style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderLeft: '4px solid ' + src.color }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <span style={{ fontSize: 14 }}>{src.icon}</span>
-                      <span style={{ fontSize: 12, fontWeight: 'bold', color: src.color }}>{src.label}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {notes.map((n, index) => {
+          const src = sourceLabel(n.source)
+          return (
+            <div key={n.id || index} style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderLeft: '4px solid ' + src.color }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontSize: 14 }}>{src.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 'bold', color: src.color }}>{src.label}</span>
+                  </div>
+                  {n.intervenant_name && (
+                    <div style={{ fontSize: 13, color: '#333', fontWeight: '600', background: '#f0f4f0', padding: '3px 10px', borderRadius: 20, display: 'inline-block' }}>
+                      👤 {n.intervenant_name}
                     </div>
-                    {n.intervenant_name && (
-                      <div style={{ fontSize: 13, color: '#333', fontWeight: '600', background: '#f0f4f0', padding: '3px 10px', borderRadius: 20, display: 'inline-block' }}>
-                        👤 {n.intervenant_name}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 10 }}>
-                    <span style={{ fontSize: 11, color: '#aaa' }}>
-                      {new Date(n.created_at).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {isAdmin && (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={() => editNote(n.id, n.content)}
-                          style={{ background: '#f0f9ff', color: '#3498db', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>✏️</button>
-                        <button onClick={() => deleteNote(n.id)}
-                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>🗑️</button>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-                <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>{n.content}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 10 }}>
+                  <span style={{ fontSize: 11, color: '#aaa' }}>
+                    {new Date(n.created_at).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {isAdmin && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => editNote(n.id, n.content)}
+                        style={{ background: '#f0f9ff', color: '#3498db', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>✏️</button>
+                      <button onClick={() => deleteNote(n.id)}
+                        style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>🗑️</button>
+                    </div>
+                  )}
+                </div>
               </div>
-            )
-          })}
-          {notes.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
-              <div>Aucune note pour le moment</div>
+              <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>{n.content}</p>
             </div>
-          )}
-        </div>
-      </main>
-    </div>
+          )
+        })}
+        {notes.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
+            <div>Aucune note pour le moment</div>
+          </div>
+        )}
+      </div>
+    </Layout>
   )
 }
