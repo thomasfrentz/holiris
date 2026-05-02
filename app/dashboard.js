@@ -24,11 +24,23 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   const now = new Date()
 
-  const prochainEvent = events.filter(e => new Date(e.scheduled_at) >= now).sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0]
-  const dernierPassage = events.filter(e => e.status === 'note_received' && new Date(e.scheduled_at) < now).sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0]
+  const prochainEvent = events
+    .filter(e => new Date(e.scheduled_at) >= now)
+    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0]
+
+  const dernierPassage = events
+    .filter(e => new Date(e.scheduled_at) < now)
+    .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0]
+
   const derniereNote = notes[0]
-  const prochaineOrdonnance = ordonnances.filter(o => new Date(o.date_renouvellement) >= now).sort((a, b) => new Date(a.date_renouvellement) - new Date(b.date_renouvellement))[0]
-  const joursOrdonnance = prochaineOrdonnance ? Math.ceil((new Date(prochaineOrdonnance.date_renouvellement) - now) / 86400000) : null
+
+  const prochaineOrdonnance = ordonnances
+    .filter(o => new Date(o.date_renouvellement) >= now)
+    .sort((a, b) => new Date(a.date_renouvellement) - new Date(b.date_renouvellement))[0]
+
+  const joursOrdonnance = prochaineOrdonnance
+    ? Math.ceil((new Date(prochaineOrdonnance.date_renouvellement) - now) / 86400000)
+    : null
 
   const typeLabel = { care: 'Aide à domicile', kine: 'Kiné', medical: 'Médical', pharmacy: 'Pharmacie' }
 
@@ -49,9 +61,12 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   const alertesNonLues = alertes.filter(a => !a.lu)
 
-  const statusColors = { note_received: '#7FAF9B', silence: '#D98992', relance_envoyee: '#E6B98A', a_venir: '#BC84C6' }
-  const statusBgs = { note_received: '#EAF4EF', silence: '#FBECED', relance_envoyee: '#FDF3E7', a_venir: '#F3EDF7' }
-  const statusLabels = { note_received: 'Reçu', silence: 'Silence', relance_envoyee: 'Relancé', a_venir: 'À venir' }
+  const noteSourceLabel = (s) => s === 'whatsapp_audio' ? 'Note vocale' : s === 'whatsapp_text' ? 'WhatsApp' : 'Note'
+  const noteSourceColor = (s) => {
+    if (s === 'whatsapp_audio') return { color: '#BC84C6', bg: '#F3EDF7' }
+    if (s === 'whatsapp_text') return { color: '#7FAF9B', bg: '#EAF4EF' }
+    return { color: '#6F7C75', bg: '#F4F5F5' }
+  }
 
   const formatRelative = (date) => {
     const d = Math.floor((now - new Date(date)) / 86400000)
@@ -60,11 +75,12 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     return `Il y a ${d}j`
   }
 
-  const noteSourceLabel = (s) => s === 'whatsapp_audio' ? 'Note vocale' : s === 'whatsapp_text' ? 'WhatsApp' : 'Note'
-  const noteSourceColor = (s) => {
-    if (s === 'whatsapp_audio') return { color: '#BC84C6', bg: '#F3EDF7' }
-    if (s === 'whatsapp_text') return { color: '#7FAF9B', bg: '#EAF4EF' }
-    return { color: '#6F7C75', bg: '#F4F5F5' }
+  const formatProchain = (date) => {
+    const d = new Date(date)
+    if (d.toDateString() === now.toDateString()) return "Aujourd'hui"
+    const demain = new Date(now); demain.setDate(demain.getDate() + 1)
+    if (d.toDateString() === demain.toDateString()) return 'Demain'
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   }
 
   return (
@@ -117,67 +133,98 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
       {/* KPIs 2x2 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 36 }}>
-        {[
-          {
-            label: 'Prochain RDV',
-            value: prochainEvent ? (new Date(prochainEvent.scheduled_at).toDateString() === now.toDateString() ? "Aujourd'hui" : new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long' })) : 'Aucun',
-            detail: prochainEvent ? new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + (prochainEvent.intervenants ? ' — ' + prochainEvent.intervenants.name.split(' ')[0] : '') : 'Aucun rendez-vous prévu',
-            accent: '#4A8870', accentBg: '#EAF4EF',
-          },
-          {
-            label: 'Dernier passage',
-            value: dernierPassage ? formatRelative(dernierPassage.scheduled_at) : 'Aucun',
-            detail: dernierPassage ? (typeLabel[dernierPassage.type] || dernierPassage.label) : 'Aucun passage enregistré',
-            accent: '#8B6FAA', accentBg: '#F3EDF7',
-          },
-          {
-            label: 'Renouvellement',
-            value: prochaineOrdonnance ? (joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance} j`) : 'RAS',
-            detail: prochaineOrdonnance ? prochaineOrdonnance.type_ordonnance : 'Aucune ordonnance',
-            accent: joursOrdonnance !== null && joursOrdonnance <= 3 ? '#C4606A' : joursOrdonnance !== null && joursOrdonnance <= 7 ? '#C4844A' : '#4A8870',
-            accentBg: joursOrdonnance !== null && joursOrdonnance <= 7 ? '#FDF3E7' : '#EAF4EF',
-          },
-          {
-            label: 'Dernière note',
-            value: derniereNote ? (() => { const d = Math.floor((now - new Date(derniereNote.created_at)) / 60000); return d < 60 ? `${d} min` : d < 1440 ? `${Math.floor(d/60)}h` : `${Math.floor(d/1440)}j` })() : '—',
-            detail: derniereNote ? (derniereNote.intervenant_name || 'Famille') : 'Aucune note',
-            accent: '#4A8870', accentBg: '#EAF4EF',
-          },
-        ].map(card => (
-          <div key={card.label} className="hl-card" style={{ padding: '20px 22px' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>{card.label}</div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 30, fontWeight: 500, color: card.accent, lineHeight: 1.1, marginBottom: 7 }}>{card.value}</div>
-            <div style={{ fontSize: 12, color: '#9BB5AA', lineHeight: 1.4 }}>{card.detail}</div>
-          </div>
-        ))}
-      </div>
 
-      {/* Événements */}
-      {events.length > 0 && (
-        <Section title="Événements de la semaine">
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8EFEB', overflow: 'hidden' }}>
-            {events.map((e, i) => {
-              const color = statusColors[e.status] || '#9BB5AA'
-              const bg = statusBgs[e.status] || '#F4F5F5'
-              const estPasse = new Date(e.scheduled_at) < now && e.status === 'a_venir'
-              return (
-                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '15px 20px', borderBottom: i < events.length - 1 ? '1px solid #F0F4F1' : 'none', opacity: estPasse ? 0.45 : 1 }}>
-                  <div style={{ fontSize: 13, color: '#9BB5AA', width: 44, flexShrink: 0, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
-                    {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 15, color: '#1F2A24', fontWeight: 400 }}>{e.label}</div>
-                    {e.intervenants && <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{e.intervenants.name}</div>}
-                  </div>
-                  <Tag color={estPasse ? '#9BB5AA' : color} bg={estPasse ? '#F4F5F5' : bg}>
-                    {estPasse ? 'Passé' : statusLabels[e.status]}
-                  </Tag>
+        {/* Prochain RDV — détaillé */}
+        <div className="hl-card" style={{ padding: '20px 22px' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>Prochain RDV</div>
+          {prochainEvent ? (
+            <>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 500, color: '#4A8870', lineHeight: 1.1, marginBottom: 10 }}>
+                {formatProchain(prochainEvent.scheduled_at)}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 500 }}>
+                  {prochainEvent.label}
                 </div>
-              )
-            })}
+                <div style={{ fontSize: 12, color: '#9BB5AA' }}>
+                  {new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  {prochainEvent.intervenants && (
+                    <span> · {prochainEvent.intervenants.name}</span>
+                  )}
+                </div>
+                {prochainEvent.type && (
+                  <div style={{ marginTop: 4 }}>
+                    <Tag color="#4A8870" bg="#EAF4EF">{typeLabel[prochainEvent.type] || prochainEvent.type}</Tag>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 500, color: '#9BB5AA', lineHeight: 1.1, marginBottom: 7 }}>Aucun</div>
+              <div style={{ fontSize: 12, color: '#9BB5AA' }}>Aucun rendez-vous prévu</div>
+            </>
+          )}
+        </div>
+
+        {/* Dernier passage — détaillé */}
+        <div className="hl-card" style={{ padding: '20px 22px' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>Dernier passage</div>
+          {dernierPassage ? (
+            <>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 500, color: '#8B6FAA', lineHeight: 1.1, marginBottom: 10 }}>
+                {formatRelative(dernierPassage.scheduled_at)}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 500 }}>
+                  {dernierPassage.label}
+                </div>
+                <div style={{ fontSize: 12, color: '#9BB5AA' }}>
+                  {new Date(dernierPassage.scheduled_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })}
+                  {' · '}
+                  {new Date(dernierPassage.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  {dernierPassage.intervenants && (
+                    <span> · {dernierPassage.intervenants.name}</span>
+                  )}
+                </div>
+                {dernierPassage.type && (
+                  <div style={{ marginTop: 4 }}>
+                    <Tag color="#8B6FAA" bg="#F3EDF7">{typeLabel[dernierPassage.type] || dernierPassage.type}</Tag>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 500, color: '#9BB5AA', lineHeight: 1.1, marginBottom: 7 }}>Aucun</div>
+              <div style={{ fontSize: 12, color: '#9BB5AA' }}>Aucun passage enregistré</div>
+            </>
+          )}
+        </div>
+
+        {/* Renouvellement */}
+        <div className="hl-card" style={{ padding: '20px 22px' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>Renouvellement</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 500, lineHeight: 1.1, marginBottom: 7, color: joursOrdonnance !== null && joursOrdonnance <= 3 ? '#C4606A' : joursOrdonnance !== null && joursOrdonnance <= 7 ? '#C4844A' : '#4A8870' }}>
+            {prochaineOrdonnance ? (joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance} j`) : 'RAS'}
           </div>
-        </Section>
-      )}
+          <div style={{ fontSize: 12, color: '#9BB5AA', lineHeight: 1.4 }}>
+            {prochaineOrdonnance ? prochaineOrdonnance.type_ordonnance : 'Aucune ordonnance'}
+          </div>
+        </div>
+
+        {/* Dernière note */}
+        <div className="hl-card" style={{ padding: '20px 22px' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>Dernière note</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 500, color: '#4A8870', lineHeight: 1.1, marginBottom: 7 }}>
+            {derniereNote ? (() => { const d = Math.floor((now - new Date(derniereNote.created_at)) / 60000); return d < 60 ? `${d} min` : d < 1440 ? `${Math.floor(d/60)}h` : `${Math.floor(d/1440)}j` })() : '—'}
+          </div>
+          <div style={{ fontSize: 12, color: '#9BB5AA', lineHeight: 1.4 }}>
+            {derniereNote ? (derniereNote.intervenant_name || 'Famille') : 'Aucune note'}
+          </div>
+        </div>
+
+      </div>
 
       {/* Notes */}
       <Section title="Dernières notes">
