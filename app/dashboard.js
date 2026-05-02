@@ -13,18 +13,16 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
   const silenceCount = events.filter(e => e.status === 'silence').length
   const relanceCount = events.filter(e => e.status === 'relance_envoyee').length
 
-  // Prochain RDV
   const now = new Date()
+
   const prochainEvent = events
     .filter(e => new Date(e.scheduled_at) >= now)
     .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0]
 
-  // Dernier passage
   const dernierPassage = events
     .filter(e => e.status === 'note_received' && new Date(e.scheduled_at) < now)
     .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0]
 
-  // Dernière note
   const derniereNote = notes[0]
   const derniereNoteTemps = derniereNote ? (() => {
     const diff = Math.floor((now - new Date(derniereNote.created_at)) / 60000)
@@ -33,7 +31,6 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     return `Il y a ${Math.floor(diff / 1440)}j`
   })() : null
 
-  // Ordonnance la plus proche
   const prochaineOrdonnance = ordonnances
     .filter(o => new Date(o.date_renouvellement) >= now)
     .sort((a, b) => new Date(a.date_renouvellement) - new Date(b.date_renouvellement))[0]
@@ -43,20 +40,20 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     : null
 
   const statusConfig = {
-    note_received: { color: '#2ecc71', label: '✅ Note reçue' },
-    silence: { color: '#e74c3c', label: '🔴 Silence détecté' },
-    relance_envoyee: { color: '#f39c12', label: '📨 Relance envoyée' },
-    a_venir: { color: '#3498db', label: '🕐 À venir' },
+    note_received: { color: '#6B8F71', label: '✅ Note reçue' },
+    silence: { color: '#C47A82', label: '🔴 Silence détecté' },
+    relance_envoyee: { color: '#C4844A', label: '📨 Relance envoyée' },
+    a_venir: { color: '#7A9FA8', label: '🕐 À venir' },
   }
 
   const typeIcon = { care: '🤝', kine: '🦵', medical: '🏥', pharmacy: '💊' }
   const typeLabel = { care: 'Aide à domicile', kine: 'Kinésithérapie', medical: 'Médical', pharmacy: 'Pharmacie' }
 
   const niveauConfig = {
-    info: { color: '#3498db', bg: '#eaf4ff', icon: 'ℹ️' },
-    warning: { color: '#f39c12', bg: '#fef9ec', icon: '⚠️' },
-    danger: { color: '#e74c3c', bg: '#fdf0f0', icon: '🚨' },
-    ordonnance: { color: '#f39c12', bg: '#fef9ec', icon: '💊' },
+    info: { color: '#7A9FA8', bg: 'rgba(122,159,168,0.1)', border: 'rgba(122,159,168,0.3)', icon: 'ℹ️' },
+    warning: { color: '#C4844A', bg: 'rgba(196,132,74,0.1)', border: 'rgba(196,132,74,0.3)', icon: '⚠️' },
+    danger: { color: '#C47A82', bg: 'rgba(196,122,130,0.1)', border: 'rgba(196,122,130,0.3)', icon: '🚨' },
+    ordonnance: { color: '#C4844A', bg: 'rgba(196,132,74,0.1)', border: 'rgba(196,132,74,0.3)', icon: '💊' },
   }
 
   useEffect(() => {
@@ -70,26 +67,18 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
           setNotes(prev => [payload.new, ...prev].slice(0, 3))
           setTotalNotes(prev => prev + 1)
         }
-      )
-      .subscribe()
+      ).subscribe()
 
     const alertesChannel = supabase
       .channel('db-alertes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alertes' },
-        (payload) => {
-          setAlertes(prev => [payload.new, ...prev])
-        }
-      )
-      .subscribe()
+        (payload) => { setAlertes(prev => [payload.new, ...prev]) }
+      ).subscribe()
 
-    return () => {
-      notesChannel.unsubscribe()
-      alertesChannel.unsubscribe()
-    }
+    return () => { notesChannel.unsubscribe(); alertesChannel.unsubscribe() }
   }, [supabaseUrl, supabaseKey])
 
   async function marquerLu(id) {
-    // Les alertes ordonnances sont locales, pas en base
     if (String(id).startsWith('ordonnance-')) {
       setAlertes(prev => prev.filter(a => a.id !== id))
       return
@@ -101,116 +90,92 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   const alertesNonLues = alertes.filter(a => !a.lu)
 
+  const cardStyle = {
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(107,143,113,0.2)',
+    borderRadius: 2,
+    padding: 20,
+  }
+
   return (
-    <main style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>
-        ⚡ Flux en temps réel
-      </h1>
-      <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>
-        {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-      </p>
+    <div>
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 32, fontWeight: 300, color: '#FAFCFA', marginBottom: 4, letterSpacing: '0.04em' }}>
+          Flux en temps réel
+        </h1>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, letterSpacing: '0.05em' }}>
+          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </p>
+      </div>
 
       {/* CARDS RÉSUMÉ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>PROCHAIN RDV</div>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>📅</div>
-          {prochainEvent ? (
-            <>
-              <div style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a' }}>
-                {new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }) === new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' })
-                  ? "Aujourd'hui"
-                  : new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long' }).charAt(0).toUpperCase() + new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long' }).slice(1)}
-              </div>
-              <div style={{ fontSize: 13, color: '#888' }}>
-                {new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                {prochainEvent.intervenants && ' · ' + prochainEvent.intervenants.name}
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 14, color: '#aaa' }}>Aucun RDV</div>
-          )}
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>DERNIER PASSAGE</div>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>🤝</div>
-          {dernierPassage ? (
-            <>
-              <div style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a' }}>
-                {(() => {
-                  const diff = Math.floor((now - new Date(dernierPassage.scheduled_at)) / (1000 * 60 * 60 * 24))
-                  if (diff === 0) return "Aujourd'hui"
-                  if (diff === 1) return 'Hier'
-                  return `Il y a ${diff}j`
-                })()}
-              </div>
-              <div style={{ fontSize: 13, color: '#888' }}>{typeLabel[dernierPassage.type] || dernierPassage.label}</div>
-            </>
-          ) : (
-            <div style={{ fontSize: 14, color: '#aaa' }}>Aucun passage</div>
-          )}
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>MÉDICAMENTS</div>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>💊</div>
-          {prochaineOrdonnance ? (
-            <>
-              <div style={{ fontSize: 16, fontWeight: 'bold', color: joursOrdonnance <= 3 ? '#e74c3c' : joursOrdonnance <= 7 ? '#f39c12' : '#12201a' }}>
-                {joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance} jour${joursOrdonnance > 1 ? 's' : ''}`}
-              </div>
-              <div style={{ fontSize: 13, color: '#888' }}>Avant renouvellement</div>
-              <div style={{ fontSize: 11, color: '#5a8a6a', marginTop: 2 }}>{prochaineOrdonnance.type_ordonnance}</div>
-            </>
-          ) : (
-            <div style={{ fontSize: 14, color: '#aaa' }}>Aucune ordonnance</div>
-          )}
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: '16px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>DERNIÈRE NOTE</div>
-          <div style={{ fontSize: 24, marginBottom: 4 }}>📝</div>
-          {derniereNote ? (
-            <>
-              <div style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a' }}>{derniereNoteTemps}</div>
-              <div style={{ fontSize: 13, color: '#888' }}>{derniereNote.intervenant_name || 'Famille'}</div>
-            </>
-          ) : (
-            <div style={{ fontSize: 14, color: '#aaa' }}>Aucune note</div>
-          )}
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 24 }}>
+        {[
+          {
+            label: 'Prochain RDV', icon: '📅',
+            title: prochainEvent
+              ? (new Date(prochainEvent.scheduled_at).toDateString() === now.toDateString() ? "Aujourd'hui" : new Date(prochainEvent.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long' }))
+              : 'Aucun RDV',
+            sub: prochainEvent
+              ? new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + (prochainEvent.intervenants ? ' · ' + prochainEvent.intervenants.name : '')
+              : null,
+            color: '#9AB89F'
+          },
+          {
+            label: 'Dernier passage', icon: '🤝',
+            title: dernierPassage
+              ? (() => { const d = Math.floor((now - new Date(dernierPassage.scheduled_at)) / 86400000); return d === 0 ? "Aujourd'hui" : d === 1 ? 'Hier' : `Il y a ${d}j` })()
+              : 'Aucun passage',
+            sub: dernierPassage ? (typeLabel[dernierPassage.type] || dernierPassage.label) : null,
+            color: '#A89FCC'
+          },
+          {
+            label: 'Médicaments', icon: '💊',
+            title: prochaineOrdonnance ? (joursOrdonnance === 0 ? "Aujourd'hui" : `${joursOrdonnance}j`) : 'Aucune ordonnance',
+            sub: prochaineOrdonnance ? prochaineOrdonnance.type_ordonnance : null,
+            color: joursOrdonnance <= 3 ? '#C47A82' : joursOrdonnance <= 7 ? '#C4844A' : '#9AB89F'
+          },
+          {
+            label: 'Dernière note', icon: '📝',
+            title: derniereNote ? derniereNoteTemps : 'Aucune note',
+            sub: derniereNote ? (derniereNote.intervenant_name || 'Famille') : null,
+            color: '#9AB89F'
+          },
+        ].map((card) => (
+          <div key={card.label} style={cardStyle}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 12 }}>{card.label}</div>
+            <div style={{ fontSize: 22, marginBottom: 8 }}>{card.icon}</div>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 18, fontWeight: 400, color: card.color, marginBottom: 4 }}>{card.title}</div>
+            {card.sub && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{card.sub}</div>}
+          </div>
+        ))}
       </div>
 
       {/* ALERTES */}
       {alertesNonLues.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 'bold', color: '#12201a', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-            ⚠️ Alertes en cours
+          <div style={{ fontSize: 10, fontWeight: 500, color: '#C47A82', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 10 }}>
+            Alertes en cours
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {alertesNonLues.map(a => {
               const cfg = niveauConfig[a.niveau] || niveauConfig.warning
               return (
                 <div key={a.id} style={{
-                  background: cfg.bg,
-                  border: '1px solid ' + cfg.color + '44',
-                  borderLeft: '4px solid ' + cfg.color,
-                  borderRadius: 10,
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12
+                  background: cfg.bg, border: '1px solid ' + cfg.border,
+                  borderLeft: '3px solid ' + cfg.color,
+                  borderRadius: 2, padding: '12px 16px',
+                  display: 'flex', alignItems: 'center', gap: 12
                 }}>
-                  <span style={{ fontSize: 20 }}>{cfg.icon}</span>
+                  <span style={{ fontSize: 18 }}>{cfg.icon}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, color: '#333', fontWeight: '500' }}>{a.message}</div>
-                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+                    <div style={{ fontSize: 13, color: '#FAFCFA', fontWeight: 400 }}>{a.message}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
                       {new Date(a.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                   <button onClick={() => marquerLu(a.id)}
-                    style={{ background: 'none', border: '1px solid ' + cfg.color, color: cfg.color, borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>
+                    style={{ background: 'transparent', border: '1px solid ' + cfg.color, color: cfg.color, borderRadius: 2, padding: '4px 12px', fontSize: 11, cursor: 'pointer', letterSpacing: '0.05em' }}>
                     Vu ✓
                   </button>
                 </div>
@@ -221,74 +186,72 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       )}
 
       {/* STATS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 24 }}>
         {[
-          { icon: '✅', label: 'Notes reçues', value: totalNotes, color: '#2ecc71' },
-          { icon: '🔴', label: 'Silences détectés', value: silenceCount, color: '#e74c3c' },
-          { icon: '📨', label: 'Relances envoyées', value: relanceCount, color: '#f39c12' },
+          { icon: '✅', label: 'Notes reçues', value: totalNotes, color: '#6B8F71' },
+          { icon: '🔴', label: 'Silences détectés', value: silenceCount, color: '#C47A82' },
+          { icon: '📨', label: 'Relances envoyées', value: relanceCount, color: '#C4844A' },
         ].map((s) => (
-          <div key={s.label} style={{
-            background: '#fff', borderRadius: 12, padding: 20,
-            borderTop: '3px solid ' + s.color, boxShadow: '0 1px 6px rgba(0,0,0,0.05)'
-          }}>
-            <div style={{ fontSize: 28 }}>{s.icon}</div>
-            <div style={{ fontSize: 32, fontWeight: 900, color: s.color, margin: '8px 0 4px' }}>{s.value}</div>
-            <div style={{ fontSize: 12, color: '#888' }}>{s.label}</div>
+          <div key={s.label} style={{ ...cardStyle, borderTop: '2px solid ' + s.color }}>
+            <div style={{ fontSize: 22 }}>{s.icon}</div>
+            <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 40, fontWeight: 300, color: s.color, margin: '8px 0 4px' }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.05em' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* EVENTS */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-        {events?.map((e) => {
-          const cfg = statusConfig[e.status] ?? { color: '#999', label: e.status }
-          return (
-            <div key={e.id} style={{
-              background: '#fff', borderRadius: 10, padding: '14px 16px',
-              borderLeft: '4px solid ' + cfg.color, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-              display: 'flex', alignItems: 'center', gap: 14
-            }}>
-              <div style={{ fontSize: 24 }}>{typeIcon[e.type] ?? '📋'}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: 14, color: '#12201a' }}>{e.label}</div>
-                <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                  {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  {e.intervenants && ' · ' + e.intervenants.name}
+      {events.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
+          {events.map((e) => {
+            const cfg = statusConfig[e.status] ?? { color: '#666', label: e.status }
+            return (
+              <div key={e.id} style={{
+                ...cardStyle,
+                borderLeft: '3px solid ' + cfg.color,
+                display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px'
+              }}>
+                <div style={{ fontSize: 22 }}>{typeIcon[e.type] ?? '📋'}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, color: '#FAFCFA', fontWeight: 400 }}>{e.label}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                    {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    {e.intervenants && ' · ' + e.intervenants.name}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, padding: '3px 10px', borderRadius: 2, background: cfg.color + '22', color: cfg.color, fontWeight: 500, letterSpacing: '0.05em' }}>
+                  {cfg.label}
                 </div>
               </div>
-              <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>
-                {cfg.label}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* NOTES */}
-      <h2 style={{ fontSize: 14, fontWeight: 'bold', color: '#12201a', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
-        Dernières notes <span style={{ color: '#2ecc71', fontSize: 11 }}>● temps réel</span>
-      </h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {notes?.map((n, index) => (
-          <div key={n.id || index} style={{ background: '#fff', borderRadius: 10, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+      <div style={{ fontSize: 10, fontWeight: 500, color: '#9AB89F', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 12 }}>
+        Dernières notes <span style={{ color: '#6B8F71' }}>● temps réel</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {notes.map((n, index) => (
+          <div key={n.id || index} style={{ ...cardStyle, padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 'bold', color: '#12201a' }}>
-                {n.source === 'whatsapp_audio' ? '🎤 Note vocale' :
-                 n.source === 'whatsapp_text' ? '💬 WhatsApp' : '📝 Note'}
+              <span style={{ fontSize: 11, fontWeight: 500, color: '#9AB89F', letterSpacing: '0.05em' }}>
+                {n.source === 'whatsapp_audio' ? '🎤 Note vocale' : n.source === 'whatsapp_text' ? '💬 WhatsApp' : '📝 Note'}
               </span>
-              <span style={{ fontSize: 11, color: '#aaa' }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
                 {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
             {n.intervenant_name && (
-              <div style={{ fontSize: 12, color: '#5a8a6a', marginBottom: 6, fontStyle: 'italic' }}>
+              <div style={{ fontSize: 11, color: 'rgba(154,184,159,0.7)', marginBottom: 8, fontStyle: 'italic' }}>
                 👤 {n.intervenant_name}
               </div>
             )}
-            <p style={{ fontSize: 14, color: '#444', lineHeight: 1.6, margin: 0 }}>{n.content}</p>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.7, margin: 0, fontWeight: 300 }}>{n.content}</p>
           </div>
         ))}
       </div>
-    </main>
+    </div>
   )
 }

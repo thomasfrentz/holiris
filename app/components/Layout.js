@@ -23,7 +23,6 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
 
   const navItems = isIntervenant ? navItemsIntervenant : navItemsAdmin
 
-  // Bottom nav — max 5 items sur mobile
   const bottomNavItems = isIntervenant ? navItemsIntervenant : [
     { icon: '⚡', label: 'Flux', href: '/app' },
     { icon: '📅', label: 'Agenda', href: '/agenda' },
@@ -35,9 +34,11 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+        * { box-sizing: border-box; }
         @media (max-width: 768px) {
           .holiris-sidebar { display: none !important; }
-          .holiris-main { padding: 16px 16px 80px 16px !important; }
+          .holiris-main { padding: 20px 16px 90px 16px !important; }
           .holiris-bottom-nav { display: flex !important; }
           .holiris-layout { height: auto !important; min-height: 100vh !important; }
         }
@@ -45,89 +46,125 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
           .holiris-bottom-nav { display: none !important; }
           .holiris-layout { height: 100vh !important; }
         }
+        .nav-item:hover { background: rgba(154,184,159,0.08) !important; }
+        .holiris-card { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(107,143,113,0.2) !important; }
+        .holiris-card:hover { background: rgba(255,255,255,0.07) !important; }
       `}</style>
 
-      <div className="holiris-layout" style={{ display: 'flex', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
+      <div className="holiris-layout" style={{
+        display: 'flex',
+        fontFamily: 'DM Sans, system-ui, sans-serif',
+        background: '#1E2820',
+        color: '#FAFCFA'
+      }}>
 
         {/* Sidebar desktop */}
-        <aside className="holiris-sidebar" style={{ width: 260, background: '#12201a', color: '#e8f0eb', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16, flexShrink: 0, overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 42, height: 42, background: '#2ecc71', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#12201a', fontSize: 18 }}>H</div>
+        <aside className="holiris-sidebar" style={{
+          width: 260, background: 'rgba(255,255,255,0.03)',
+          borderRight: '1px solid rgba(107,143,113,0.2)',
+          padding: '28px 20px', display: 'flex', flexDirection: 'column',
+          gap: 20, flexShrink: 0, overflowY: 'auto'
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 8 }}>
+            <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+              <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
+              <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
+              <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
+              <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
+            </svg>
             <div>
-              <div style={{ fontWeight: 'bold', fontSize: 18 }}>Holiris</div>
-              <div style={{ fontSize: 10, color: '#5a8a6a', letterSpacing: 1 }}>
-                {isIntervenant ? 'ESPACE INTERVENANT' : 'PYRÉNÉES-ORIENTALES'}
+              <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 22, fontWeight: 300, letterSpacing: '0.12em' }}>
+                Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(154,184,159,0.6)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                {isIntervenant ? 'Espace intervenant' : 'Pyrénées-Orientales'}
               </div>
             </div>
           </div>
 
+          {/* Senior card */}
           {isAdmin && seniors?.length > 1 ? (
-            <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 8, letterSpacing: 1 }}>DOSSIER ACTIF</div>
+            <div style={{ background: 'rgba(107,143,113,0.1)', border: '1px solid rgba(107,143,113,0.25)', borderRadius: 2, padding: '14px 16px' }}>
+              <div style={{ fontSize: 9, color: '#9AB89F', marginBottom: 8, letterSpacing: '0.2em', textTransform: 'uppercase' }}>Dossier actif</div>
               <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
-                style={{ width: '100%', background: '#1a3028', color: '#e8f0eb', border: '1px solid #2ecc71', borderRadius: 8, padding: '8px 10px', fontSize: 13, cursor: 'pointer', outline: 'none' }}>
-                {seniors.map(s => <option key={s.id} value={s.id}>{s.name} · {s.age} ans</option>)}
+                style={{ width: '100%', background: 'transparent', color: '#FAFCFA', border: 'none', fontSize: 13, cursor: 'pointer', outline: 'none', fontFamily: 'DM Sans, sans-serif' }}>
+                {seniors.map(s => <option key={s.id} value={s.id} style={{ background: '#1E2820' }}>{s.name} · {s.age} ans</option>)}
               </select>
-              <div style={{ fontSize: 11, color: '#7aaa8a', marginTop: 6 }}>{senior?.city}</div>
+              <div style={{ fontSize: 11, color: 'rgba(154,184,159,0.6)', marginTop: 6 }}>{senior?.city}</div>
             </div>
           ) : senior ? (
-            <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>👵</div>
-              <div style={{ fontWeight: 'bold' }}>{senior.name}</div>
-              <div style={{ fontSize: 12, color: '#7aaa8a', marginTop: 2 }}>{senior.age} ans · {senior.city}</div>
+            <div style={{ background: 'rgba(107,143,113,0.1)', border: '1px solid rgba(107,143,113,0.25)', borderRadius: 2, padding: '14px 16px' }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>👵</div>
+              <div style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: 16, fontWeight: 400, color: '#FAFCFA' }}>{senior.name}</div>
+              <div style={{ fontSize: 11, color: 'rgba(154,184,159,0.6)', marginTop: 4 }}>{senior.age} ans · {senior.city}</div>
             </div>
           ) : null}
 
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', borderRadius: 8,
-                  color: pathname === item.href ? '#2ecc71' : '#9abaa8',
-                  background: pathname === item.href ? 'rgba(46,204,113,0.15)' : 'none',
-                  fontWeight: pathname === item.href ? 'bold' : 'normal',
-                  cursor: 'pointer', fontSize: 14
-                }}>
-                  <span>{item.icon}</span>{item.label}
-                </div>
-              </Link>
-            ))}
+          {/* Nav */}
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+            {navItems.map((item) => {
+              const active = pathname === item.href
+              return (
+                <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+                  <div className="nav-item" style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 12px', borderRadius: 2,
+                    color: active ? '#9AB89F' : 'rgba(255,255,255,0.45)',
+                    background: active ? 'rgba(107,143,113,0.15)' : 'transparent',
+                    borderLeft: active ? '2px solid #6B8F71' : '2px solid transparent',
+                    fontWeight: active ? 500 : 300,
+                    fontSize: 13, letterSpacing: '0.02em',
+                    transition: 'all 0.15s ease'
+                  }}>
+                    <span style={{ fontSize: 15 }}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </div>
+                </Link>
+              )
+            })}
           </nav>
 
           {isAdmin && (
-            <div style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 10, padding: '10px 12px' }}>
-              <div style={{ fontSize: 12, fontWeight: 'bold', color: '#ff8070' }}>🔐 Mode Admin</div>
-              <div style={{ fontSize: 11, color: '#cc8070', marginTop: 2 }}>Suppression activée</div>
+            <div style={{ background: 'rgba(196,122,130,0.1)', border: '1px solid rgba(196,122,130,0.25)', borderRadius: 2, padding: '10px 12px' }}>
+              <div style={{ fontSize: 11, fontWeight: 500, color: '#C47A82', letterSpacing: '0.05em' }}>🔐 Mode Admin</div>
+              <div style={{ fontSize: 10, color: 'rgba(196,122,130,0.6)', marginTop: 2 }}>Suppression activée</div>
             </div>
           )}
         </aside>
 
-        {/* Contenu principal */}
-        <main className="holiris-main" style={{ flex: 1, padding: 28, overflowY: 'auto' }}>
+        {/* Main */}
+        <main className="holiris-main" style={{
+          flex: 1, padding: 32, overflowY: 'auto',
+          background: '#1E2820'
+        }}>
           {children}
         </main>
 
         {/* Bottom nav mobile */}
         <nav className="holiris-bottom-nav" style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: '#12201a', borderTop: '1px solid rgba(255,255,255,0.1)',
-          padding: '8px 0 12px', zIndex: 100,
+          background: 'rgba(20,32,24,0.97)',
+          borderTop: '1px solid rgba(107,143,113,0.2)',
+          backdropFilter: 'blur(12px)',
+          padding: '8px 0 16px', zIndex: 100,
           justifyContent: 'space-around', alignItems: 'center'
         }}>
-          {bottomNavItems.map((item) => (
-            <Link key={item.href} href={item.href} style={{ textDecoration: 'none', flex: 1 }}>
-              <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                color: pathname === item.href ? '#2ecc71' : '#5a8a6a',
-              }}>
-                <span style={{ fontSize: 20 }}>{item.icon}</span>
-                <span style={{ fontSize: 10, fontWeight: pathname === item.href ? 'bold' : 'normal' }}>{item.label}</span>
-              </div>
-            </Link>
-          ))}
+          {bottomNavItems.map((item) => {
+            const active = pathname === item.href
+            return (
+              <Link key={item.href} href={item.href} style={{ textDecoration: 'none', flex: 1 }}>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                  color: active ? '#9AB89F' : 'rgba(255,255,255,0.35)',
+                }}>
+                  <span style={{ fontSize: 20 }}>{item.icon}</span>
+                  <span style={{ fontSize: 10, fontWeight: active ? 500 : 300, letterSpacing: '0.05em' }}>{item.label}</span>
+                </div>
+              </Link>
+            )
+          })}
         </nav>
-
       </div>
     </>
   )
