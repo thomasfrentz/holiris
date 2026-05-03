@@ -19,8 +19,6 @@ export async function POST(request) {
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
-    const message = `Bonjour ${prenom} 👋\n\nVous avez été invité(e) sur *Holiris* pour suivre *${seniorName}*.\n\n🔑 Votre code d'accès : *${code}*\n\n1. Créez votre compte : https://holiris.fr/login\n2. Entrez ce code pour activer votre espace\n\n_Holiris — Prendre soin de ceux qui nous sont chers_`
-
     const response = await fetch(
       'https://graph.facebook.com/v18.0/' + process.env.META_PHONE_NUMBER_ID + '/messages',
       {
@@ -32,13 +30,30 @@ export async function POST(request) {
         body: JSON.stringify({
           messaging_product: 'whatsapp',
           to: phoneNumber,
-          type: 'text',
-          text: { body: message }
+          type: 'template',
+          template: {
+            name: 'invitation_holiris',
+            language: { code: 'fr' },
+            components: [{
+              type: 'body',
+              parameters: [
+                { type: 'text', text: prenom || '' },
+                { type: 'text', text: seniorName || '' },
+                { type: 'text', text: code },
+              ]
+            }]
+          }
         })
       }
     )
 
-    const data = await response.json()
+    const responseText = await response.text()
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch {
+      data = { raw: responseText }
+    }
 
     if (response.ok) {
       return NextResponse.json({ success: true })
