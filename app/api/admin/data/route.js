@@ -10,21 +10,12 @@ export async function GET() {
   )
 
   const [seniorsRes, familleRes] = await Promise.all([
-    supabase.from('seniors').select('*, famille(name, email, is_admin)').order('created_at', { ascending: false }),
-    supabase.from('famille').select('*, seniors(name)').order('created_at', { ascending: false })
+    supabase.from('seniors').select('*, famille!famille_senior_id_fkey(name, email, is_admin)').order('created_at', { ascending: false }),
+    supabase.from('famille').select('*, seniors!famille_senior_id_fkey(name)').order('created_at', { ascending: false })
   ])
-
-  console.log('seniors error:', JSON.stringify(seniorsRes.error))
-  console.log('famille error:', JSON.stringify(familleRes.error))
-  console.log('seniors count:', seniorsRes.data?.length)
-  console.log('famille count:', familleRes.data?.length)
 
   return NextResponse.json({
     seniors: seniorsRes.data || [],
-    utilisateurs: familleRes.data || [],
-    debug: {
-      seniorsError: seniorsRes.error,
-      familleError: familleRes.error,
-    }
+    utilisateurs: familleRes.data || []
   })
 }
