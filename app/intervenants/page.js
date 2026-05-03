@@ -13,7 +13,7 @@ export default function Intervenants() {
   const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [emailSent, setEmailSent] = useState(null)
-  const [messageModal, setMessageModal] = useState(null) // intervenant sélectionné pour message libre
+  const [messageModal, setMessageModal] = useState(null)
   const [messageTexte, setMessageTexte] = useState('')
   const [messageSending, setMessageSending] = useState(false)
   const [messageResult, setMessageResult] = useState(null)
@@ -97,41 +97,52 @@ export default function Intervenants() {
 
   async function envoyerTemplate(intervenant) {
     if (!intervenant.whatsapp) return alert('Pas de numéro WhatsApp pour cet intervenant.')
-    const res = await fetch('/api/whatsapp-intervenant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        whatsapp: intervenant.whatsapp,
-        prenom: intervenant.name.split(' ')[0],
-        seniorName: selectedSenior?.name,
-        type: 'template'
+    try {
+      const res = await fetch('/api/whatsapp-intervenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsapp: intervenant.whatsapp,
+          prenom: intervenant.name.split(' ')[0],
+          seniorName: selectedSenior?.name,
+          type: 'template',
+          intervenantId: intervenant.id
+        })
       })
-    })
-    const data = await res.json()
-    if (data.success) alert('Invitation envoyée sur WhatsApp ✅')
-    else alert('Erreur : le template n\'est peut-être pas encore approuvé par Meta.')
+      const data = await res.json()
+      if (data.success) alert('Invitation envoyée sur WhatsApp ✅')
+      else alert('Erreur : ' + JSON.stringify(data.error))
+    } catch (e) {
+      alert('Erreur réseau : ' + e.message)
+    }
   }
 
   async function envoyerMessageLibre() {
     if (!messageTexte.trim() || !messageModal) return
     setMessageSending(true)
-    const res = await fetch('/api/whatsapp-intervenant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        whatsapp: messageModal.whatsapp,
-        type: 'libre',
-        message: messageTexte
+    setMessageResult(null)
+    try {
+      const res = await fetch('/api/whatsapp-intervenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsapp: messageModal.whatsapp,
+          type: 'libre',
+          message: messageTexte
+        })
       })
-    })
-    const data = await res.json()
-    setMessageSending(false)
-    if (data.success) {
-      setMessageResult('success')
-      setTimeout(() => { setMessageModal(null); setMessageTexte(''); setMessageResult(null) }, 2000)
-    } else {
+      const data = await res.json()
+      if (data.success) {
+        setMessageResult('success')
+        setTimeout(() => { setMessageModal(null); setMessageTexte(''); setMessageResult(null) }, 2000)
+      } else {
+        setMessageResult('error')
+      }
+    } catch (e) {
+      console.error('Erreur fetch:', e)
       setMessageResult('error')
     }
+    setMessageSending(false)
   }
 
   async function archiverIntervenant(id) {
@@ -192,7 +203,7 @@ export default function Intervenants() {
             )}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={envoyerMessageLibre} disabled={messageSending || !messageTexte.trim()}
-                style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: !messageTexte.trim() ? 0.5 : 1 }}>
+                style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!messageTexte.trim() || messageSending) ? 0.5 : 1 }}>
                 {messageSending ? 'Envoi...' : 'Envoyer →'}
               </button>
               <button onClick={() => { setMessageModal(null); setMessageTexte(''); setMessageResult(null) }}
@@ -270,11 +281,11 @@ export default function Intervenants() {
           </div>
         ) : intervenants.map(i => (
           <div key={i.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EAF4EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                 {roleIcons[i.role] ?? '👤'}
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 120 }}>
                 <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{i.name}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{i.role}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -284,17 +295,14 @@ export default function Intervenants() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                {/* Bouton invitation WhatsApp (template) */}
                 <button onClick={() => envoyerTemplate(i)}
-                  style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                  style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                   Inviter WA
                 </button>
-                {/* Bouton message libre */}
-                <button onClick={() => { setMessageModal(i); setMessageTexte('') }}
-                  style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                <button onClick={() => { setMessageModal(i); setMessageTexte(''); setMessageResult(null) }}
+                  style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                   Message
                 </button>
-                {/* Bouton archiver */}
                 <button onClick={() => archiverIntervenant(i.id)}
                   style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
                   Archiver
