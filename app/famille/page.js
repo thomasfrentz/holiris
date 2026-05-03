@@ -7,8 +7,10 @@ import { useSenior } from '../lib/useSenior'
 
 export default function Famille() {
   const [membres, setMembres] = useState([])
+  const [archives, setArchives] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [inviteSent, setInviteSent] = useState(null)
   const [prenom, setPrenom] = useState('')
@@ -29,23 +31,26 @@ export default function Famille() {
     'Neveu / Nièce', 'Conjoint(e)', 'Ami(e) proche', 'Voisin(e)', 'Autre',
   ]
 
-  const roleIcons = {
-    'Fils / Fille': '👨‍👩‍👧', 'Petit-fils / Petite-fille': '👶',
-    'Frère / Sœur': '👫', 'Neveu / Nièce': '🧑',
-    'Conjoint(e)': '💑', 'Ami(e) proche': '🤝', 'Voisin(e)': '🏠', 'Autre': '👤',
-  }
-
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       if (!selectedSeniorId) return
 
-      const { data } = await supabase
+      const { data: actifs } = await supabase
         .from('famille').select('*')
         .eq('senior_id', selectedSeniorId)
+        .is('archived_at', null)
         .order('created_at', { ascending: false })
-      setMembres(data || [])
+
+      const { data: archivés } = await supabase
+        .from('famille').select('*')
+        .eq('senior_id', selectedSeniorId)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false })
+
+      setMembres(actifs || [])
+      setArchives(archivés || [])
       setLoading(false)
     }
     loadData()
@@ -80,6 +85,7 @@ export default function Famille() {
       const { data: updated } = await supabase
         .from('famille').select('*')
         .eq('senior_id', selectedSeniorId)
+        .is('archived_at', null)
         .order('created_at', { ascending: false })
       setMembres(updated || [])
       resetForm()
@@ -88,101 +94,164 @@ export default function Famille() {
     setSaving(false)
   }
 
-  async function deleteMembre(id) {
+  async function archiverMembre(id) {
     if (!isAdmin) return
-    await supabase.from('famille').delete().eq('id', id)
+    await supabase.from('famille').update({ archived_at: new Date().toISOString() }).eq('id', id)
+    const membre = membres.find(m => m.id === id)
     setMembres(prev => prev.filter(m => m.id !== id))
+    if (membre) setArchives(prev => [{ ...membre, archived_at: new Date().toISOString() }, ...prev])
+  }
+
+  async function restaurerMembre(id) {
+    if (!isAdmin) return
+    await supabase.from('famille').update({ archived_at: null }).eq('id', id)
+    const membre = archives.find(m => m.id === id)
+    setArchives(prev => prev.filter(m => m.id !== id))
+    if (membre) setMembres(prev => [{ ...membre, archived_at: null }, ...prev])
+  }
+
+  async function supprimerDefinitivement(id) {
+    if (!isAdmin) return
+    if (!confirm('Supprimer définitivement ce membre ?')) return
+    await supabase.from('famille').delete().eq('id', id)
+    setArchives(prev => prev.filter(m => m.id !== id))
   }
 
   if (loading || !selectedSenior) return (
-    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-      <div style={{ color: '#888' }}>Chargement...</div>
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", background: '#F7F9F8' }}>
+      <div style={{ color: '#9BB5AA' }}>Chargement...</div>
+    </div>
+  )
+
+  const MembreCard = ({ m, archivé = false }) => (
+    <div style={{ background: '#fff', border: '1px solid ' + (archivé ? '#F0D9B5' : '#E8EFEB'), borderRadius: 12, padding: '16px 20px', opacity: archivé ? 0.8 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: archivé ? '#FDF3E7' : '#EAF4EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+          👤
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{m.name}</div>
+          <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{m.role}</div>
+          <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {m.phone && <span>{m.phone}</span>}
+            {m.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
+            {!m.user_id && m.code_acces && <span style={{ color: '#C4844A' }}>· Invitation envoyée</span>}
+            {archivé && m.archived_at && <span style={{ color: '#C4844A' }}>· Archivé le {new Date(m.archived_at).toLocaleDateString('fr-FR')}</span>}
+          </div>
+        </div>
+        {isAdmin && (
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {archivé ? (
+              <>
+                <button onClick={() => restaurerMembre(m.id)}
+                  style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                  Restaurer
+                </button>
+                <button onClick={() => supprimerDefinitivement(m.id)}
+                  style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 8, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>
+                  🗑️
+                </button>
+              </>
+            ) : (
+              <button onClick={() => archiverMembre(m.id)}
+                style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Archiver
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 
   return (
     <Layout senior={selectedSenior} seniors={seniors} selectedSeniorId={selectedSeniorId} switchSenior={switchSenior} isAdmin={isAdmin}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>👨‍👩‍👧 Famille</h1>
-          <p style={{ color: '#888', fontSize: 13 }}>{membres.length} membre{membres.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
+          <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Entourage</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Famille</h1>
+          <p style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>{membres.length} membre{membres.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
         </div>
         <button onClick={() => setShowForm(!showForm)}
-          style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+          style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 22px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
           + Inviter
         </button>
       </div>
 
       {inviteSent && (
-        <div style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#27ae60', fontWeight: 'bold' }}>
-          ✅ Invitation WhatsApp envoyée à {inviteSent} !
+        <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#4A8870', fontWeight: 500 }}>
+          Invitation WhatsApp envoyée à {inviteSent}
         </div>
       )}
 
       {showForm && (
-        <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-          <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Inviter un proche</h2>
+        <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: 24, marginBottom: 24 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Inviter un proche</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <input placeholder="Prénom *" value={prenom} onChange={e => setPrenom(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
             <input placeholder="Nom (optionnel)" value={nom} onChange={e => setNom(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <select value={role} onChange={e => setRole(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }}>
               <option value="">Lien avec le senior *</option>
               {roles.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
             <input placeholder="WhatsApp (ex: 06 12 34 56 78) *" value={telephone} onChange={e => setTelephone(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
-          <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 16 }}>
-            💡 Un message WhatsApp avec le code d'accès sera envoyé automatiquement
+          <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 16 }}>
+            Un message WhatsApp avec le code d'accès sera envoyé automatiquement
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={inviteMembre} disabled={saving || !prenom || !role || !telephone}
-              style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !role || !telephone) ? 0.5 : 1 }}>
               {saving ? 'Envoi...' : 'Inviter'}
             </button>
             <button onClick={resetForm}
-              style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
+              style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
               Annuler
             </button>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Membres actifs */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
         {membres.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>👨‍👩‍👧</div>
-            <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Aucun membre</div>
-            <div style={{ fontSize: 13 }}>Invitez les proches de {selectedSenior?.name}</div>
+          <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 14, color: '#9BB5AA', marginBottom: 4 }}>Aucun membre actif</div>
+            <div style={{ fontSize: 13, color: '#C8DDD4' }}>Invitez les proches de {selectedSenior?.name}</div>
           </div>
-        ) : membres.map(m => (
-          <div key={m.id} style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ fontSize: 32 }}>{roleIcons[m.role] ?? '👤'}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: 15, color: '#12201a' }}>{m.name}</div>
-                <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{m.role}</div>
-                <div style={{ fontSize: 12, color: '#5a8a6a', marginTop: 4 }}>
-                  📱 {m.phone}
-                  {m.user_id && <span style={{ marginLeft: 8, color: '#2ecc71' }}>· Compte actif ✓</span>}
-                  {!m.user_id && m.code_acces && <span style={{ marginLeft: 8, color: '#f39c12' }}>· Invitation envoyée</span>}
-                </div>
-              </div>
-              {isAdmin && (
-                <button onClick={() => deleteMembre(m.id)}
-                  style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-                  🗑️
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+        ) : membres.map(m => <MembreCard key={m.id} m={m} />)}
       </div>
+
+      {/* Archives */}
+      {(archives.length > 0 || isAdmin) && (
+        <div>
+          <button onClick={() => setShowArchives(!showArchives)} style={{
+            background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: 0,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#C4844A', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+              Archives {archives.length > 0 && `(${archives.length})`}
+            </div>
+            <div style={{ fontSize: 11, color: '#C4844A' }}>{showArchives ? '▲' : '▼'}</div>
+          </button>
+
+          {showArchives && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {archives.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#C8DDD4', padding: '12px 0' }}>Aucun membre archivé.</div>
+              ) : archives.map(m => <MembreCard key={m.id} m={m} archivé={true} />)}
+            </div>
+          )}
+        </div>
+      )}
+
     </Layout>
   )
 }
