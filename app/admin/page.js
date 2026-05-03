@@ -12,7 +12,7 @@ function calculerAge(dateNaissance) {
 export default function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
-  const [onglet, setOnglet] = useState('seniors') // seniors | utilisateurs
+  const [onglet, setOnglet] = useState('seniors')
   const [seniors, setSeniors] = useState([])
   const [utilisateurs, setUtilisateurs] = useState([])
   const [loading, setLoading] = useState(false)
@@ -20,7 +20,6 @@ export default function Admin() {
   const [copied, setCopied] = useState(null)
   const [searchUser, setSearchUser] = useState('')
 
-  // Formulaire nouveau senior
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [dateNaissance, setDateNaissance] = useState('')
@@ -32,38 +31,22 @@ export default function Admin() {
   )
 
   useEffect(() => {
-    if (authenticated) {
-      loadSeniors()
-      loadUtilisateurs()
-    }
+    if (authenticated) loadData()
   }, [authenticated])
 
-  async function loadSeniors() {
-    const { data } = await supabase
-      .from('seniors')
-      .select('*, famille(name, email, is_admin)')
-      .order('created_at', { ascending: false })
-    setSeniors((data || []).map(s => ({
+  async function loadData() {
+    const res = await fetch('/api/admin/data')
+    const data = await res.json()
+    setSeniors((data.seniors || []).map(s => ({
       ...s,
       age: s.date_naissance ? calculerAge(s.date_naissance) : s.age
     })))
-  }
-
-  async function loadUtilisateurs() {
-    const { data } = await supabase
-      .from('famille')
-      .select('*, seniors(name)')
-      .order('created_at', { ascending: false })
-    setUtilisateurs(data || [])
+    setUtilisateurs(data.utilisateurs || [])
   }
 
   async function toggleAdmin(familleId, currentValue) {
-    await supabase
-      .from('famille')
-      .update({ is_admin: !currentValue })
-      .eq('id', familleId)
-    loadUtilisateurs()
-    loadSeniors()
+    await supabase.from('famille').update({ is_admin: !currentValue }).eq('id', familleId)
+    loadData()
   }
 
   function generateCode(name) {
@@ -79,14 +62,12 @@ export default function Admin() {
     const fullName = prenom + ' ' + nom
     const age = calculerAge(dateNaissance)
     const invite_code = generateCode(fullName)
-    const { error } = await supabase.from('seniors').insert({
+    await supabase.from('seniors').insert({
       name: fullName, age, date_naissance: dateNaissance, city, status: 'stable', invite_code
     })
-    if (!error) {
-      setPrenom(''); setNom(''); setDateNaissance(''); setCity('')
-      setShowForm(false)
-      loadSeniors()
-    }
+    setPrenom(''); setNom(''); setDateNaissance(''); setCity('')
+    setShowForm(false)
+    loadData()
     setLoading(false)
   }
 
@@ -108,7 +89,6 @@ export default function Admin() {
     u.email?.toLowerCase().includes(searchUser.toLowerCase())
   )
 
-  // ── Auth ──
   if (!authenticated) return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 50%, #F5F0FA 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap');`}</style>
@@ -136,7 +116,6 @@ export default function Admin() {
     </div>
   )
 
-  // ── Dashboard admin ──
   return (
     <div style={{ minHeight: '100vh', background: '#F7F9F8', fontFamily: "'Inter', system-ui, sans-serif", color: '#1F2A24' }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap');`}</style>
@@ -155,25 +134,25 @@ export default function Admin() {
             <div style={{ fontSize: 9, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Admin</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span>{seniors.length} senior{seniors.length > 1 ? 's' : ''}</span>
-            <span>{utilisateurs.length} utilisateur{utilisateurs.length > 1 ? 's' : ''}</span>
-          </div>
+        <div style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', gap: 16 }}>
+          <span>{seniors.length} senior{seniors.length > 1 ? 's' : ''}</span>
+          <span>{utilisateurs.length} utilisateur{utilisateurs.length > 1 ? 's' : ''}</span>
         </div>
       </header>
 
       {/* Onglets */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '0 32px', display: 'flex', gap: 0 }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '0 32px', display: 'flex' }}>
         {[
           { key: 'seniors', label: 'Dossiers seniors' },
           { key: 'utilisateurs', label: 'Utilisateurs & Admins' },
         ].map(o => (
           <button key={o.key} onClick={() => setOnglet(o.key)} style={{
-            background: 'none', border: 'none', borderBottom: onglet === o.key ? '2px solid #7FAF9B' : '2px solid transparent',
-            padding: '14px 20px', fontSize: 13, fontWeight: onglet === o.key ? 500 : 400,
-            color: onglet === o.key ? '#4A8870' : '#9BB5AA', cursor: 'pointer', fontFamily: 'inherit',
-            transition: 'all 0.15s',
+            background: 'none', border: 'none',
+            borderBottom: onglet === o.key ? '2px solid #7FAF9B' : '2px solid transparent',
+            padding: '14px 20px', fontSize: 13,
+            fontWeight: onglet === o.key ? 500 : 400,
+            color: onglet === o.key ? '#4A8870' : '#9BB5AA',
+            cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
           }}>
             {o.label}
           </button>
@@ -285,8 +264,7 @@ export default function Admin() {
               <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 20 }}>Utilisateurs & Admins</h1>
               <input
                 placeholder="Rechercher par nom ou email..."
-                value={searchUser}
-                onChange={e => setSearchUser(e.target.value)}
+                value={searchUser} onChange={e => setSearchUser(e.target.value)}
                 style={{ ...inputStyle, maxWidth: 400 }}
               />
             </div>
@@ -314,19 +292,15 @@ export default function Admin() {
                       {u.role && <span> · {u.role}</span>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                    <button
-                      onClick={() => toggleAdmin(u.id, u.is_admin)}
-                      style={{
-                        background: u.is_admin ? '#FBECED' : '#EAF4EF',
-                        color: u.is_admin ? '#C4606A' : '#4A8870',
-                        border: '1px solid ' + (u.is_admin ? '#F2C4C8' : '#C8DDD4'),
-                        borderRadius: 8, padding: '7px 16px', fontSize: 12,
-                        fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
-                      }}>
-                      {u.is_admin ? 'Retirer admin' : 'Rendre admin'}
-                    </button>
-                  </div>
+                  <button onClick={() => toggleAdmin(u.id, u.is_admin)} style={{
+                    background: u.is_admin ? '#FBECED' : '#EAF4EF',
+                    color: u.is_admin ? '#C4606A' : '#4A8870',
+                    border: '1px solid ' + (u.is_admin ? '#F2C4C8' : '#C8DDD4'),
+                    borderRadius: 8, padding: '7px 16px', fontSize: 12,
+                    fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                  }}>
+                    {u.is_admin ? 'Retirer admin' : 'Rendre admin'}
+                  </button>
                 </div>
               ))}
               {utilisateursFiltres.length === 0 && (
@@ -337,7 +311,6 @@ export default function Admin() {
             </div>
           </>
         )}
-
       </div>
     </div>
   )
