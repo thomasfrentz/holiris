@@ -104,8 +104,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, letterSpacing: '0.05em', color: '#1F2A24', lineHeight: 1 }}>
                 Holiris
               </div>
-              <div style={{ fontSize: 9, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 3 }}>
-                {isIntervenant ? 'Intervenant' : 'Pyrénées-Orientales'}
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 11, color: '#9BB5AA', fontStyle: 'italic', marginTop: 3, letterSpacing: '0.02em' }}>
+                {isIntervenant ? 'Espace intervenant' : 'Prendre soin de ceux qui nous sont chers'}
               </div>
             </div>
           </Link>
