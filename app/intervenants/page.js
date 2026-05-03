@@ -7,8 +7,10 @@ import { useSenior } from '../lib/useSenior'
 
 export default function Intervenants() {
   const [intervenants, setIntervenants] = useState([])
+  const [archives, setArchives] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(null)
   const [emailSent, setEmailSent] = useState(null)
@@ -33,21 +35,29 @@ export default function Intervenants() {
     'Pharmacien': '💊', 'Autre': '👤',
   }
 
-  useEffect(() => {
-    async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      if (!selectedSeniorId) return
+  async function loadData() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+    if (!selectedSeniorId) return
 
-      const { data } = await supabase
-        .from('intervenants').select('*')
-        .eq('senior_id', selectedSeniorId)
-        .order('created_at', { ascending: false })
-      setIntervenants(data || [])
-      setLoading(false)
-    }
-    loadData()
-  }, [selectedSeniorId])
+    const { data: actifs } = await supabase
+      .from('intervenants').select('*')
+      .eq('senior_id', selectedSeniorId)
+      .is('archived_at', null)
+      .order('created_at', { ascending: false })
+
+    const { data: archivés } = await supabase
+      .from('intervenants').select('*')
+      .eq('senior_id', selectedSeniorId)
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+
+    setIntervenants(actifs || [])
+    setArchives(archivés || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [selectedSeniorId])
 
   async function addIntervenant() {
     if (!prenom || !nom || !role || !telephone) return
@@ -76,18 +86,34 @@ export default function Intervenants() {
       }
       setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
       setShowForm(false)
-      const { data: updated } = await supabase.from('intervenants').select('*')
-        .eq('senior_id', selectedSeniorId).order('created_at', { ascending: false })
-      setIntervenants(updated || [])
       setTimeout(() => setEmailSent(null), 5000)
+      loadData()
     }
     setSaving(false)
   }
 
-  async function deleteIntervenant(id) {
-    if (!isAdmin) return
+  async function archiverIntervenant(id) {
+    const { error } = await supabase
+      .from('intervenants')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id)
+    if (!error) loadData()
+    else console.error('Erreur archivage:', error)
+  }
+
+  async function restaurerIntervenant(id) {
+    const { error } = await supabase
+      .from('intervenants')
+      .update({ archived_at: null })
+      .eq('id', id)
+    if (!error) loadData()
+    else console.error('Erreur restauration:', error)
+  }
+
+  async function supprimerDefinitivement(id) {
+    if (!confirm('Supprimer définitivement cet intervenant ?')) return
     await supabase.from('intervenants').delete().eq('id', id)
-    setIntervenants(prev => prev.filter(i => i.id !== id))
+    loadData()
   }
 
   function copyInvitation(intervenant) {
@@ -147,11 +173,9 @@ export default function Intervenants() {
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <input placeholder="Email (optionnel — pour envoyer l'invitation)" value={email} onChange={e => setEmail(e.target.value)}
+            <input placeholder="Email (optionnel)" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
-            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Un email + SMS avec le code d'accès seront envoyés automatiquement
-            </div>
+            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>Un email + SMS avec le code d'accès seront envoyés automatiquement</div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
@@ -166,13 +190,14 @@ export default function Intervenants() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Intervenants actifs */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
         {intervenants.length === 0 ? (
           <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: 14, color: '#9BB5AA', marginBottom: 4 }}>Aucun intervenant</div>
+            <div style={{ fontSize: 14, color: '#9BB5AA', marginBottom: 4 }}>Aucun intervenant actif</div>
             <div style={{ fontSize: 13, color: '#C8DDD4' }}>Ajoutez les professionnels qui s'occupent de {selectedSenior?.name}</div>
           </div>
-        ) : intervenants.map((i) => (
+        ) : intervenants.map(i => (
           <div key={i.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EAF4EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
@@ -182,7 +207,7 @@ export default function Intervenants() {
                 <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{i.name}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{i.role}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <span>{i.phone}</span>
+                  {i.phone && <span>{i.phone}</span>}
                   {i.email && <span>· {i.email}</span>}
                   {i.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
                 </div>
@@ -192,17 +217,62 @@ export default function Intervenants() {
                   style={{ background: copied === i.id ? '#EAF4EF' : '#F4F5F5', color: copied === i.id ? '#4A8870' : '#6F7C75', border: '1px solid ' + (copied === i.id ? '#C8DDD4' : '#E8EFEB'), borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                   {copied === i.id ? 'Copié ✓' : 'Copier SMS'}
                 </button>
-                {isAdmin && (
-                  <button onClick={() => deleteIntervenant(i.id)}
-                    style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-                    🗑️
-                  </button>
-                )}
+                <button onClick={() => archiverIntervenant(i.id)}
+                  style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
+                  Archiver
+                </button>
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Archives */}
+      <div>
+        <button onClick={() => setShowArchives(!showArchives)} style={{
+          background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: 0,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#C4844A', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            Archives {archives.length > 0 && `(${archives.length})`}
+          </div>
+          <div style={{ fontSize: 11, color: '#C4844A' }}>{showArchives ? '▲' : '▼'}</div>
+        </button>
+
+        {showArchives && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {archives.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#C8DDD4', padding: '12px 0' }}>Aucun intervenant archivé.</div>
+            ) : archives.map(i => (
+              <div key={i.id} style={{ background: '#fff', border: '1px solid #F0D9B5', borderRadius: 12, padding: '16px 20px', opacity: 0.8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FDF3E7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                    {roleIcons[i.role] ?? '👤'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{i.name}</div>
+                    <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{i.role}</div>
+                    <div style={{ fontSize: 12, color: '#C4844A', marginTop: 4 }}>
+                      Archivé le {new Date(i.archived_at).toLocaleDateString('fr-FR')}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                    <button onClick={() => restaurerIntervenant(i.id)}
+                      style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      Restaurer
+                    </button>
+                    <button onClick={() => supprimerDefinitivement(i.id)}
+                      style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 8, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
     </Layout>
   )
 }
