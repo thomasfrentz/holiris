@@ -100,13 +100,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
               <circle cx="32" cy="32" r="4" fill="#7FAF9B"/>
               <circle cx="32" cy="32" r="1.8" fill="#fff"/>
             </svg>
-            <div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, letterSpacing: '0.05em', color: '#1F2A24', lineHeight: 1 }}>
-                Holiris
-              </div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 11, color: '#9BB5AA', fontStyle: 'italic', marginTop: 3, letterSpacing: '0.02em' }}>
-                {isIntervenant ? 'Espace intervenant' : 'Prendre soin de ceux qui nous sont chers'}
-              </div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, letterSpacing: '0.05em', color: '#1F2A24', lineHeight: 1 }}>
+              Holiris
             </div>
           </Link>
 
