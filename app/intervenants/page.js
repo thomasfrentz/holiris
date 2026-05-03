@@ -5,34 +5,32 @@ import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 
-export default function Famille() {
-  const [membres, setMembres] = useState([])
+export default function Intervenants() {
+  const [intervenants, setIntervenants] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [inviteSent, setInviteSent] = useState(null)
+  const [copied, setCopied] = useState(null)
+  const [emailSent, setEmailSent] = useState(null)
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
+
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [role, setRole] = useState('')
   const [telephone, setTelephone] = useState('')
+  const [email, setEmail] = useState('')
 
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
-
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const roles = [
-    'Fils / Fille', 'Petit-fils / Petite-fille', 'Frère / Sœur',
-    'Neveu / Nièce', 'Conjoint(e)', 'Ami(e) proche', 'Voisin(e)', 'Autre',
-  ]
-
   const roleIcons = {
-    'Fils / Fille': '👨‍👩‍👧', 'Petit-fils / Petite-fille': '👶',
-    'Frère / Sœur': '👫', 'Neveu / Nièce': '🧑',
-    'Conjoint(e)': '💑', 'Ami(e) proche': '🤝', 'Voisin(e)': '🏠', 'Autre': '👤',
+    'Infirmière': '💉', 'Infirmier': '💉',
+    'Kinésithérapeute': '🦵', 'Aide à domicile': '🤝',
+    'Médecin': '🏥', 'Cardiologue': '❤️',
+    'Pharmacien': '💊', 'Autre': '👤',
   }
 
   useEffect(() => {
@@ -42,143 +40,165 @@ export default function Famille() {
       if (!selectedSeniorId) return
 
       const { data } = await supabase
-        .from('famille').select('*')
+        .from('intervenants').select('*')
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
-      setMembres(data || [])
+      setIntervenants(data || [])
       setLoading(false)
     }
     loadData()
   }, [selectedSeniorId])
 
-  function resetForm() {
-    setPrenom(''); setNom(''); setRole(''); setTelephone(''); setShowForm(false)
-  }
-
-  async function inviteMembre() {
-    if (!prenom || !role || !telephone) return
+  async function addIntervenant() {
+    if (!prenom || !nom || !role || !telephone) return
     setSaving(true)
     const whatsapp = telephone.replace(/\s/g, '').replace(/^0/, '+33')
 
-    const { data, error } = await supabase.from('famille').insert({
-      senior_id: selectedSeniorId,
-      name: prenom + (nom ? ' ' + nom : ''),
-      role, phone: telephone, whatsapp,
+    const { data, error } = await supabase.from('intervenants').insert({
+      name: prenom + ' ' + nom, role, phone: telephone, whatsapp,
+      email: email || null, senior_id: selectedSeniorId
     }).select()
 
     if (!error && data) {
-      try {
-        const res = await fetch('/api/invite-famille', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ familleId: data[0].id, prenom, seniorName: selectedSenior?.name, whatsapp })
-        })
-        const result = await res.json()
-        if (result.success) setInviteSent(prenom + (nom ? ' ' + nom : ''))
-      } catch (e) { console.error('Erreur invitation:', e) }
-
-      const { data: updated } = await supabase
-        .from('famille').select('*')
-        .eq('senior_id', selectedSeniorId)
-        .order('created_at', { ascending: false })
-      setMembres(updated || [])
-      resetForm()
-      setTimeout(() => setInviteSent(null), 5000)
+      if (email && data[0]) {
+        try {
+          const res = await fetch('/api/invite-intervenant-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              intervenantId: data[0].id, email, prenom, nom, role,
+              seniorName: selectedSenior?.name, phone: telephone
+            })
+          })
+          const result = await res.json()
+          if (result.success) setEmailSent(prenom + ' ' + nom)
+        } catch (e) { console.error('Erreur invitation:', e) }
+      }
+      setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
+      setShowForm(false)
+      const { data: updated } = await supabase.from('intervenants').select('*')
+        .eq('senior_id', selectedSeniorId).order('created_at', { ascending: false })
+      setIntervenants(updated || [])
+      setTimeout(() => setEmailSent(null), 5000)
     }
     setSaving(false)
   }
 
-  async function deleteMembre(id) {
+  async function deleteIntervenant(id) {
     if (!isAdmin) return
-    await supabase.from('famille').delete().eq('id', id)
-    setMembres(prev => prev.filter(m => m.id !== id))
+    await supabase.from('intervenants').delete().eq('id', id)
+    setIntervenants(prev => prev.filter(i => i.id !== id))
+  }
+
+  function copyInvitation(intervenant) {
+    const message = 'Bonjour ' + intervenant.name.split(' ')[0] + ' 👋\n\nJe vous invite à utiliser Holiris pour le suivi de ' + selectedSenior?.name + '.\n\nPour créer votre compte : https://holiris.fr/login?signup=true\n\nMerci pour votre accompagnement 🌸'
+    navigator.clipboard.writeText(message).then(() => {
+      setCopied(intervenant.id)
+      setTimeout(() => setCopied(null), 3000)
+    })
   }
 
   if (loading || !selectedSenior) return (
-    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-      <div style={{ color: '#888' }}>Chargement...</div>
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", background: '#F7F9F8' }}>
+      <div style={{ color: '#9BB5AA' }}>Chargement...</div>
     </div>
   )
 
   return (
     <Layout senior={selectedSenior} seniors={seniors} selectedSeniorId={selectedSeniorId} switchSenior={switchSenior} isAdmin={isAdmin}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>👨‍👩‍👧 Famille</h1>
-          <p style={{ color: '#888', fontSize: 13 }}>{membres.length} membre{membres.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
+          <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Équipe</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Intervenants</h1>
+          <p style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>{intervenants.length} intervenant{intervenants.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
         </div>
         <button onClick={() => setShowForm(!showForm)}
-          style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-          + Inviter
+          style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 22px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+          + Ajouter
         </button>
       </div>
 
-      {inviteSent && (
-        <div style={{ background: '#eafaf1', border: '1px solid #2ecc71', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#27ae60', fontWeight: 'bold' }}>
-          ✅ Invitation WhatsApp envoyée à {inviteSent} !
+      {emailSent && (
+        <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#4A8870', fontWeight: 500 }}>
+          Email et SMS envoyés à {emailSent}
         </div>
       )}
 
       {showForm && (
-        <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-          <h2 style={{ fontSize: 16, fontWeight: 'bold', color: '#12201a', marginBottom: 16 }}>Inviter un proche</h2>
+        <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: 24, marginBottom: 24 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Nouvel intervenant</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <input placeholder="Prénom *" value={prenom} onChange={e => setPrenom(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
-            <input placeholder="Nom (optionnel)" value={nom} onChange={e => setNom(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
+            <input placeholder="Prénom" value={prenom} onChange={e => setPrenom(e.target.value)}
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
+            <input placeholder="Nom" value={nom} onChange={e => setNom(e.target.value)}
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <select value={role} onChange={e => setRole(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
-              <option value="">Lien avec le senior *</option>
-              {roles.map(r => <option key={r} value={r}>{r}</option>)}
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }}>
+              <option value="">Rôle / Fonction</option>
+              <option>Infirmière</option><option>Infirmier</option>
+              <option>Kinésithérapeute</option><option>Aide à domicile</option>
+              <option>Médecin</option><option>Cardiologue</option>
+              <option>Pharmacien</option><option>Autre</option>
             </select>
-            <input placeholder="WhatsApp (ex: 06 12 34 56 78) *" value={telephone} onChange={e => setTelephone(e.target.value)}
-              style={{ padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif' }} />
+            <input placeholder="Téléphone (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
+              style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
-          <div style={{ fontSize: 11, color: '#5a8a6a', marginBottom: 16 }}>
-            💡 Un message WhatsApp avec le code d'accès sera envoyé automatiquement
+          <div style={{ marginBottom: 16 }}>
+            <input placeholder="Email (optionnel — pour envoyer l'invitation)" value={email} onChange={e => setEmail(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
+            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
+              Un email + SMS avec le code d'accès seront envoyés automatiquement
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={inviteMembre} disabled={saving || !prenom || !role || !telephone}
-              style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-              {saving ? 'Envoi...' : 'Inviter'}
+            <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !nom || !role || !telephone) ? 0.5 : 1 }}>
+              {saving ? 'Ajout...' : 'Ajouter'}
             </button>
-            <button onClick={resetForm}
-              style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
+            <button onClick={() => setShowForm(false)}
+              style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
               Annuler
             </button>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {membres.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>👨‍👩‍👧</div>
-            <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Aucun membre</div>
-            <div style={{ fontSize: 13 }}>Invitez les proches de {selectedSenior?.name}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {intervenants.length === 0 ? (
+          <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 14, color: '#9BB5AA', marginBottom: 4 }}>Aucun intervenant</div>
+            <div style={{ fontSize: 13, color: '#C8DDD4' }}>Ajoutez les professionnels qui s'occupent de {selectedSenior?.name}</div>
           </div>
-        ) : membres.map(m => (
-          <div key={m.id} style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+        ) : intervenants.map((i) => (
+          <div key={i.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ fontSize: 32 }}>{roleIcons[m.role] ?? '👤'}</div>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EAF4EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                {roleIcons[i.role] ?? '👤'}
+              </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 'bold', fontSize: 15, color: '#12201a' }}>{m.name}</div>
-                <div style={{ fontSize: 13, color: '#888', marginTop: 2 }}>{m.role}</div>
-                <div style={{ fontSize: 12, color: '#5a8a6a', marginTop: 4 }}>
-                  📱 {m.phone}
-                  {m.user_id && <span style={{ marginLeft: 8, color: '#2ecc71' }}>· Compte actif ✓</span>}
-                  {!m.user_id && m.code_acces && <span style={{ marginLeft: 8, color: '#f39c12' }}>· Invitation envoyée</span>}
+                <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{i.name}</div>
+                <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{i.role}</div>
+                <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <span>{i.phone}</span>
+                  {i.email && <span>· {i.email}</span>}
+                  {i.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
                 </div>
               </div>
-              {isAdmin && (
-                <button onClick={() => deleteMembre(m.id)}
-                  style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-                  🗑️
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <button onClick={() => copyInvitation(i)}
+                  style={{ background: copied === i.id ? '#EAF4EF' : '#F4F5F5', color: copied === i.id ? '#4A8870' : '#6F7C75', border: '1px solid ' + (copied === i.id ? '#C8DDD4' : '#E8EFEB'), borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                  {copied === i.id ? 'Copié ✓' : 'Copier SMS'}
                 </button>
-              )}
+                {isAdmin && (
+                  <button onClick={() => deleteIntervenant(i.id)}
+                    style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
+                    🗑️
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
