@@ -12,10 +12,13 @@ function calculerAge(dateNaissance) {
 export default function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
+  const [onglet, setOnglet] = useState('seniors') // seniors | utilisateurs
   const [seniors, setSeniors] = useState([])
+  const [utilisateurs, setUtilisateurs] = useState([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied] = useState(null)
+  const [searchUser, setSearchUser] = useState('')
 
   // Formulaire nouveau senior
   const [prenom, setPrenom] = useState('')
@@ -29,18 +32,38 @@ export default function Admin() {
   )
 
   useEffect(() => {
-    if (authenticated) loadSeniors()
+    if (authenticated) {
+      loadSeniors()
+      loadUtilisateurs()
+    }
   }, [authenticated])
 
   async function loadSeniors() {
     const { data } = await supabase
       .from('seniors')
-      .select('*, famille(name, email)')
+      .select('*, famille(name, email, is_admin)')
       .order('created_at', { ascending: false })
     setSeniors((data || []).map(s => ({
       ...s,
       age: s.date_naissance ? calculerAge(s.date_naissance) : s.age
     })))
+  }
+
+  async function loadUtilisateurs() {
+    const { data } = await supabase
+      .from('famille')
+      .select('*, seniors(name)')
+      .order('created_at', { ascending: false })
+    setUtilisateurs(data || [])
+  }
+
+  async function toggleAdmin(familleId, currentValue) {
+    await supabase
+      .from('famille')
+      .update({ is_admin: !currentValue })
+      .eq('id', familleId)
+    loadUtilisateurs()
+    loadSeniors()
   }
 
   function generateCode(name) {
@@ -53,15 +76,12 @@ export default function Admin() {
   async function createSenior() {
     if (!prenom || !nom || !dateNaissance || !city) return
     setLoading(true)
-
     const fullName = prenom + ' ' + nom
     const age = calculerAge(dateNaissance)
     const invite_code = generateCode(fullName)
-
-    const { error } = await supabase
-      .from('seniors')
-      .insert({ name: fullName, age, date_naissance: dateNaissance, city, status: 'stable', invite_code })
-
+    const { error } = await supabase.from('seniors').insert({
+      name: fullName, age, date_naissance: dateNaissance, city, status: 'stable', invite_code
+    })
     if (!error) {
       setPrenom(''); setNom(''); setDateNaissance(''); setCity('')
       setShowForm(false)
@@ -82,6 +102,12 @@ export default function Admin() {
     background: '#FAFCFC', color: '#1F2A24', width: '100%', boxSizing: 'border-box',
   }
 
+  const utilisateursFiltres = utilisateurs.filter(u =>
+    !searchUser ||
+    u.name?.toLowerCase().includes(searchUser.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchUser.toLowerCase())
+  )
+
   // ── Auth ──
   if (!authenticated) return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 50%, #F5F0FA 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif" }}>
@@ -96,17 +122,14 @@ export default function Admin() {
         <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>Holiris</div>
         <div style={{ fontSize: 10, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 28 }}>Espace Admin</div>
         <input
-          type="password"
-          placeholder="Mot de passe admin"
-          value={adminPassword}
-          onChange={e => setAdminPassword(e.target.value)}
+          type="password" placeholder="Mot de passe admin"
+          value={adminPassword} onChange={e => setAdminPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && adminPassword === ADMIN_PASSWORD && setAuthenticated(true)}
           style={{ ...inputStyle, marginBottom: 12, textAlign: 'center' }}
         />
         <button
           onClick={() => adminPassword === ADMIN_PASSWORD ? setAuthenticated(true) : alert('Mot de passe incorrect')}
-          style={{ width: '100%', background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '13px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-        >
+          style={{ width: '100%', background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '13px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
           Accéder →
         </button>
       </div>
@@ -132,104 +155,189 @@ export default function Admin() {
             <div style={{ fontSize: 9, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Admin</div>
           </div>
         </div>
-        <div style={{ fontSize: 13, color: '#9BB5AA' }}>{seniors.length} dossier{seniors.length > 1 ? 's' : ''}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span>{seniors.length} senior{seniors.length > 1 ? 's' : ''}</span>
+            <span>{utilisateurs.length} utilisateur{utilisateurs.length > 1 ? 's' : ''}</span>
+          </div>
+        </div>
       </header>
+
+      {/* Onglets */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '0 32px', display: 'flex', gap: 0 }}>
+        {[
+          { key: 'seniors', label: 'Dossiers seniors' },
+          { key: 'utilisateurs', label: 'Utilisateurs & Admins' },
+        ].map(o => (
+          <button key={o.key} onClick={() => setOnglet(o.key)} style={{
+            background: 'none', border: 'none', borderBottom: onglet === o.key ? '2px solid #7FAF9B' : '2px solid transparent',
+            padding: '14px 20px', fontSize: 13, fontWeight: onglet === o.key ? 500 : 400,
+            color: onglet === o.key ? '#4A8870' : '#9BB5AA', cursor: 'pointer', fontFamily: 'inherit',
+            transition: 'all 0.15s',
+          }}>
+            {o.label}
+          </button>
+        ))}
+      </div>
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '36px 24px' }}>
 
-        {/* Titre */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
-          <div>
-            <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Dossiers seniors</h1>
-          </div>
-          <button onClick={() => setShowForm(!showForm)}
-            style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 22px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-            + Nouveau dossier
-          </button>
-        </div>
-
-        {/* Formulaire */}
-        {showForm && (
-          <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '24px', marginBottom: 24, boxShadow: '0 2px 12px rgba(127,175,155,0.08)' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Nouveau dossier</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        {/* ── Onglet Seniors ── */}
+        {onglet === 'seniors' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
               <div>
-                <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Prénom</label>
-                <input placeholder="Marie" value={prenom} onChange={e => setPrenom(e.target.value)} style={inputStyle} />
+                <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
+                <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Dossiers seniors</h1>
               </div>
-              <div>
-                <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Nom</label>
-                <input placeholder="Dupont" value={nom} onChange={e => setNom(e.target.value)} style={inputStyle} />
-              </div>
+              <button onClick={() => setShowForm(!showForm)}
+                style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 22px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                + Nouveau dossier
+              </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-              <div>
-                <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Date de naissance</label>
-                <input type="date" value={dateNaissance} onChange={e => setDateNaissance(e.target.value)} style={inputStyle} />
-                {dateNaissance && (
-                  <div style={{ fontSize: 11, color: '#7FAF9B', marginTop: 4 }}>
-                    {calculerAge(dateNaissance)} ans
+
+            {showForm && (
+              <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '24px', marginBottom: 24 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Nouveau dossier</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Prénom</label>
+                    <input placeholder="Marie" value={prenom} onChange={e => setPrenom(e.target.value)} style={inputStyle} />
                   </div>
-                )}
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Ville</label>
-                <input placeholder="Paris" value={city} onChange={e => setCity(e.target.value)} style={inputStyle} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={createSenior} disabled={loading || !prenom || !nom || !dateNaissance || !city}
-                style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !nom || !dateNaissance || !city) ? 0.5 : 1 }}>
-                {loading ? 'Création...' : 'Créer le dossier'}
-              </button>
-              <button onClick={() => setShowForm(false)}
-                style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '11px 20px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Annuler
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Liste seniors */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {seniors.map((s) => (
-            <div key={s.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24' }}>{s.name}</div>
-                <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>
-                  {s.age} ans · {s.city}
-                  {s.date_naissance && <span> · Né(e) le {new Date(s.date_naissance).toLocaleDateString('fr-FR')}</span>}
+                  <div>
+                    <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Nom</label>
+                    <input placeholder="Dupont" value={nom} onChange={e => setNom(e.target.value)} style={inputStyle} />
+                  </div>
                 </div>
-                {s.famille?.length > 0 && (
-                  <div style={{ fontSize: 12, color: '#4A8870', marginTop: 6 }}>
-                    {s.famille.map(f => f.name).filter(Boolean).join(', ')}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Date de naissance</label>
+                    <input type="date" value={dateNaissance} onChange={e => setDateNaissance(e.target.value)} style={inputStyle} />
+                    {dateNaissance && <div style={{ fontSize: 11, color: '#7FAF9B', marginTop: 4 }}>{calculerAge(dateNaissance)} ans</div>}
                   </div>
-                )}
+                  <div>
+                    <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Ville</label>
+                    <input placeholder="Paris" value={city} onChange={e => setCity(e.target.value)} style={inputStyle} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={createSenior} disabled={loading || !prenom || !nom || !dateNaissance || !city}
+                    style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !nom || !dateNaissance || !city) ? 0.5 : 1 }}>
+                    {loading ? 'Création...' : 'Créer le dossier'}
+                  </button>
+                  <button onClick={() => setShowForm(false)}
+                    style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '11px 20px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Annuler
+                  </button>
+                </div>
               </div>
-              {s.invite_code && (
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 10, color: '#9BB5AA', marginBottom: 6, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Code invitation</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ background: '#EAF4EF', borderRadius: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: '#4A8870', letterSpacing: '0.08em', fontFamily: 'monospace' }}>
-                      {s.invite_code}
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {seniors.map((s) => (
+                <div key={s.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24' }}>{s.name}</div>
+                    <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>
+                      {s.age} ans · {s.city}
+                      {s.date_naissance && <span> · Né(e) le {new Date(s.date_naissance).toLocaleDateString('fr-FR')}</span>}
                     </div>
-                    <button onClick={() => copyCode(s.invite_code)}
-                      style={{ background: copied === s.invite_code ? '#EAF4EF' : '#7FAF9B', color: copied === s.invite_code ? '#4A8870' : '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                      {copied === s.invite_code ? 'Copié ✓' : 'Copier'}
-                    </button>
+                    {s.famille?.length > 0 && (
+                      <div style={{ fontSize: 12, color: '#4A8870', marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {s.famille.map((f, i) => (
+                          <span key={i} style={{ background: f.is_admin ? '#EAF4EF' : '#F4F5F5', color: f.is_admin ? '#4A8870' : '#9BB5AA', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 500 }}>
+                            {f.name || f.email} {f.is_admin ? '· Admin' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  {s.invite_code && (
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 10, color: '#9BB5AA', marginBottom: 6, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Code invitation</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ background: '#EAF4EF', borderRadius: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: '#4A8870', letterSpacing: '0.08em', fontFamily: 'monospace' }}>
+                          {s.invite_code}
+                        </div>
+                        <button onClick={() => copyCode(s.invite_code)}
+                          style={{ background: copied === s.invite_code ? '#EAF4EF' : '#7FAF9B', color: copied === s.invite_code ? '#4A8870' : '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                          {copied === s.invite_code ? 'Copié ✓' : 'Copier'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {seniors.length === 0 && (
+                <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 14, color: '#9BB5AA' }}>Aucun dossier senior pour le moment.</div>
                 </div>
               )}
             </div>
-          ))}
+          </>
+        )}
 
-          {seniors.length === 0 && (
-            <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: 14, color: '#9BB5AA' }}>Aucun dossier senior pour le moment.</div>
+        {/* ── Onglet Utilisateurs ── */}
+        {onglet === 'utilisateurs' && (
+          <>
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
+              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 20 }}>Utilisateurs & Admins</h1>
+              <input
+                placeholder="Rechercher par nom ou email..."
+                value={searchUser}
+                onChange={e => setSearchUser(e.target.value)}
+                style={{ ...inputStyle, maxWidth: 400 }}
+              />
             </div>
-          )}
-        </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {utilisateursFiltres.map((u) => (
+                <div key={u.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{u.name || '—'}</div>
+                      {u.is_admin && (
+                        <span style={{ background: '#EAF4EF', color: '#4A8870', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                          Admin
+                        </span>
+                      )}
+                      {u.user_id && (
+                        <span style={{ background: '#F3EDF7', color: '#8B6FAA', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                          Compte actif
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9BB5AA' }}>
+                      {u.email || u.phone || '—'}
+                      {u.seniors?.name && <span> · Proche de {u.seniors.name}</span>}
+                      {u.role && <span> · {u.role}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                    <button
+                      onClick={() => toggleAdmin(u.id, u.is_admin)}
+                      style={{
+                        background: u.is_admin ? '#FBECED' : '#EAF4EF',
+                        color: u.is_admin ? '#C4606A' : '#4A8870',
+                        border: '1px solid ' + (u.is_admin ? '#F2C4C8' : '#C8DDD4'),
+                        borderRadius: 8, padding: '7px 16px', fontSize: 12,
+                        fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                      }}>
+                      {u.is_admin ? 'Retirer admin' : 'Rendre admin'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {utilisateursFiltres.length === 0 && (
+                <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 14, color: '#9BB5AA' }}>Aucun utilisateur trouvé.</div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   )
