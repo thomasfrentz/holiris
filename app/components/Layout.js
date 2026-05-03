@@ -85,7 +85,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
 
       <div className="hl-wrap">
 
-        {/* ───── Sidebar desktop ───── */}
+        {/* ── Sidebar desktop ── */}
         <aside className="hl-sidebar hl-scroll" style={{
           width: 256, background: '#fff', borderRight: '1px solid #EBF0EC',
           padding: '28px 16px', flexDirection: 'column', gap: 0,
@@ -116,7 +116,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
               <div style={{ fontSize: 9, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>
                 Dossier actif
               </div>
-              {isAdmin && seniors?.length > 1 ? (
+              {seniors?.length > 1 ? (
                 <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)}
                   style={{ width: '100%', background: 'transparent', color: '#1F2A24', border: 'none', fontSize: 15, cursor: 'pointer', outline: 'none', fontFamily: "'Cormorant Garamond', serif", fontWeight: 500 }}>
                   {seniors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -136,10 +136,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
                 <Link key={item.href} href={item.href} className="hl-navlink">
                   <div className="hl-navlink-inner" style={{ background: active ? '#EAF4EF' : 'transparent' }}>
                     <Icon type={item.icon} active={active} size={16} />
-                    <span style={{
-                      fontSize: 13, fontWeight: active ? 500 : 400,
-                      color: active ? '#4A8870' : '#6F7C75',
-                    }}>
+                    <span style={{ fontSize: 13, fontWeight: active ? 500 : 400, color: active ? '#4A8870' : '#6F7C75' }}>
                       {item.label}
                     </span>
                     {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#7FAF9B', marginLeft: 'auto' }} />}
@@ -156,14 +153,14 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
           )}
         </aside>
 
-        {/* ───── Main ───── */}
+        {/* ── Main ── */}
         <main className="hl-main hl-scroll" style={{
           flex: 1, padding: '36px 40px', overflowY: 'auto', background: '#F7F9F8',
         }}>
           {children}
         </main>
 
-        {/* ───── Bottom nav mobile ───── */}
+        {/* ── Bottom nav mobile ── */}
         <nav className="hl-bottom" style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
           background: 'rgba(255,255,255,0.97)',

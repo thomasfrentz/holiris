@@ -34,29 +34,42 @@ export function useSenior() {
         .from('famille')
         .select('*')
         .eq('user_id', user.id)
-        .limit(1)
 
-      const famille = familleData?.[0]
-      if (!famille) { setLoading(false); return }
+      if (!familleData?.length) { setLoading(false); return }
 
-      setIsAdmin(famille.is_admin === true)
+      // Vérifier si admin
+      const isAdminUser = familleData.some(f => f.is_admin === true)
+      setIsAdmin(isAdminUser)
 
-      if (famille.is_admin) {
+      if (isAdminUser) {
+        // Admin — charge tous les seniors
         const { data: allSeniors } = await supabase
           .from('seniors')
           .select('*')
           .order('name')
         const enrichis = (allSeniors || []).map(enrichirSenior)
         setSeniors(enrichis)
-        setSelectedSeniorId(famille.selected_senior_id || enrichis?.[0]?.id)
+        const saved = familleData[0].selected_senior_id
+        setSelectedSeniorId(saved || enrichis?.[0]?.id)
       } else {
+        // Proche — charge tous les seniors liés à cet utilisateur
+        const seniorIds = familleData.map(f => f.senior_id).filter(Boolean)
+
+        if (!seniorIds.length) { setLoading(false); return }
+
         const { data: seniorData } = await supabase
           .from('seniors')
           .select('*')
-          .eq('id', famille.senior_id)
+          .in('id', seniorIds)
+          .order('name')
+
         const enrichis = (seniorData || []).map(enrichirSenior)
         setSeniors(enrichis)
-        setSelectedSeniorId(famille.senior_id)
+
+        // Utiliser selected_senior_id si disponible, sinon le premier
+        const saved = familleData[0].selected_senior_id
+        const activeId = seniorIds.includes(saved) ? saved : seniorIds[0]
+        setSelectedSeniorId(activeId)
       }
 
       setLoading(false)
@@ -67,6 +80,7 @@ export function useSenior() {
   async function switchSenior(seniorId) {
     setSelectedSeniorId(seniorId)
     const { data: { user } } = await supabase.auth.getUser()
+    // Mettre à jour toutes les entrées famille de cet utilisateur
     await supabase
       .from('famille')
       .update({ selected_senior_id: seniorId })
