@@ -16,7 +16,6 @@ export async function GET(request) {
     const maintenant = new Date()
     const ilYa7j = new Date(maintenant.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    // Chercher les intervenants qui ont eu un événement dans les 7 derniers jours
     const { data: events } = await supabase
       .from('events')
       .select('*, intervenants(*), seniors(*)')
@@ -28,7 +27,6 @@ export async function GET(request) {
       return NextResponse.json({ success: true, message: 'Aucun intervenant actif cette semaine', relances: 0 })
     }
 
-    // Dédupliquer par intervenant (un seul message par intervenant)
     const intervenantsVus = new Set()
     let relancesEnvoyees = 0
 
@@ -39,9 +37,9 @@ export async function GET(request) {
       intervenantsVus.add(intervenant.id)
 
       const senior = event.seniors
-      const phoneNumber = intervenant.whatsapp.replace('+', '')
-
-      const message = 'Bonjour ' + intervenant.name + ' 👋 Merci pour votre suivi de ' + (senior?.name || 'votre patient') + ' cette semaine. Avez-vous des observations à partager ? Un message vocal de 20 secondes suffit 🎤'
+      const phoneNumber = intervenant.whatsapp.replace('+', '').replace(/\s/g, '')
+      const prenom = intervenant.name.split(' ')[0]
+      const seniorName = senior?.name || 'votre patient'
 
       const response = await fetch(
         'https://graph.facebook.com/v18.0/' + process.env.META_PHONE_NUMBER_ID + '/messages',
@@ -54,13 +52,25 @@ export async function GET(request) {
           body: JSON.stringify({
             messaging_product: 'whatsapp',
             to: phoneNumber,
-            type: 'text',
-            text: { body: message }
+            type: 'template',
+            template: {
+              name: 'relance_intervenant',
+              language: { code: 'en' },
+              components: [{
+                type: 'body',
+                parameters: [
+                  { type: 'text', text: prenom },
+                  { type: 'text', text: seniorName },
+                ]
+              }]
+            }
           })
         }
       )
 
-      const data = await response.json()
+      const responseText = await response.text()
+      let data
+      try { data = JSON.parse(responseText) } catch { data = { raw: responseText } }
       console.log('Relance envoyée à', intervenant.name, ':', JSON.stringify(data))
 
       if (response.ok) {
