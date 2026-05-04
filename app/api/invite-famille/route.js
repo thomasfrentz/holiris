@@ -12,19 +12,18 @@ export async function POST(request) {
 
     const code = Math.random().toString(36).substring(2, 8).toUpperCase()
 
-    await supabase
-      .from('famille')
-      .update({ code_acces: code })
-      .eq('id', familleId)
+    if (familleId) {
+      await supabase.from('famille').update({ code_acces: code }).eq('id', familleId)
+    }
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
     const response = await fetch(
-      'https://graph.facebook.com/v18.0/' + process.env.META_PHONE_NUMBER_ID + '/messages',
+      `https://graph.facebook.com/v18.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
       {
         method: 'POST',
         headers: {
-          'Authorization': 'Bearer ' + process.env.META_WHATSAPP_TOKEN,
+          'Authorization': `Bearer ${process.env.META_WHATSAPP_TOKEN}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -32,7 +31,7 @@ export async function POST(request) {
           to: phoneNumber,
           type: 'template',
           template: {
-            name: 'invitation_holiris',
+            name: 'acces_holiris',
             language: { code: 'fr' },
             components: [{
               type: 'body',
@@ -49,11 +48,7 @@ export async function POST(request) {
 
     const responseText = await response.text()
     let data
-    try {
-      data = JSON.parse(responseText)
-    } catch {
-      data = { raw: responseText }
-    }
+    try { data = JSON.parse(responseText) } catch { data = { raw: responseText } }
 
     if (response.ok) {
       return NextResponse.json({ success: true })
