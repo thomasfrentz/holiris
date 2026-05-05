@@ -39,7 +39,7 @@ export async function POST(request) {
         to: phoneNumber,
         type: 'template',
         template: {
-          name: 'invitation_holiris',
+          name: 'acces_holiris',
           language: { code: 'fr' },
           components: [{
             type: 'body',
