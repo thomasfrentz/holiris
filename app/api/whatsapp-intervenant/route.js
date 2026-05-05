@@ -11,19 +11,11 @@ export async function POST(request) {
     const body = await request.json()
     const { whatsapp, prenom, seniorName, type, message, intervenantId } = body
 
-    console.log('=== WhatsApp Intervenant ===')
-    console.log('Phone Number ID:', process.env.META_PHONE_NUMBER_ID)
-    console.log('Type:', type)
-    console.log('WhatsApp:', whatsapp)
-    console.log('Prenom:', prenom)
-    console.log('SeniorName:', seniorName)
-
     if (!whatsapp) {
       return NextResponse.json({ success: false, error: 'Numéro WhatsApp manquant' })
     }
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
-    console.log('Phone number formaté:', phoneNumber)
 
     let requestBody
 
@@ -60,8 +52,6 @@ export async function POST(request) {
       }
     }
 
-    console.log('Request body:', JSON.stringify(requestBody))
-
     const response = await fetch(
       `https://graph.facebook.com/v18.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
       {
@@ -74,17 +64,9 @@ export async function POST(request) {
       }
     )
 
-    console.log('Response status:', response.status)
-
     const responseText = await response.text()
-    console.log('Response text:', responseText)
-
     let data
-    try {
-      data = JSON.parse(responseText)
-    } catch {
-      data = { raw: responseText }
-    }
+    try { data = JSON.parse(responseText) } catch { data = { raw: responseText } }
 
     if (response.ok) {
       return NextResponse.json({ success: true })
@@ -93,7 +75,6 @@ export async function POST(request) {
     }
 
   } catch (error) {
-    console.error('Erreur:', error.message)
     return NextResponse.json({ success: false, error: error.message })
   }
 }
