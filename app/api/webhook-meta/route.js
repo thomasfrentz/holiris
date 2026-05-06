@@ -32,11 +32,16 @@ export async function POST(request) {
     const from = message.from
     const messageType = message.type
 
+    console.log('Message reçu de:', from, 'type:', messageType)
+
+    // Chercher l'intervenant par numéro WhatsApp
     const { data: intervenantData } = await supabase
       .from('intervenants')
       .select('*')
-      .or('whatsapp.eq.+' + from + ',phone.eq.+' + from)
+      .or(`whatsapp.eq.+${from},whatsapp.eq.${from},phone.eq.+${from}`)
       .limit(1)
+
+    console.log('Intervenant trouvé:', intervenantData?.length > 0 ? intervenantData[0].name : 'aucun')
 
     let seniorId = null
     let intervenantName = 'Intervenant inconnu'
@@ -67,16 +72,21 @@ export async function POST(request) {
       source = 'whatsapp_audio'
     }
 
+    console.log('Note à créer:', noteContent)
+
     if (noteContent) {
       const finalSeniorId = await findSeniorByName(rawText, seniorId)
 
-      await supabase.from('notes').insert({
+      const { error } = await supabase.from('notes').insert({
         senior_id: finalSeniorId,
         content: noteContent,
         source,
         intervenant_name: intervenantName + (intervenantRole ? ' · ' + intervenantRole : ''),
         created_at: new Date().toISOString()
       })
+
+      if (error) console.error('Erreur insertion note:', error)
+      else console.log('Note créée pour senior:', finalSeniorId)
 
       await analyzeForAlerts(rawText, finalSeniorId)
     }
