@@ -23,10 +23,39 @@ function LoginContent() {
   )
 
   useEffect(() => {
-    if (searchParams.get('signup') === 'true') {
-      setIsSignup(true)
-    }
+    if (searchParams.get('signup') === 'true') setIsSignup(true)
   }, [searchParams])
+
+  function getRedirect() {
+    return searchParams.get('redirect') || null
+  }
+
+  async function redirectAfterAuth(user) {
+    const redirect = getRedirect()
+    if (redirect) {
+      router.push(redirect)
+      return
+    }
+
+    const { data: intervenantData } = await supabase
+      .from('intervenants').select('id')
+      .eq('user_id', user.id).limit(1)
+
+    if (intervenantData?.length > 0) {
+      router.push('/espace-intervenant')
+      return
+    }
+
+    const { data: familleData } = await supabase
+      .from('famille').select('id')
+      .eq('user_id', user.id).limit(1)
+
+    if (familleData?.length > 0) {
+      router.push('/app')
+    } else {
+      router.push('/famille-onboarding')
+    }
+  }
 
   async function handleAuth() {
     setLoading(true)
@@ -55,17 +84,8 @@ function LoginContent() {
         })
 
         const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
-
         if (signInData?.user) {
-          const { data: intervenantData } = await supabase
-            .from('intervenants').select('id')
-            .eq('user_id', signInData.user.id).limit(1)
-
-          if (intervenantData?.length > 0) {
-            router.push('/espace-intervenant')
-          } else {
-            router.push('/famille-onboarding')
-          }
+          await redirectAfterAuth(signInData.user)
         }
       }
       setLoading(false)
@@ -75,24 +95,7 @@ function LoginContent() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError('Email ou mot de passe incorrect.'); setLoading(false); return }
 
-    const { data: intervenantData } = await supabase
-      .from('intervenants').select('id')
-      .eq('user_id', data.user.id).limit(1)
-
-    if (intervenantData?.length > 0) {
-      router.push('/espace-intervenant')
-      return
-    }
-
-    const { data: familleData } = await supabase
-      .from('famille').select('id')
-      .eq('user_id', data.user.id).limit(1)
-
-    if (familleData?.length > 0) {
-      router.push('/app')
-    } else {
-      router.push('/famille-onboarding')
-    }
+    await redirectAfterAuth(data.user)
   }
 
   async function handleReset() {
@@ -140,10 +143,7 @@ function LoginContent() {
               <>
                 <div>
                   <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Email</label>
-                  <input
-                    type="email"
-                    placeholder="votre@email.com"
-                    value={resetEmail}
+                  <input type="email" placeholder="votre@email.com" value={resetEmail}
                     onChange={e => setResetEmail(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleReset()}
                     style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
@@ -171,10 +171,7 @@ function LoginContent() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Email</label>
-              <input
-                type="email"
-                placeholder="votre@email.com"
-                value={email}
+              <input type="email" placeholder="votre@email.com" value={email}
                 onChange={e => setEmail(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAuth()}
                 style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
@@ -182,10 +179,7 @@ function LoginContent() {
             </div>
             <div>
               <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Mot de passe</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
+              <input type="password" placeholder="••••••••" value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !isSignup && handleAuth()}
                 style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
@@ -195,10 +189,7 @@ function LoginContent() {
             {isSignup && (
               <div>
                 <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Confirmer le mot de passe</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
+                <input type="password" placeholder="••••••••" value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAuth()}
                   style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 2, color: '#FAFCFA', fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
@@ -212,11 +203,8 @@ function LoginContent() {
               </div>
             )}
 
-            <button
-              onClick={handleAuth}
-              disabled={loading || !email || !password || (isSignup && !confirmPassword)}
-              style={{ background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer', marginTop: 8 }}
-            >
+            <button onClick={handleAuth} disabled={loading || !email || !password || (isSignup && !confirmPassword)}
+              style={{ background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 2, padding: '13px 0', fontSize: 13, fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer', marginTop: 8 }}>
               {loading ? 'Chargement...' : isSignup ? 'Créer mon compte' : 'Se connecter'}
             </button>
 
@@ -230,10 +218,8 @@ function LoginContent() {
             )}
 
             <div style={{ textAlign: 'center' }}>
-              <button
-                onClick={() => { setIsSignup(!isSignup); setError(''); setConfirmPassword('') }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
-              >
+              <button onClick={() => { setIsSignup(!isSignup); setError(''); setConfirmPassword('') }}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
                 {isSignup ? 'Déjà un compte ? Se connecter' : 'Créer un compte'}
               </button>
             </div>
