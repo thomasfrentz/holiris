@@ -10,6 +10,35 @@ function generateToken() {
   return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
 }
 
+async function envoyerTemplate(phoneNumber, templateName, parameters) {
+  const response = await fetch(
+    `https://graph.facebook.com/v18.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.META_WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: 'fr' },
+          components: [{
+            type: 'body',
+            parameters: parameters.map(p => ({ type: 'text', text: p }))
+          }]
+        }
+      })
+    }
+  )
+  const responseText = await response.text()
+  try { return { ok: response.ok, data: JSON.parse(responseText) } }
+  catch { return { ok: response.ok, data: { raw: responseText } } }
+}
+
 export async function POST(request) {
   try {
     const { familleId, prenom, seniorName, whatsapp } = await request.json()
@@ -23,42 +52,23 @@ export async function POST(request) {
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.META_WHATSAPP_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: phoneNumber,
-          type: 'template',
-          template: {
-            name: 'invitation_intervenant',
-            language: { code: 'fr' },
-            components: [{
-              type: 'body',
-              parameters: [
-                { type: 'text', text: prenom || '' },
-                { type: 'text', text: seniorName || '' },
-                { type: 'text', text: lien },
-              ]
-            }]
-          }
-        })
-      }
-    )
+    // Message 1 — lien d'activation
+    await envoyerTemplate(phoneNumber, 'lien_holiris', [
+      prenom || '',
+      seniorName || '',
+      lien,
+    ])
 
-    const responseText = await response.text()
-    let data
-    try { data = JSON.parse(responseText) } catch { data = { raw: responseText } }
+    // Message 2 — bienvenue + instructions
+    const result2 = await envoyerTemplate(phoneNumber, 'bienvenue_holiris', [
+      prenom || '',
+      seniorName || '',
+    ])
 
-    if (response.ok) {
+    if (result2.ok) {
       return NextResponse.json({ success: true })
     } else {
-      return NextResponse.json({ success: false, error: data })
+      return NextResponse.json({ success: false, error: result2.data })
     }
 
   } catch (error) {
