@@ -13,6 +13,7 @@ export default function Famille() {
   const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [inviteSent, setInviteSent] = useState(null)
+  const [copied, setCopied] = useState(null)
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
   const [role, setRole] = useState('')
@@ -61,26 +62,29 @@ export default function Famille() {
   }
 
   async function inviteMembre() {
-    if (!prenom || !role || !telephone) return
+    if (!prenom || !role) return
     setSaving(true)
-    const whatsapp = telephone.replace(/\s/g, '').replace(/^0/, '+33')
+    const whatsapp = telephone ? telephone.replace(/\s/g, '').replace(/^0/, '+33') : null
 
     const { data, error } = await supabase.from('famille').insert({
       senior_id: selectedSeniorId,
       name: prenom + (nom ? ' ' + nom : ''),
-      role, phone: telephone, whatsapp,
+      role, phone: telephone || null, whatsapp,
     }).select()
 
     if (!error && data) {
-      try {
-        const res = await fetch('/api/invite-famille', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ familleId: data[0].id, prenom, seniorName: selectedSenior?.name, whatsapp })
-        })
-        const result = await res.json()
-        if (result.success) setInviteSent(prenom + (nom ? ' ' + nom : ''))
-      } catch (e) { console.error('Erreur invitation:', e) }
+      // Envoyer invitation WhatsApp si numéro disponible
+      if (whatsapp) {
+        try {
+          const res = await fetch('/api/invite-famille', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ familleId: data[0].id, prenom, seniorName: selectedSenior?.name, whatsapp })
+          })
+          const result = await res.json()
+          if (result.success) setInviteSent(prenom + (nom ? ' ' + nom : ''))
+        } catch (e) { console.error('Erreur invitation:', e) }
+      }
 
       const { data: updated } = await supabase
         .from('famille').select('*')
@@ -92,6 +96,30 @@ export default function Famille() {
       setTimeout(() => setInviteSent(null), 5000)
     }
     setSaving(false)
+  }
+
+  async function renvoyerInvitation(m) {
+    if (!m.whatsapp) return alert('Pas de numéro WhatsApp pour ce membre.')
+    try {
+      const res = await fetch('/api/invite-famille', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familleId: m.id, prenom: m.name.split(' ')[0], seniorName: selectedSenior?.name, whatsapp: m.whatsapp })
+      })
+      const result = await res.json()
+      if (result.success) alert('Invitation renvoyée ✓')
+      else alert('Erreur : ' + JSON.stringify(result.error))
+    } catch (e) { alert('Erreur réseau') }
+  }
+
+  async function copierLien(m) {
+    // Générer un nouveau token et copier le lien
+    const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
+    await supabase.from('famille').update({ invite_token: token }).eq('id', m.id)
+    const lien = `https://holiris.fr/rejoindre?token=${token}&type=famille`
+    navigator.clipboard.writeText(lien)
+    setCopied(m.id)
+    setTimeout(() => setCopied(null), 3000)
   }
 
   async function archiverMembre(id) {
@@ -125,22 +153,22 @@ export default function Famille() {
 
   const MembreCard = ({ m, archivé = false }) => (
     <div style={{ background: '#fff', border: '1px solid ' + (archivé ? '#F0D9B5' : '#E8EFEB'), borderRadius: 12, padding: '16px 20px', opacity: archivé ? 0.8 : 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ width: 40, height: 40, borderRadius: 10, background: archivé ? '#FDF3E7' : '#EAF4EF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
           👤
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{m.name}</div>
           <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{m.role}</div>
           <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {m.phone && <span>{m.phone}</span>}
             {m.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
-            {!m.user_id && m.code_acces && <span style={{ color: '#C4844A' }}>· Invitation envoyée</span>}
+            {!m.user_id && <span style={{ color: '#C4844A' }}>· En attente</span>}
             {archivé && m.archived_at && <span style={{ color: '#C4844A' }}>· Archivé le {new Date(m.archived_at).toLocaleDateString('fr-FR')}</span>}
           </div>
         </div>
         {isAdmin && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {archivé ? (
               <>
                 <button onClick={() => restaurerMembre(m.id)}
@@ -153,10 +181,24 @@ export default function Famille() {
                 </button>
               </>
             ) : (
-              <button onClick={() => archiverMembre(m.id)}
-                style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Archiver
-              </button>
+              <>
+                {!m.user_id && (
+                  <>
+                    <button onClick={() => renvoyerInvitation(m)}
+                      style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      Inviter WA
+                    </button>
+                    <button onClick={() => copierLien(m)}
+                      style={{ background: copied === m.id ? '#EAF4EF' : '#F3EDF7', color: copied === m.id ? '#4A8870' : '#8B6FAA', border: '1px solid ' + (copied === m.id ? '#C8DDD4' : '#E0D0EC'), borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      {copied === m.id ? 'Copié ✓' : 'Copier lien'}
+                    </button>
+                  </>
+                )}
+                <button onClick={() => archiverMembre(m.id)}
+                  style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Archiver
+                </button>
+              </>
             )}
           </div>
         )}
@@ -200,15 +242,15 @@ export default function Famille() {
               <option value="">Lien avec le senior *</option>
               {roles.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <input placeholder="WhatsApp (ex: 06 12 34 56 78) *" value={telephone} onChange={e => setTelephone(e.target.value)}
+            <input placeholder="WhatsApp (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 16 }}>
-            Un message WhatsApp avec le code d'accès sera envoyé automatiquement
+            Si WhatsApp renseigné, un lien d'invitation sera envoyé automatiquement
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={inviteMembre} disabled={saving || !prenom || !role || !telephone}
-              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !role || !telephone) ? 0.5 : 1 }}>
+            <button onClick={inviteMembre} disabled={saving || !prenom || !role}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !role) ? 0.5 : 1 }}>
               {saving ? 'Envoi...' : 'Inviter'}
             </button>
             <button onClick={resetForm}
@@ -241,7 +283,6 @@ export default function Famille() {
             </div>
             <div style={{ fontSize: 11, color: '#C4844A' }}>{showArchives ? '▲' : '▼'}</div>
           </button>
-
           {showArchives && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {archives.length === 0 ? (

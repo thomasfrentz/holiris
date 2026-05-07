@@ -6,14 +6,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
+function generateToken() {
+  return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
+}
+
 export async function POST(request) {
   try {
     const { familleId, prenom, seniorName, whatsapp } = await request.json()
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+    const token = generateToken()
+    const lien = `https://holiris.fr/rejoindre?token=${token}&type=famille`
 
     if (familleId) {
-      await supabase.from('famille').update({ code_acces: code }).eq('id', familleId)
+      await supabase.from('famille').update({ invite_token: token }).eq('id', familleId)
     }
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
@@ -31,14 +36,14 @@ export async function POST(request) {
           to: phoneNumber,
           type: 'template',
           template: {
-            name: 'acces_holiris',
+            name: 'invitation_intervenant',
             language: { code: 'fr' },
             components: [{
               type: 'body',
               parameters: [
                 { type: 'text', text: prenom || '' },
                 { type: 'text', text: seniorName || '' },
-                { type: 'text', text: code },
+                { type: 'text', text: lien },
               ]
             }]
           }

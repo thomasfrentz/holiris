@@ -13,6 +13,7 @@ export default function Intervenants() {
   const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [emailSent, setEmailSent] = useState(null)
+  const [copied, setCopied] = useState(null)
   const [messageModal, setMessageModal] = useState(null)
   const [messageTexte, setMessageTexte] = useState('')
   const [messageSending, setMessageSending] = useState(false)
@@ -73,6 +74,7 @@ export default function Intervenants() {
     }).select()
 
     if (!error && data) {
+      // Email si disponible
       if (email && data[0]) {
         try {
           const res = await fetch('/api/invite-intervenant-email', {
@@ -80,13 +82,31 @@ export default function Intervenants() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               intervenantId: data[0].id, email, prenom, nom, role,
-              seniorName: selectedSenior?.name, phone: telephone
+              seniorName: selectedSenior?.name
             })
           })
           const result = await res.json()
           if (result.success) setEmailSent(prenom + ' ' + nom)
-        } catch (e) { console.error('Erreur invitation:', e) }
+        } catch (e) { console.error('Erreur email:', e) }
       }
+
+      // WhatsApp automatique si numéro disponible
+      if (whatsapp && data[0]) {
+        try {
+          await fetch('/api/whatsapp-intervenant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              whatsapp,
+              prenom,
+              seniorName: selectedSenior?.name,
+              type: 'template',
+              intervenantId: data[0].id
+            })
+          })
+        } catch (e) { console.error('Erreur WA:', e) }
+      }
+
       setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
       setShowForm(false)
       setTimeout(() => setEmailSent(null), 5000)
@@ -95,26 +115,33 @@ export default function Intervenants() {
     setSaving(false)
   }
 
-  async function envoyerTemplate(intervenant) {
-    if (!intervenant.whatsapp) return alert('Pas de numéro WhatsApp pour cet intervenant.')
+  async function renvoyerInvitation(i) {
+    if (!i.whatsapp) return alert('Pas de numéro WhatsApp.')
     try {
       const res = await fetch('/api/whatsapp-intervenant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          whatsapp: intervenant.whatsapp,
-          prenom: intervenant.name.split(' ')[0],
+          whatsapp: i.whatsapp,
+          prenom: i.name.split(' ')[0],
           seniorName: selectedSenior?.name,
           type: 'template',
-          intervenantId: intervenant.id
+          intervenantId: i.id
         })
       })
       const data = await res.json()
-      if (data.success) alert('Invitation envoyée sur WhatsApp ✅')
+      if (data.success) alert('Invitation renvoyée ✓')
       else alert('Erreur : ' + JSON.stringify(data.error))
-    } catch (e) {
-      alert('Erreur réseau : ' + e.message)
-    }
+    } catch (e) { alert('Erreur réseau') }
+  }
+
+  async function copierLien(i) {
+    const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
+    await supabase.from('intervenants').update({ invite_token: token }).eq('id', i.id)
+    const lien = `https://holiris.fr/rejoindre?token=${token}`
+    navigator.clipboard.writeText(lien)
+    setCopied(i.id)
+    setTimeout(() => setCopied(null), 3000)
   }
 
   async function envoyerMessageLibre() {
@@ -125,11 +152,7 @@ export default function Intervenants() {
       const res = await fetch('/api/whatsapp-intervenant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          whatsapp: messageModal.whatsapp,
-          type: 'libre',
-          message: messageTexte
-        })
+        body: JSON.stringify({ whatsapp: messageModal.whatsapp, type: 'libre', message: messageTexte })
       })
       const data = await res.json()
       if (data.success) {
@@ -139,7 +162,6 @@ export default function Intervenants() {
         setMessageResult('error')
       }
     } catch (e) {
-      console.error('Erreur fetch:', e)
       setMessageResult('error')
     }
     setMessageSending(false)
@@ -175,32 +197,18 @@ export default function Intervenants() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>Message WhatsApp</div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>
-              {messageModal.name}
-            </div>
-            <div style={{ fontSize: 12, color: '#9BB5AA', marginBottom: 20 }}>
-              {messageModal.whatsapp} · {messageModal.role}
-            </div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>{messageModal.name}</div>
+            <div style={{ fontSize: 12, color: '#9BB5AA', marginBottom: 20 }}>{messageModal.whatsapp} · {messageModal.role}</div>
             <div style={{ background: '#FDF3E7', border: '1px solid #F0D9B5', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#C4844A', marginBottom: 16 }}>
               Ce message ne peut être envoyé que si l'intervenant a déjà écrit au numéro Holiris (+1 218-443-9755).
             </div>
             <textarea
               placeholder={'Votre message à ' + messageModal.name.split(' ')[0] + '...'}
-              value={messageTexte}
-              onChange={e => setMessageTexte(e.target.value)}
-              rows={4}
+              value={messageTexte} onChange={e => setMessageTexte(e.target.value)} rows={4}
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box', marginBottom: 12, background: '#FAFCFC' }}
             />
-            {messageResult === 'success' && (
-              <div style={{ background: '#EAF4EF', color: '#4A8870', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 500 }}>
-                Message envoyé ✓
-              </div>
-            )}
-            {messageResult === 'error' && (
-              <div style={{ background: '#FBECED', color: '#C4606A', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>
-                Erreur — l'intervenant doit d'abord écrire au numéro Holiris.
-              </div>
-            )}
+            {messageResult === 'success' && <div style={{ background: '#EAF4EF', color: '#4A8870', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 500 }}>Message envoyé ✓</div>}
+            {messageResult === 'error' && <div style={{ background: '#FBECED', color: '#C4606A', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>Erreur — l'intervenant doit d'abord écrire au numéro Holiris.</div>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={envoyerMessageLibre} disabled={messageSending || !messageTexte.trim()}
                 style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!messageTexte.trim() || messageSending) ? 0.5 : 1 }}>
@@ -229,7 +237,7 @@ export default function Intervenants() {
 
       {emailSent && (
         <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#4A8870', fontWeight: 500 }}>
-          Email et SMS envoyés à {emailSent}
+          Email d'invitation envoyé à {emailSent}
         </div>
       )}
 
@@ -257,7 +265,9 @@ export default function Intervenants() {
           <div style={{ marginBottom: 16 }}>
             <input placeholder="Email (optionnel)" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
-            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>Un email + SMS avec le code d'accès seront envoyés automatiquement</div>
+            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
+              Lien d'invitation envoyé automatiquement par WhatsApp · Email si renseigné
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
@@ -292,13 +302,22 @@ export default function Intervenants() {
                   {i.phone && <span>{i.phone}</span>}
                   {i.email && <span>· {i.email}</span>}
                   {i.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
+                  {!i.user_id && <span style={{ color: '#C4844A' }}>· En attente</span>}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <button onClick={() => envoyerTemplate(i)}
-                  style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                  Inviter WA
-                </button>
+                {!i.user_id && (
+                  <>
+                    <button onClick={() => renvoyerInvitation(i)}
+                      style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      Inviter WA
+                    </button>
+                    <button onClick={() => copierLien(i)}
+                      style={{ background: copied === i.id ? '#EAF4EF' : '#F3EDF7', color: copied === i.id ? '#4A8870' : '#8B6FAA', border: '1px solid ' + (copied === i.id ? '#C8DDD4' : '#E0D0EC'), borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      {copied === i.id ? 'Copié ✓' : 'Copier lien'}
+                    </button>
+                  </>
+                )}
                 <button onClick={() => { setMessageModal(i); setMessageTexte(''); setMessageResult(null) }}
                   style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                   Message
@@ -324,7 +343,6 @@ export default function Intervenants() {
           </div>
           <div style={{ fontSize: 11, color: '#C4844A' }}>{showArchives ? '▲' : '▼'}</div>
         </button>
-
         {showArchives && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {archives.length === 0 ? (
@@ -338,9 +356,7 @@ export default function Intervenants() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{i.name}</div>
                     <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{i.role}</div>
-                    <div style={{ fontSize: 12, color: '#C4844A', marginTop: 4 }}>
-                      Archivé le {new Date(i.archived_at).toLocaleDateString('fr-FR')}
-                    </div>
+                    <div style={{ fontSize: 12, color: '#C4844A', marginTop: 4 }}>Archivé le {new Date(i.archived_at).toLocaleDateString('fr-FR')}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     <button onClick={() => restaurerIntervenant(i.id)}

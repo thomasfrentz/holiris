@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
 function RejoindreContent() {
-  const [status, setStatus] = useState('loading') // loading | valid | invalid | success
-  const [intervenant, setIntervenant] = useState(null)
+  const [status, setStatus] = useState('loading')
+  const [membre, setMembre] = useState(null)
   const [senior, setSenior] = useState(null)
+  const [type, setType] = useState(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
+  const typeParam = searchParams.get('type') // 'famille' ou null (intervenant)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -21,34 +23,39 @@ function RejoindreContent() {
     async function checkToken() {
       if (!token) { setStatus('invalid'); return }
 
+      const table = typeParam === 'famille' ? 'famille' : 'intervenants'
+      const fkey = typeParam === 'famille' ? 'famille_senior_id_fkey' : 'intervenants_senior_id_fkey'
+      setType(typeParam === 'famille' ? 'famille' : 'intervenant')
+
       const { data } = await supabase
-        .from('intervenants')
-        .select('*, seniors!intervenants_senior_id_fkey(*)')
+        .from(table)
+        .select(`*, seniors!${fkey}(*)`)
         .eq('invite_token', token)
         .limit(1)
 
       if (!data?.length) { setStatus('invalid'); return }
 
-      setIntervenant(data[0])
+      setMembre(data[0])
       setSenior(data[0].seniors)
       setStatus('valid')
     }
     checkToken()
-  }, [token])
+  }, [token, typeParam])
 
   async function activer() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      router.push('/login?signup=true&redirect=/rejoindre?token=' + token)
+      router.push('/login?signup=true&redirect=/rejoindre?token=' + token + (typeParam ? '&type=' + typeParam : ''))
       return
     }
 
-    await supabase.from('intervenants')
+    const table = typeParam === 'famille' ? 'famille' : 'intervenants'
+    await supabase.from(table)
       .update({ user_id: user.id, invite_token: null })
       .eq('invite_token', token)
 
     setStatus('success')
-    setTimeout(() => router.push('/espace-intervenant'), 2000)
+    setTimeout(() => router.push(typeParam === 'famille' ? '/app' : '/espace-intervenant'), 2000)
   }
 
   if (status === 'loading') return (
@@ -88,7 +95,9 @@ function RejoindreContent() {
           <circle cx="32" cy="32" r="2.2" fill="#fff"/>
         </svg>
         <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, color: '#1F2A24', marginBottom: 6 }}>Holiris</div>
-        <div style={{ fontSize: 13, color: '#9BB5AA', marginBottom: 28 }}>Invitation intervenant</div>
+        <div style={{ fontSize: 13, color: '#9BB5AA', marginBottom: 28 }}>
+          {type === 'famille' ? 'Invitation proche' : 'Invitation intervenant'}
+        </div>
 
         <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 10, padding: '16px 20px', marginBottom: 24, textAlign: 'left' }}>
           <div style={{ fontSize: 10, color: '#7FAF9B', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>Dossier</div>
@@ -96,10 +105,10 @@ function RejoindreContent() {
           <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4 }}>{senior?.age} ans · {senior?.city}</div>
         </div>
 
-        {intervenant?.name && (
+        {membre?.name && (
           <div style={{ fontSize: 14, color: '#6F7C75', marginBottom: 24 }}>
-            Invitation pour <strong>{intervenant.name}</strong>
-            {intervenant.role && <span> · {intervenant.role}</span>}
+            Invitation pour <strong>{membre.name}</strong>
+            {membre.role && <span> · {membre.role}</span>}
           </div>
         )}
 
