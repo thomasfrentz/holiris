@@ -74,35 +74,24 @@ export default function Intervenants() {
     }).select()
 
     if (!error && data) {
-      // Email si disponible
       if (email && data[0]) {
         try {
           const res = await fetch('/api/invite-intervenant-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              intervenantId: data[0].id, email, prenom, nom, role,
-              seniorName: selectedSenior?.name
-            })
+            body: JSON.stringify({ intervenantId: data[0].id, email, prenom, nom, role, seniorName: selectedSenior?.name })
           })
           const result = await res.json()
           if (result.success) setEmailSent(prenom + ' ' + nom)
         } catch (e) { console.error('Erreur email:', e) }
       }
 
-      // WhatsApp automatique si numéro disponible
       if (whatsapp && data[0]) {
         try {
           await fetch('/api/whatsapp-intervenant', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              whatsapp,
-              prenom,
-              seniorName: selectedSenior?.name,
-              type: 'template',
-              intervenantId: data[0].id
-            })
+            body: JSON.stringify({ whatsapp, prenom, seniorName: selectedSenior?.name, type: 'template', intervenantId: data[0].id })
           })
         } catch (e) { console.error('Erreur WA:', e) }
       }
@@ -121,13 +110,7 @@ export default function Intervenants() {
       const res = await fetch('/api/whatsapp-intervenant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          whatsapp: i.whatsapp,
-          prenom: i.name.split(' ')[0],
-          seniorName: selectedSenior?.name,
-          type: 'template',
-          intervenantId: i.id
-        })
+        body: JSON.stringify({ whatsapp: i.whatsapp, prenom: i.name.split(' ')[0], seniorName: selectedSenior?.name, type: 'template', intervenantId: i.id })
       })
       const data = await res.json()
       if (data.success) alert('Invitation renvoyée ✓')
@@ -139,7 +122,21 @@ export default function Intervenants() {
     const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
     await supabase.from('intervenants').update({ invite_token: token }).eq('id', i.id)
     const lien = `https://holiris.fr/rejoindre?token=${token}`
-    navigator.clipboard.writeText(lien)
+
+    try {
+      await navigator.clipboard.writeText(lien)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = lien
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+
     setCopied(i.id)
     setTimeout(() => setCopied(null), 3000)
   }
@@ -161,9 +158,7 @@ export default function Intervenants() {
       } else {
         setMessageResult('error')
       }
-    } catch (e) {
-      setMessageResult('error')
-    }
+    } catch (e) { setMessageResult('error') }
     setMessageSending(false)
   }
 
@@ -192,7 +187,6 @@ export default function Intervenants() {
   return (
     <Layout senior={selectedSenior} seniors={seniors} selectedSeniorId={selectedSeniorId} switchSenior={switchSenior} isAdmin={isAdmin}>
 
-      {/* Modal message libre */}
       {messageModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
@@ -282,7 +276,6 @@ export default function Intervenants() {
         </div>
       )}
 
-      {/* Intervenants actifs */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
         {intervenants.length === 0 ? (
           <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
@@ -332,7 +325,6 @@ export default function Intervenants() {
         ))}
       </div>
 
-      {/* Archives */}
       <div>
         <button onClick={() => setShowArchives(!showArchives)} style={{
           background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',

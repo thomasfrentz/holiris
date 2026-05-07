@@ -75,7 +75,6 @@ export default function Famille() {
     }).select()
 
     if (!error && data) {
-      // WhatsApp si numéro disponible
       if (whatsapp) {
         try {
           const res = await fetch('/api/invite-famille', {
@@ -88,16 +87,12 @@ export default function Famille() {
         } catch (e) { console.error('Erreur invitation WA:', e) }
       }
 
-      // Email si disponible
       if (email) {
         try {
           await fetch('/api/invite-famille-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              familleId: data[0].id, email, prenom,
-              role, seniorName: selectedSenior?.name
-            })
+            body: JSON.stringify({ familleId: data[0].id, email, prenom, role, seniorName: selectedSenior?.name })
           })
         } catch (e) { console.error('Erreur email famille:', e) }
       }
@@ -132,7 +127,21 @@ export default function Famille() {
     const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
     await supabase.from('famille').update({ invite_token: token }).eq('id', m.id)
     const lien = `https://holiris.fr/rejoindre?token=${token}&type=famille`
-    navigator.clipboard.writeText(lien)
+
+    try {
+      await navigator.clipboard.writeText(lien)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = lien
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+
     setCopied(m.id)
     setTimeout(() => setCopied(null), 3000)
   }
@@ -281,7 +290,6 @@ export default function Famille() {
         </div>
       )}
 
-      {/* Membres actifs */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
         {membres.length === 0 ? (
           <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
@@ -291,7 +299,6 @@ export default function Famille() {
         ) : membres.map(m => <MembreCard key={m.id} m={m} />)}
       </div>
 
-      {/* Archives */}
       {(archives.length > 0 || isAdmin) && (
         <div>
           <button onClick={() => setShowArchives(!showArchives)} style={{
