@@ -18,6 +18,7 @@ export default function Famille() {
   const [nom, setNom] = useState('')
   const [role, setRole] = useState('')
   const [telephone, setTelephone] = useState('')
+  const [email, setEmail] = useState('')
 
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
@@ -58,7 +59,7 @@ export default function Famille() {
   }, [selectedSeniorId])
 
   function resetForm() {
-    setPrenom(''); setNom(''); setRole(''); setTelephone(''); setShowForm(false)
+    setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail(''); setShowForm(false)
   }
 
   async function inviteMembre() {
@@ -70,10 +71,11 @@ export default function Famille() {
       senior_id: selectedSeniorId,
       name: prenom + (nom ? ' ' + nom : ''),
       role, phone: telephone || null, whatsapp,
+      email: email || null,
     }).select()
 
     if (!error && data) {
-      // Envoyer invitation WhatsApp si numéro disponible
+      // WhatsApp si numéro disponible
       if (whatsapp) {
         try {
           const res = await fetch('/api/invite-famille', {
@@ -83,7 +85,21 @@ export default function Famille() {
           })
           const result = await res.json()
           if (result.success) setInviteSent(prenom + (nom ? ' ' + nom : ''))
-        } catch (e) { console.error('Erreur invitation:', e) }
+        } catch (e) { console.error('Erreur invitation WA:', e) }
+      }
+
+      // Email si disponible
+      if (email) {
+        try {
+          await fetch('/api/invite-famille-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              familleId: data[0].id, email, prenom,
+              role, seniorName: selectedSenior?.name
+            })
+          })
+        } catch (e) { console.error('Erreur email famille:', e) }
       }
 
       const { data: updated } = await supabase
@@ -113,7 +129,6 @@ export default function Famille() {
   }
 
   async function copierLien(m) {
-    // Générer un nouveau token et copier le lien
     const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
     await supabase.from('famille').update({ invite_token: token }).eq('id', m.id)
     const lien = `https://holiris.fr/rejoindre?token=${token}&type=famille`
@@ -162,6 +177,7 @@ export default function Famille() {
           <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{m.role}</div>
           <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {m.phone && <span>{m.phone}</span>}
+            {m.email && <span>· {m.email}</span>}
             {m.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
             {!m.user_id && <span style={{ color: '#C4844A' }}>· En attente</span>}
             {archivé && m.archived_at && <span style={{ color: '#C4844A' }}>· Archivé le {new Date(m.archived_at).toLocaleDateString('fr-FR')}</span>}
@@ -223,7 +239,7 @@ export default function Famille() {
 
       {inviteSent && (
         <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#4A8870', fontWeight: 500 }}>
-          Invitation WhatsApp envoyée à {inviteSent}
+          Invitation envoyée à {inviteSent}
         </div>
       )}
 
@@ -236,7 +252,7 @@ export default function Famille() {
             <input placeholder="Nom (optionnel)" value={nom} onChange={e => setNom(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <select value={role} onChange={e => setRole(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }}>
               <option value="">Lien avec le senior *</option>
@@ -245,8 +261,12 @@ export default function Famille() {
             <input placeholder="WhatsApp (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
-          <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 16 }}>
-            Si WhatsApp renseigné, un lien d'invitation sera envoyé automatiquement
+          <div style={{ marginBottom: 16 }}>
+            <input placeholder="Email (optionnel)" value={email} onChange={e => setEmail(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
+            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
+              Lien d'invitation envoyé par WhatsApp et/ou email
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={inviteMembre} disabled={saving || !prenom || !role}
