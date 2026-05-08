@@ -13,7 +13,7 @@ export default function Intervenants() {
   const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [emailSent, setEmailSent] = useState(null)
-  const [copied, setCopied] = useState(null)
+  const [codeModal, setCodeModal] = useState(null)
   const [messageModal, setMessageModal] = useState(null)
   const [messageTexte, setMessageTexte] = useState('')
   const [messageSending, setMessageSending] = useState(false)
@@ -74,6 +74,8 @@ export default function Intervenants() {
     }).select()
 
     if (!error && data) {
+      let code = null
+
       if (email && data[0]) {
         try {
           const res = await fetch('/api/invite-intervenant-email', {
@@ -82,19 +84,29 @@ export default function Intervenants() {
             body: JSON.stringify({ intervenantId: data[0].id, email, prenom, nom, role, seniorName: selectedSenior?.name })
           })
           const result = await res.json()
-          if (result.success) setEmailSent(prenom + ' ' + nom)
+          if (result.success) { setEmailSent(prenom + ' ' + nom); code = result.code }
         } catch (e) { console.error('Erreur email:', e) }
       }
 
       if (whatsapp && data[0]) {
         try {
-          await fetch('/api/whatsapp-intervenant', {
+          const res = await fetch('/api/whatsapp-intervenant', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ whatsapp, prenom, seniorName: selectedSenior?.name, type: 'template', intervenantId: data[0].id })
           })
+          const result = await res.json()
+          if (result.code) code = result.code
         } catch (e) { console.error('Erreur WA:', e) }
       }
+
+      if (!email && !whatsapp && data[0]) {
+        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+        await supabase.from('intervenants').update({ code_acces: newCode }).eq('id', data[0].id)
+        code = newCode
+      }
+
+      if (code) setCodeModal({ nom: prenom + ' ' + nom, code })
 
       setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
       setShowForm(false)
@@ -102,6 +114,16 @@ export default function Intervenants() {
       loadData()
     }
     setSaving(false)
+  }
+
+  async function afficherCode(i) {
+    if (i.code_acces) {
+      setCodeModal({ nom: i.name, code: i.code_acces })
+    } else {
+      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      await supabase.from('intervenants').update({ code_acces: newCode }).eq('id', i.id)
+      setCodeModal({ nom: i.name, code: newCode })
+    }
   }
 
   async function renvoyerInvitation(i) {
@@ -116,29 +138,6 @@ export default function Intervenants() {
       if (data.success) alert('Invitation renvoyée ✓')
       else alert('Erreur : ' + JSON.stringify(data.error))
     } catch (e) { alert('Erreur réseau') }
-  }
-
-  async function copierLien(i) {
-    const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
-    await supabase.from('intervenants').update({ invite_token: token }).eq('id', i.id)
-    const lien = `https://holiris.fr/rejoindre?token=${token}`
-
-    try {
-      await navigator.clipboard.writeText(lien)
-    } catch {
-      const textarea = document.createElement('textarea')
-      textarea.value = lien
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.focus()
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-    }
-
-    setCopied(i.id)
-    setTimeout(() => setCopied(null), 3000)
   }
 
   async function envoyerMessageLibre() {
@@ -187,6 +186,31 @@ export default function Intervenants() {
   return (
     <Layout senior={selectedSenior} seniors={seniors} selectedSeniorId={selectedSeniorId} switchSenior={switchSenior} isAdmin={isAdmin}>
 
+      {/* Modal code */}
+      {codeModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 400, boxShadow: '0 8px 40px rgba(0,0,0,0.15)', textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>Code d'accès</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 500, color: '#1F2A24', marginBottom: 20 }}>
+              {codeModal.nom}
+            </div>
+            <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 12, padding: '20px 24px', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: '#7FAF9B', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>Code d'accès</div>
+              <div style={{ fontFamily: 'monospace', fontSize: 32, fontWeight: 700, color: '#1F2A24', letterSpacing: '0.2em' }}>{codeModal.code}</div>
+            </div>
+            <div style={{ fontSize: 12, color: '#9BB5AA', marginBottom: 20 }}>
+              Partagez ce code avec {codeModal.nom.split(' ')[0]}.<br/>
+              Il devra créer un compte sur holiris.fr puis entrer ce code.
+            </div>
+            <button onClick={() => setCodeModal(null)}
+              style={{ width: '100%', background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal message libre */}
       {messageModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
@@ -260,7 +284,7 @@ export default function Intervenants() {
             <input placeholder="Email (optionnel)" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Lien d'invitation envoyé automatiquement par WhatsApp · Email si renseigné
+              Code d'accès envoyé automatiquement par WhatsApp · Email si renseigné
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -305,9 +329,9 @@ export default function Intervenants() {
                       style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                       Inviter WA
                     </button>
-                    <button onClick={() => copierLien(i)}
-                      style={{ background: copied === i.id ? '#EAF4EF' : '#F3EDF7', color: copied === i.id ? '#4A8870' : '#8B6FAA', border: '1px solid ' + (copied === i.id ? '#C8DDD4' : '#E0D0EC'), borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                      {copied === i.id ? 'Copié ✓' : 'Copier lien'}
+                    <button onClick={() => afficherCode(i)}
+                      style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      Voir code
                     </button>
                   </>
                 )}
