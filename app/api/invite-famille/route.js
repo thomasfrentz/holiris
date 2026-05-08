@@ -41,37 +41,72 @@ async function envoyerTemplate(phoneNumber, templateName, parameters) {
 
 export async function POST(request) {
   try {
-    const { familleId, prenom, seniorName, whatsapp } = await request.json()
+    const body = await request.json()
+    const { whatsapp, prenom, seniorName, type, message, intervenantId } = body
 
-    const code = generateCode()
-
-    if (familleId) {
-      await supabase.from('famille').update({ code_acces: code }).eq('id', familleId)
+    if (!whatsapp) {
+      return NextResponse.json({ success: false, error: 'Numéro WhatsApp manquant' })
     }
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
-    // Message 1 — code d'accès
-    await envoyerTemplate(phoneNumber, 'lien_holiris', [
-      prenom || '',
-      seniorName || '',
-      code,
-    ])
+    if (type === 'template') {
+      const code = generateCode()
+      const lien = `https://holiris.fr/activer?code=${code}`
 
-    // Message 2 — bienvenue + instructions
-    const result2 = await envoyerTemplate(phoneNumber, 'bienvenue_holiris', [
-      prenom || '',
-      seniorName || '',
-    ])
+      if (intervenantId) {
+        await supabase.from('intervenants').update({ code_acces: code }).eq('id', intervenantId)
+      }
 
-    if (result2.ok) {
-      return NextResponse.json({ success: true, code })
+      // Message 1 — lien d'activation
+      await envoyerTemplate(phoneNumber, 'lien_holiris', [
+        prenom || '',
+        seniorName || '',
+        lien,
+      ])
+
+      // Message 2 — bienvenue + instructions
+      const result2 = await envoyerTemplate(phoneNumber, 'bienvenue_holiris', [
+        prenom || '',
+        seniorName || '',
+      ])
+
+      if (result2.ok) {
+        return NextResponse.json({ success: true, code })
+      } else {
+        return NextResponse.json({ success: false, error: result2.data })
+      }
+
     } else {
-      return NextResponse.json({ success: false, error: result2.data })
+      const response = await fetch(
+        `https://graph.facebook.com/v18.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.META_WHATSAPP_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: phoneNumber,
+            type: 'text',
+            text: { body: message || '' }
+          })
+        }
+      )
+
+      const responseText = await response.text()
+      let data
+      try { data = JSON.parse(responseText) } catch { data = { raw: responseText } }
+
+      if (response.ok) {
+        return NextResponse.json({ success: true })
+      } else {
+        return NextResponse.json({ success: false, error: data })
+      }
     }
 
   } catch (error) {
-    console.error('Erreur invitation famille:', error.message)
     return NextResponse.json({ success: false, error: error.message })
   }
 }

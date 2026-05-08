@@ -52,16 +52,17 @@ export async function POST(request) {
 
     if (type === 'template') {
       const code = generateCode()
+      const lien = `https://holiris.fr/activer?code=${code}`
 
       if (intervenantId) {
         await supabase.from('intervenants').update({ code_acces: code }).eq('id', intervenantId)
       }
 
-      // Message 1 — code d'accès
+      // Message 1 — lien d'activation
       await envoyerTemplate(phoneNumber, 'lien_holiris', [
         prenom || '',
         seniorName || '',
-        code,
+        lien,
       ])
 
       // Message 2 — bienvenue + instructions
@@ -77,7 +78,6 @@ export async function POST(request) {
       }
 
     } else {
-      // Message libre
       const response = await fetch(
         `https://graph.facebook.com/v18.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
         {
