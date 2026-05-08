@@ -6,10 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-function generateCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
-}
-
 async function envoyerTemplate(phoneNumber, templateName, parameters) {
   const response = await fetch(
     `https://graph.facebook.com/v18.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
@@ -42,7 +38,7 @@ async function envoyerTemplate(phoneNumber, templateName, parameters) {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { whatsapp, prenom, seniorName, type, message, intervenantId } = body
+    const { whatsapp, prenom, seniorName, type, message } = body
 
     if (!whatsapp) {
       return NextResponse.json({ success: false, error: 'Numéro WhatsApp manquant' })
@@ -51,30 +47,16 @@ export async function POST(request) {
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
     if (type === 'template') {
-      const code = generateCode()
-      const lien = `https://holiris.fr/activer?code=${code}`
-
-      if (intervenantId) {
-        await supabase.from('intervenants').update({ code_acces: code }).eq('id', intervenantId)
-      }
-
-      // Message 1 — lien d'activation
-      await envoyerTemplate(phoneNumber, 'lien_holiris', [
-        prenom || '',
-        seniorName || '',
-        lien,
-      ])
-
-      // Message 2 — bienvenue + instructions
-      const result2 = await envoyerTemplate(phoneNumber, 'bienvenue_holiris', [
+      // Envoyer uniquement bienvenue_holiris
+      const result = await envoyerTemplate(phoneNumber, 'bienvenue_holiris', [
         prenom || '',
         seniorName || '',
       ])
 
-      if (result2.ok) {
-        return NextResponse.json({ success: true, code })
+      if (result.ok) {
+        return NextResponse.json({ success: true })
       } else {
-        return NextResponse.json({ success: false, error: result2.data })
+        return NextResponse.json({ success: false, error: result.data })
       }
 
     } else {
