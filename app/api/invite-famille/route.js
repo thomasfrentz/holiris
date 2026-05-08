@@ -6,8 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
-function generateToken() {
-  return Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
+function generateCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase()
 }
 
 async function envoyerTemplate(phoneNumber, templateName, parameters) {
@@ -43,20 +43,19 @@ export async function POST(request) {
   try {
     const { familleId, prenom, seniorName, whatsapp } = await request.json()
 
-    const token = generateToken()
-    const lien = `https://holiris.fr/rejoindre?token=${token}&type=famille`
+    const code = generateCode()
 
     if (familleId) {
-      await supabase.from('famille').update({ invite_token: token }).eq('id', familleId)
+      await supabase.from('famille').update({ code_acces: code }).eq('id', familleId)
     }
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
-    // Message 1 — lien d'activation
+    // Message 1 — code d'accès
     await envoyerTemplate(phoneNumber, 'lien_holiris', [
       prenom || '',
       seniorName || '',
-      lien,
+      code,
     ])
 
     // Message 2 — bienvenue + instructions
@@ -66,7 +65,7 @@ export async function POST(request) {
     ])
 
     if (result2.ok) {
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, code })
     } else {
       return NextResponse.json({ success: false, error: result2.data })
     }
