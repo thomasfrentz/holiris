@@ -44,6 +44,7 @@ export async function POST(request) {
     const { familleId, prenom, seniorName, whatsapp } = await request.json()
 
     const code = generateCode()
+    const lien = `https://holiris.fr/activer?code=${code}`
 
     if (familleId) {
       await supabase.from('famille').update({ code_acces: code }).eq('id', familleId)
@@ -51,7 +52,14 @@ export async function POST(request) {
 
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
-    // Envoyer uniquement bienvenue_holiris
+    // Message 1 — lien d'activation
+    await envoyerTemplate(phoneNumber, 'lien_holiris', [
+      prenom || '',
+      seniorName || '',
+      lien,
+    ])
+
+    // Message 2 — bienvenue + instructions
     const result = await envoyerTemplate(phoneNumber, 'bienvenue_holiris', [
       prenom || '',
       seniorName || '',
