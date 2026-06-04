@@ -6,22 +6,24 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY // ← service role pour le webhook server-side
 )
 
+// ─── Réponse TwiML ───────────────────────────────────────────────────────────
 function twimlResponse(message) {
   return new NextResponse(
-    '<?xml version="1.0" encoding="UTF-8"?><Response><Message>' + message + '</Message></Response>',
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`,
     { headers: { 'Content-Type': 'text/xml' } }
   )
 }
 
+// ─── Transcription audio ─────────────────────────────────────────────────────
 async function transcribeAudio(mediaUrl) {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID
-  const authToken = process.env.TWILIO_AUTH_TOKEN
   const response = await fetch(mediaUrl, {
     headers: {
-      'Authorization': 'Basic ' + Buffer.from(accountSid + ':' + authToken).toString('base64')
+      'Authorization': 'Basic ' + Buffer.from(
+        process.env.TWILIO_ACCOUNT_SID + ':' + process.env.TWILIO_AUTH_TOKEN
+      ).toString('base64')
     }
   })
   const audioBuffer = await response.arrayBuffer()
@@ -34,6 +36,7 @@ async function transcribeAudio(mediaUrl) {
   return transcription.text
 }
 
+// ─── Synthèse note ───────────────────────────────────────────────────────────
 async function synthesizeNote(text) {
   try {
     const completion = await groq.chat.completions.create({
@@ -41,7 +44,7 @@ async function synthesizeNote(text) {
       messages: [
         {
           role: 'system',
-          content: 'Tu es l\'assistant de Holiris. Transforme ce message en note courte et naturelle en 1-2 phrases maximum. Sois direct et factuel. Commence directement par l\'information, sans formule de politesse, sans objet, sans signature.'
+          content: "Tu es l'assistant de Holiris. Transforme ce message en note courte et naturelle en 1-2 phrases maximum. Sois direct et factuel. Commence directement par l'information, sans formule de politesse, sans objet, sans signature."
         },
         { role: 'user', content: text }
       ],
@@ -53,25 +56,21 @@ async function synthesizeNote(text) {
   }
 }
 
-async function findSeniorByName(text, fallbackSeniorId) {
-  const { data: seniors } = await supabase.from('seniors').select('id, name')
-  if (!seniors?.length) return fallbackSeniorId
-
+// ─── Détection senior parmi une liste ────────────────────────────────────────
+function detectSeniorInText(text, seniors) {
   const textLower = text.toLowerCase()
-
   for (const senior of seniors) {
     const parts = senior.name.toLowerCase().split(' ')
     for (const part of parts) {
       if (part.length > 2 && textLower.includes(part)) {
-        console.log('Senior trouvé par nom:', senior.name)
-        return senior.id
+        return senior
       }
     }
   }
-
-  return fallbackSeniorId
+  return null
 }
 
+// ─── Analyse alertes ─────────────────────────────────────────────────────────
 async function analyzeForAlerts(text, seniorId) {
   try {
     const completion = await groq.chat.completions.create({
@@ -104,8 +103,7 @@ Niveaux : "info", "warning", "danger".`
     })
 
     const response = completion.choices[0]?.message?.content || '{}'
-    const clean = response.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(clean)
+    const parsed = JSON.parse(response.replace(/```json|```/g, '').trim())
 
     if (parsed.alerte && parsed.message) {
       await supabase.from('alertes').insert({
@@ -115,13 +113,13 @@ Niveaux : "info", "warning", "danger".`
         niveau: parsed.niveau || 'warning',
         created_at: new Date().toISOString()
       })
-      console.log('Alerte créée:', parsed.message)
     }
   } catch (error) {
     console.error('Erreur analyse alertes:', error.message)
   }
 }
 
+// ─── Handler principal ───────────────────────────────────────────────────────
 export async function POST(request) {
   try {
     const formData = await request.formData()
@@ -132,79 +130,99 @@ export async function POST(request) {
     const mediaType = formData.get('MediaContentType0') || ''
 
     const phoneNumber = from.replace('whatsapp:', '')
-    console.log('Message de:', phoneNumber)
 
-    // Chercher d'abord dans intervenants
-    const { data: intervenantData } = await supabase
+    // ── 1. Identifier l'expéditeur (intervenant ou famille) ──────────────────
+    let senderName = 'Inconnu'
+    let senderRole = ''
+    let seniorRows = [] // liste de { senior_id, senior_name }
+
+    // Chercher dans intervenants (toutes les lignes du numéro)
+    const { data: intervenantRows } = await supabase
       .from('intervenants')
-      .select('*')
-      .or('whatsapp.eq.' + phoneNumber + ',phone.eq.' + phoneNumber)
-      .limit(1)
+      .select('id, name, role, senior_id, seniors(name)')
+      .or(`whatsapp.eq.${phoneNumber},phone.eq.${phoneNumber}`)
 
-    let seniorId = null
-    let intervenantName = 'Inconnu'
-    let intervenantRole = ''
-
-    if (intervenantData && intervenantData.length > 0) {
-      seniorId = intervenantData[0].senior_id
-      intervenantName = intervenantData[0].name
-      intervenantRole = intervenantData[0].role
-      console.log('Intervenant trouvé:', intervenantName)
+    if (intervenantRows?.length) {
+      senderName = intervenantRows[0].name
+      senderRole = intervenantRows[0].role || ''
+      seniorRows = intervenantRows.map(r => ({
+        senior_id: r.senior_id,
+        name: r.seniors?.name || ''
+      }))
     } else {
       // Chercher dans famille
-      const { data: familleData } = await supabase
+      const { data: familleRows } = await supabase
         .from('famille')
-        .select('*')
+        .select('id, name, email, role, senior_id, seniors(name)')
         .eq('whatsapp', phoneNumber)
-        .limit(1)
 
-      if (familleData && familleData.length > 0) {
-        seniorId = familleData[0].senior_id
-        intervenantName = familleData[0].name || familleData[0].email
-        intervenantRole = familleData[0].role || 'Famille'
-        console.log('Membre famille trouvé:', intervenantName)
-      } else {
-        const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
-        seniorId = seniors && seniors[0] ? seniors[0].id : null
-        console.log('Numéro non reconnu, senior par défaut')
+      if (familleRows?.length) {
+        senderName = familleRows[0].name || familleRows[0].email
+        senderRole = familleRows[0].role || 'Famille'
+        seniorRows = familleRows.map(r => ({
+          senior_id: r.senior_id,
+          name: r.seniors?.name || ''
+        }))
       }
     }
 
-    if (!seniorId) return twimlResponse('Erreur : aucun senior trouve.')
+    if (!seniorRows.length) {
+      console.warn('Numéro non reconnu:', phoneNumber)
+      return twimlResponse("Votre numéro n'est pas enregistré sur Holiris. Contactez votre coordinateur.")
+    }
 
-    let noteContent = ''
-    let source = 'whatsapp_text'
+    // ── 2. Transcrire / préparer le contenu ──────────────────────────────────
     let rawText = body
+    let source = 'whatsapp_text'
 
     if (numMedia > 0 && mediaType.includes('audio')) {
       rawText = await transcribeAudio(mediaUrl)
-      noteContent = await synthesizeNote(rawText)
       source = 'whatsapp_audio'
-    } else if (body) {
-      noteContent = await synthesizeNote(body)
-      source = 'whatsapp_text'
+    } else if (!body) {
+      return twimlResponse('Message reçu.')
+    }
+
+    // ── 3. Déterminer le senior cible ────────────────────────────────────────
+    let targetSenior = null
+
+    if (seniorRows.length === 1) {
+      // Un seul senior → direct
+      targetSenior = seniorRows[0]
     } else {
-      return twimlResponse('Message recu.')
+      // Plusieurs seniors → chercher le prénom dans le message
+      targetSenior = detectSeniorInText(rawText, seniorRows)
+
+      if (!targetSenior) {
+        // Aucun prénom trouvé → demander de préciser
+        const prenoms = seniorRows.map(r => r.name.split(' ')[0]).join(', ')
+        return twimlResponse(
+          `Pour quel senior est cette note ? Précisez le prénom dans votre message (${prenoms}).`
+        )
+      }
     }
 
-    const finalSeniorId = await findSeniorByName(rawText, seniorId)
+    // ── 4. Synthétiser et enregistrer la note ────────────────────────────────
+    const noteContent = await synthesizeNote(rawText)
 
-    if (noteContent) {
-      await supabase.from('notes').insert({
-        senior_id: finalSeniorId,
-        content: noteContent,
-        source: source,
-        intervenant_name: intervenantName + (intervenantRole ? ' · ' + intervenantRole : ''),
-        created_at: new Date().toISOString()
-      })
+    if (!noteContent) return twimlResponse('Message reçu.')
 
-      await analyzeForAlerts(rawText, finalSeniorId)
-    }
+    await supabase.from('notes').insert({
+      senior_id: targetSenior.senior_id,
+      content: noteContent,
+      source,
+      intervenant_name: senderName + (senderRole ? ' · ' + senderRole : ''),
+      created_at: new Date().toISOString()
+    })
 
-    return twimlResponse('Note recue. Merci ' + intervenantName + ' !')
+    await analyzeForAlerts(rawText, targetSenior.senior_id)
+
+    const prenomSenior = targetSenior.name?.split(' ')[0] || ''
+    return twimlResponse(
+      `Note enregistrée${prenomSenior ? ' pour ' + prenomSenior : ''}. Merci ${senderName} !`
+    )
 
   } catch (error) {
     console.error('Erreur webhook:', error.message)
-    return twimlResponse('Message recu.')
+    return twimlResponse('Message reçu.')
   }
 }
