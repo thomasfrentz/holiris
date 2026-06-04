@@ -16,11 +16,22 @@ const Section = ({ title, children }) => (
 )
 
 export default function Dashboard({ initialSenior, initialEvents, initialNotes, initialTotalNotes, initialAlertes, initialOrdonnances, supabaseUrl, supabaseKey }) {
-  const [events] = useState(initialEvents || [])
+  // ← On utilise les props directement, pas useState figé
+  const events = initialEvents || []
+  const ordonnances = initialOrdonnances || []
   const [notes, setNotes] = useState(initialNotes || [])
   const [totalNotes, setTotalNotes] = useState(initialTotalNotes || 0)
   const [alertes, setAlertes] = useState(initialAlertes || [])
-  const [ordonnances] = useState(initialOrdonnances || [])
+
+  // Resync notes/alertes quand le senior change
+  useEffect(() => {
+    setNotes(initialNotes || [])
+    setTotalNotes(initialTotalNotes || 0)
+  }, [initialNotes, initialTotalNotes])
+
+  useEffect(() => {
+    setAlertes(initialAlertes || [])
+  }, [initialAlertes])
 
   const now = new Date()
 
@@ -44,13 +55,36 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   const typeLabel = { care: 'Aide à domicile', kine: 'Kiné', medical: 'Médical', pharmacy: 'Pharmacie' }
 
+  // Realtime Supabase — filtré par senior
   useEffect(() => {
-    if (!supabaseUrl || !supabaseKey) return
+    if (!supabaseUrl || !supabaseKey || !initialSenior?.id) return
     const supabase = createClient(supabaseUrl, supabaseKey)
-    const ch1 = supabase.channel('db-notes').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notes' }, (p) => { setNotes(prev => [p.new, ...prev].slice(0, 3)); setTotalNotes(prev => prev + 1) }).subscribe()
-    const ch2 = supabase.channel('db-alertes').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alertes' }, (p) => { setAlertes(prev => [p.new, ...prev]) }).subscribe()
+
+    const ch1 = supabase.channel('db-notes-' + initialSenior.id)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notes',
+        filter: `senior_id=eq.${initialSenior.id}`
+      }, (p) => {
+        setNotes(prev => [p.new, ...prev].slice(0, 3))
+        setTotalNotes(prev => prev + 1)
+      })
+      .subscribe()
+
+    const ch2 = supabase.channel('db-alertes-' + initialSenior.id)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'alertes',
+        filter: `senior_id=eq.${initialSenior.id}`
+      }, (p) => {
+        setAlertes(prev => [p.new, ...prev])
+      })
+      .subscribe()
+
     return () => { ch1.unsubscribe(); ch2.unsubscribe() }
-  }, [supabaseUrl, supabaseKey])
+  }, [initialSenior?.id, supabaseUrl, supabaseKey])
 
   async function marquerLu(id) {
     if (String(id).startsWith('ordonnance-')) { setAlertes(prev => prev.filter(a => a.id !== id)); return }
@@ -134,7 +168,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       {/* KPIs 2x2 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 36 }}>
 
-        {/* Prochain RDV — détaillé */}
+        {/* Prochain RDV */}
         <div className="hl-card" style={{ padding: '20px 22px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>Prochain RDV</div>
           {prochainEvent ? (
@@ -143,14 +177,10 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                 {formatProchain(prochainEvent.scheduled_at)}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 500 }}>
-                  {prochainEvent.label}
-                </div>
+                <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 500 }}>{prochainEvent.label}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA' }}>
                   {new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  {prochainEvent.intervenants && (
-                    <span> · {prochainEvent.intervenants.name}</span>
-                  )}
+                  {prochainEvent.intervenants && <span> · {prochainEvent.intervenants.name}</span>}
                 </div>
                 {prochainEvent.type && (
                   <div style={{ marginTop: 4 }}>
@@ -167,7 +197,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
           )}
         </div>
 
-        {/* Dernier passage — détaillé */}
+        {/* Dernier passage */}
         <div className="hl-card" style={{ padding: '20px 22px' }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>Dernier passage</div>
           {dernierPassage ? (
@@ -176,16 +206,12 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                 {formatRelative(dernierPassage.scheduled_at)}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 500 }}>
-                  {dernierPassage.label}
-                </div>
+                <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 500 }}>{dernierPassage.label}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA' }}>
                   {new Date(dernierPassage.scheduled_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })}
                   {' · '}
                   {new Date(dernierPassage.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  {dernierPassage.intervenants && (
-                    <span> · {dernierPassage.intervenants.name}</span>
-                  )}
+                  {dernierPassage.intervenants && <span> · {dernierPassage.intervenants.name}</span>}
                 </div>
                 {dernierPassage.type && (
                   <div style={{ marginTop: 4 }}>
