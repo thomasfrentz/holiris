@@ -13,6 +13,9 @@ export default function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
   const [onglet, setOnglet] = useState('seniors')
+  const [bornes, setBornes] = useState([])
+  const [borneSenior, setBorneSenior] = useState('')
+  const [borneCreating, setBorneCreating] = useState(false)
   const [seniors, setSeniors] = useState([])
   const [utilisateurs, setUtilisateurs] = useState([])
   const [loading, setLoading] = useState(false)
@@ -42,6 +45,12 @@ export default function Admin() {
       age: s.date_naissance ? calculerAge(s.date_naissance) : s.age
     })))
     setUtilisateurs(data.utilisateurs || [])
+
+    const { data: bornesData } = await supabase
+      .from('bornes')
+      .select('*, seniors(name)')
+      .order('created_at', { ascending: false })
+    setBornes(bornesData || [])
   }
 
   async function toggleAdmin(familleId, currentValue) {
@@ -69,6 +78,22 @@ export default function Admin() {
     setShowForm(false)
     loadData()
     setLoading(false)
+  }
+
+  async function creerBorne() {
+    if (!borneSenior) return
+    setBorneCreating(true)
+    const code = 'BORNE-' + Math.random().toString(36).substring(2, 7).toUpperCase()
+    await supabase.from('bornes').insert({ senior_id: borneSenior, code })
+    setBorneSenior('')
+    loadData()
+    setBorneCreating(false)
+  }
+
+  async function supprimerBorne(id) {
+    if (!confirm('Supprimer cette borne ?')) return
+    await supabase.from('bornes').delete().eq('id', id)
+    setBornes(prev => prev.filter(b => b.id !== id))
   }
 
   function copyCode(code) {
@@ -120,7 +145,6 @@ export default function Admin() {
     <div style={{ minHeight: '100vh', background: '#F7F9F8', fontFamily: "'Inter', system-ui, sans-serif", color: '#1F2A24' }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap');`}</style>
 
-      {/* Header */}
       <header style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <svg width="30" height="30" viewBox="0 0 64 64" fill="none">
@@ -140,11 +164,11 @@ export default function Admin() {
         </div>
       </header>
 
-      {/* Onglets */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '0 32px', display: 'flex' }}>
         {[
           { key: 'seniors', label: 'Dossiers seniors' },
           { key: 'utilisateurs', label: 'Utilisateurs & Admins' },
+          { key: 'bornes', label: 'Bornes' },
         ].map(o => (
           <button key={o.key} onClick={() => setOnglet(o.key)} style={{
             background: 'none', border: 'none',
@@ -161,7 +185,6 @@ export default function Admin() {
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '36px 24px' }}>
 
-        {/* ── Onglet Seniors ── */}
         {onglet === 'seniors' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
@@ -256,7 +279,6 @@ export default function Admin() {
           </>
         )}
 
-        {/* ── Onglet Utilisateurs ── */}
         {onglet === 'utilisateurs' && (
           <>
             <div style={{ marginBottom: 28 }}>
@@ -276,14 +298,10 @@ export default function Admin() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{u.name || '—'}</div>
                       {u.is_admin && (
-                        <span style={{ background: '#EAF4EF', color: '#4A8870', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                          Admin
-                        </span>
+                        <span style={{ background: '#EAF4EF', color: '#4A8870', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Admin</span>
                       )}
                       {u.user_id && (
-                        <span style={{ background: '#F3EDF7', color: '#8B6FAA', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                          Compte actif
-                        </span>
+                        <span style={{ background: '#F3EDF7', color: '#8B6FAA', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Compte actif</span>
                       )}
                     </div>
                     <div style={{ fontSize: 12, color: '#9BB5AA' }}>
@@ -311,6 +329,65 @@ export default function Admin() {
             </div>
           </>
         )}
+
+        {onglet === 'bornes' && (
+          <>
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
+              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Bornes</h1>
+              <p style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>Tablettes placées au domicile du senior</p>
+            </div>
+
+            <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: 24, marginBottom: 24 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Créer une borne</div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Senior</label>
+                  <select value={borneSenior} onChange={e => setBorneSenior(e.target.value)} style={{ ...inputStyle }}>
+                    <option value="">Choisir un senior...</option>
+                    {seniors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <button onClick={creerBorne} disabled={borneCreating || !borneSenior}
+                  style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: !borneSenior ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                  {borneCreating ? 'Création...' : 'Créer la borne'}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {bornes.length === 0 ? (
+                <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 14, color: '#9BB5AA' }}>Aucune borne configurée.</div>
+                </div>
+              ) : bornes.map(b => (
+                <div key={b.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ fontSize: 28 }}>📱</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{b.seniors?.name}</div>
+                    <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>
+                      Créée le {new Date(b.created_at).toLocaleDateString('fr-FR')}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ background: '#EAF4EF', borderRadius: 6, padding: '6px 14px', fontSize: 14, fontWeight: 700, color: '#4A8870', letterSpacing: '0.1em', fontFamily: 'monospace' }}>
+                      {b.code}
+                    </div>
+                    <button onClick={() => copyCode(b.code)}
+                      style={{ background: copied === b.code ? '#EAF4EF' : '#7FAF9B', color: copied === b.code ? '#4A8870' : '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      {copied === b.code ? 'Copié ✓' : 'Copier'}
+                    </button>
+                    <button onClick={() => supprimerBorne(b.id)}
+                      style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 6, padding: '6px 10px', fontSize: 13, cursor: 'pointer' }}>
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   )
