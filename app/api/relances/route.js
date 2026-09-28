@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { escapeHtml, emailRelanceIntervenant, envoyerEnLots } from '@/lib/emails'
+import { escapeHtml, emailRelanceIntervenant, envoyerEnLots, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -115,6 +115,8 @@ async function relancerParEmail(events, depuis) {
     n.senior_id === intervenant.senior_id && n.intervenant_name.startsWith(intervenant.name)
   )
 
+  const desinscrits = await adressesDesinscrites(supabase)
+
   // Un seul email par adresse, listant les seniors concernés
   const parEmail = new Map()
   for (const event of events) {
@@ -122,6 +124,7 @@ async function relancerParEmail(events, depuis) {
     if (!intervenant?.email || intervenant.archived_at) continue
     if (aDonneDesNouvelles(intervenant)) continue
     const email = intervenant.email.toLowerCase()
+    if (desinscrits.has(email)) continue
     const entree = parEmail.get(email) || { prenom: intervenant.name.split(' ')[0], seniors: new Set() }
     if (event.seniors?.name) entree.seniors.add(event.seniors.name)
     parEmail.set(email, entree)
@@ -131,7 +134,8 @@ async function relancerParEmail(events, depuis) {
     from: 'Holiris <contact@holiris.fr>',
     to: email,
     subject: 'Des nouvelles de ' + [...e.seniors].join(', ') + ' ?',
-    html: emailRelanceIntervenant({ prenom: escapeHtml(e.prenom), seniorNames: [...e.seniors].map(escapeHtml) }),
+    headers: entetesDesinscription(email),
+    html: emailRelanceIntervenant({ prenom: escapeHtml(e.prenom), seniorNames: [...e.seniors].map(escapeHtml), desinscription: lienDesinscription(email).page }),
   }))
   return envoyerEnLots(resend, messages)
 }

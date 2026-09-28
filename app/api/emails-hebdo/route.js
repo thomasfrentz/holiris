@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
-import { escapeHtml, emailResumeFamille, emailNouveauCompte, envoyerEnLots } from '@/lib/emails'
+import { escapeHtml, emailResumeFamille, emailNouveauCompte, envoyerEnLots, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
 
 // Envois du dimanche : résumé de la semaine aux familles + rappel des invitations en attente
 
@@ -50,15 +50,16 @@ Rédige un seul paragraphe de 3 à 5 phrases, sans liste ni titre : le moral et 
 }
 
 // Résumé hebdomadaire aux proches ayant un compte actif
-async function resumesFamilles() {
-  const { data: proches } = await supabase
+async function resumesFamilles(desinscrits) {
+  const { data: tousProches } = await supabase
     .from('famille')
     .select('name, email, senior_id, seniors!famille_senior_id_fkey(name)')
     .not('user_id', 'is', null)
     .not('email', 'is', null)
     .not('senior_id', 'is', null)
     .is('archived_at', null)
-  if (!proches?.length) return 0
+  const proches = (tousProches || []).filter(p => !desinscrits.has(p.email.toLowerCase()))
+  if (!proches.length) return 0
 
   // Un résumé par senior, seulement s'il y a eu des notes cette semaine
   const depuis = new Date(Date.now() - 7 * JOUR).toISOString()
@@ -90,13 +91,14 @@ async function resumesFamilles() {
     from: 'Holiris <contact@holiris.fr>',
     to: email,
     subject: 'Les nouvelles de la semaine — ' + e.resumes.map(r => r.seniorName).join(', '),
-    html: emailResumeFamille({ prenom: escapeHtml(e.prenom), resumes: e.resumes }),
+    headers: entetesDesinscription(email),
+    html: emailResumeFamille({ prenom: escapeHtml(e.prenom), resumes: e.resumes, desinscription: lienDesinscription(email).page }),
   }))
   return envoyerEnLots(resend, messages)
 }
 
 // Rappel aux invités qui n'ont pas encore créé leur compte (pendant 30 jours)
-async function rappelsInvitations() {
+async function rappelsInvitations(desinscrits) {
   const maintenant = Date.now()
   const messages = []
 
@@ -114,9 +116,11 @@ async function rappelsInvitations() {
       .lte('created_at', new Date(maintenant - 3 * JOUR).toISOString())
 
     for (const m of data || []) {
+      if (desinscrits.has(m.email.toLowerCase())) continue
       messages.push({
         from: 'Holiris <contact@holiris.fr>',
         to: m.email,
+        headers: entetesDesinscription(m.email),
         subject: 'Rappel — Votre accès Holiris pour le suivi de ' + (m.seniors?.name || ''),
         html: emailNouveauCompte({
           prenom: escapeHtml(m.name?.split(' ')[0]),
@@ -126,6 +130,7 @@ async function rappelsInvitations() {
           email: m.email,
           type,
           relance: true,
+          desinscription: lienDesinscription(m.email).page,
         }),
       })
     }
@@ -140,8 +145,9 @@ export async function GET(request) {
   }
 
   try {
-    const resumes = await resumesFamilles()
-    const rappels = await rappelsInvitations()
+    const desinscrits = await adressesDesinscrites(supabase)
+    const resumes = await resumesFamilles(desinscrits)
+    const rappels = await rappelsInvitations(desinscrits)
     return NextResponse.json({ success: true, resumes_envoyes: resumes, rappels_envoyes: rappels })
   } catch (error) {
     console.error('Erreur emails hebdo:', error.message)
