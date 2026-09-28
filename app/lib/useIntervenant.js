@@ -36,6 +36,7 @@ export function useIntervenant() {
         .from('intervenants')
         .select('*, seniors!intervenants_senior_id_fkey(*)')
         .eq('user_id', user.id)
+        .is('archived_at', null)
 
       if (error || !intervenantsData?.length) { setLoading(false); return }
 
@@ -45,7 +46,7 @@ export function useIntervenant() {
       setIntervenants(intervenantsData)
       setIntervenantName(intervenantsData[0].name)
 
-      const saved = intervenantsData[0].selected_senior_id
+      const saved = intervenantsData.find(i => i.selected_senior_id)?.selected_senior_id
       const activeSeniorId = seniorIds.includes(saved) ? saved : seniorIds[0]
 
       setSelectedSeniorId(activeSeniorId)

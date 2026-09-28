@@ -49,11 +49,12 @@ export function useSenior() {
           .order('name')
         const enrichis = (allSeniors || []).map(enrichirSenior)
         setSeniors(enrichis)
-        const saved = familleData[0].selected_senior_id
+        const saved = familleData.find(f => f.selected_senior_id)?.selected_senior_id
         setSelectedSeniorId(saved || enrichis?.[0]?.id)
       } else {
         // Proche — charge tous les seniors liés à cet utilisateur
-        const seniorIds = familleData.map(f => f.senior_id).filter(Boolean)
+        // Un même compte peut être rattaché à plusieurs seniors (une ligne famille par senior)
+        const seniorIds = familleData.filter(f => !f.archived_at).map(f => f.senior_id).filter(Boolean)
 
         if (!seniorIds.length) { setLoading(false); return }
 
@@ -67,7 +68,7 @@ export function useSenior() {
         setSeniors(enrichis)
 
         // Utiliser selected_senior_id si disponible, sinon le premier
-        const saved = familleData[0].selected_senior_id
+        const saved = familleData.find(f => f.selected_senior_id)?.selected_senior_id
         const activeId = seniorIds.includes(saved) ? saved : seniorIds[0]
         setSelectedSeniorId(activeId)
       }

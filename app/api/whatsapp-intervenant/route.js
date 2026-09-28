@@ -51,12 +51,17 @@ export async function POST(request) {
     const phoneNumber = whatsapp.replace('+', '').replace(/\s/g, '')
 
     if (type === 'template') {
-      const code = generateCode()
-      const lien = `https://holiris.fr/activer?code=${code}`
-
+      // Réutiliser le code déjà envoyé par email pour ne pas l'invalider
+      let code = null
       if (intervenantId) {
-        await supabase.from('intervenants').update({ code_acces: code }).eq('id', intervenantId)
+        const { data } = await supabase.from('intervenants').select('code_acces').eq('id', intervenantId).single()
+        code = data?.code_acces || null
       }
+      if (!code) {
+        code = generateCode()
+        if (intervenantId) await supabase.from('intervenants').update({ code_acces: code }).eq('id', intervenantId)
+      }
+      const lien = `https://holiris.fr/activer?code=${code}`
 
       // Message 1 — lien d'activation
       await envoyerTemplate(phoneNumber, 'lien_holiris', [

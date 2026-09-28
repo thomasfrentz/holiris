@@ -11,6 +11,7 @@ function ActiverContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const code = searchParams.get('code')
+  const emailParam = searchParams.get('email')
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -59,7 +60,9 @@ function ActiverContent() {
   async function activer() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      router.push(`/login?signup=true&redirect=/activer?code=${code}`)
+      const email = emailParam || membre?.email || ''
+      const redirect = `/activer?code=${code}`
+      router.push(`/login?signup=true&email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirect)}`)
       return
     }
 
@@ -67,6 +70,14 @@ function ActiverContent() {
     await supabase.from(table)
       .update({ user_id: user.id })
       .eq('code_acces', code.toUpperCase())
+
+    // Rattacher aussi les autres seniors en attente pour ce même email
+    if (membre?.email) {
+      await supabase.from(table)
+        .update({ user_id: user.id })
+        .ilike('email', membre.email)
+        .is('user_id', null)
+    }
 
     setStatus('success')
     setTimeout(() => router.push(type === 'famille' ? '/app' : '/espace-intervenant'), 2000)
@@ -144,7 +155,7 @@ function ActiverContent() {
         </button>
 
         <div style={{ fontSize: 11, color: '#C8DDD4', marginTop: 16 }}>
-          Vous devrez créer un compte ou vous connecter
+          Pas encore de compte ? Vous serez invité(e) à le créer, puis votre accès sera activé.
         </div>
       </div>
     </div>

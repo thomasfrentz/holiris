@@ -24,6 +24,7 @@ function LoginContent() {
 
   useEffect(() => {
     if (searchParams.get('signup') === 'true') setIsSignup(true)
+    if (searchParams.get('email')) setEmail(searchParams.get('email'))
   }, [searchParams])
 
   function getRedirect() {

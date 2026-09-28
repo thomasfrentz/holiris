@@ -63,21 +63,38 @@ export default function Famille() {
   }
 
   async function inviteMembre() {
-    if (!prenom || !role) return
+    if (!prenom || !role || !email) return
     setSaving(true)
     const whatsapp = telephone ? telephone.replace(/\s/g, '').replace(/^0/, '+33') : null
+    const nomComplet = prenom + (nom ? ' ' + nom : '')
 
     const { data, error } = await supabase.from('famille').insert({
       senior_id: selectedSeniorId,
-      name: prenom + (nom ? ' ' + nom : ''),
+      name: nomComplet,
       role, phone: telephone || null, whatsapp,
-      email: email || null,
+      email: email.trim().toLowerCase(),
     }).select()
 
     if (!error && data) {
       let code = null
+      let linked = false
 
-      if (whatsapp) {
+      // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
+      try {
+        const res = await fetch('/api/invitation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'famille', id: data[0].id })
+        })
+        const result = await res.json()
+        linked = !!result.linked
+        code = result.code || null
+        if (result.success) setInviteSent(linked
+          ? nomComplet + ' (compte existant, espace ajouté à son compte)'
+          : nomComplet)
+      } catch (e) { console.error('Erreur email famille:', e) }
+
+      if (whatsapp && !linked) {
         try {
           const res = await fetch('/api/invite-famille', {
             method: 'POST',
@@ -85,33 +102,11 @@ export default function Famille() {
             body: JSON.stringify({ familleId: data[0].id, prenom, seniorName: selectedSenior?.name, whatsapp })
           })
           const result = await res.json()
-          if (result.success) {
-            setInviteSent(prenom + (nom ? ' ' + nom : ''))
-            code = result.code
-          }
+          if (result.code) code = result.code
         } catch (e) { console.error('Erreur invitation WA:', e) }
       }
 
-      if (email) {
-        try {
-          const res = await fetch('/api/invite-famille-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ familleId: data[0].id, email, prenom, role, seniorName: selectedSenior?.name })
-          })
-          const result = await res.json()
-          if (result.code) code = result.code
-        } catch (e) { console.error('Erreur email famille:', e) }
-      }
-
-      if (!whatsapp && !email && data[0]) {
-        // Générer un code sans envoyer
-        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-        await supabase.from('famille').update({ code_acces: newCode }).eq('id', data[0].id)
-        code = newCode
-      }
-
-      if (code) setCodeModal({ nom: prenom + (nom ? ' ' + nom : ''), code })
+      if (code) setCodeModal({ nom: nomComplet, code })
 
       const { data: updated } = await supabase
         .from('famille').select('*')
@@ -133,6 +128,30 @@ export default function Famille() {
       await supabase.from('famille').update({ code_acces: newCode }).eq('id', m.id)
       setCodeModal({ nom: m.name, code: newCode })
     }
+  }
+
+  async function renvoyerEmail(m) {
+    if (!m.email) return alert('Pas d\'email pour ce membre.')
+    try {
+      const res = await fetch('/api/invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'famille', id: m.id })
+      })
+      const result = await res.json()
+      if (result.success) {
+        alert(result.linked ? 'Compte existant : espace rattaché et email envoyé ✓' : 'Email renvoyé ✓')
+        if (result.linked) {
+          const { data: updated } = await supabase
+            .from('famille').select('*')
+            .eq('senior_id', selectedSeniorId)
+            .is('archived_at', null)
+            .order('created_at', { ascending: false })
+          setMembres(updated || [])
+        }
+      }
+      else alert('Erreur : ' + JSON.stringify(result.error))
+    } catch (e) { alert('Erreur réseau') }
   }
 
   async function renvoyerInvitation(m) {
@@ -212,6 +231,12 @@ export default function Famille() {
               <>
                 {!m.user_id && (
                   <>
+                    {m.email && (
+                      <button onClick={() => renvoyerEmail(m)}
+                        style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                        Renvoyer email
+                      </button>
+                    )}
                     <button onClick={() => renvoyerInvitation(m)}
                       style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                       Inviter WA
@@ -298,15 +323,15 @@ export default function Famille() {
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <input placeholder="Email (optionnel)" value={email} onChange={e => setEmail(e.target.value)}
+            <input type="email" placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Code d'accès envoyé par WhatsApp et/ou email · Affiché à l'écran si aucun contact
+              Lien d'accès envoyé par email (création de compte si besoin) · WhatsApp si renseigné
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={inviteMembre} disabled={saving || !prenom || !role}
-              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !role) ? 0.5 : 1 }}>
+            <button onClick={inviteMembre} disabled={saving || !prenom || !role || !email}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !role || !email) ? 0.5 : 1 }}>
               {saving ? 'Envoi...' : 'Inviter'}
             </button>
             <button onClick={resetForm}

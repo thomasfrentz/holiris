@@ -64,31 +64,35 @@ export default function Intervenants() {
   useEffect(() => { loadData() }, [selectedSeniorId])
 
   async function addIntervenant() {
-    if (!prenom || !nom || !role || !telephone) return
+    if (!prenom || !nom || !role || !telephone || !email) return
     setSaving(true)
     const whatsapp = telephone.replace(/\s/g, '').replace(/^0/, '+33')
 
     const { data, error } = await supabase.from('intervenants').insert({
       name: prenom + ' ' + nom, role, phone: telephone, whatsapp,
-      email: email || null, senior_id: selectedSeniorId
+      email: email.trim().toLowerCase(), senior_id: selectedSeniorId
     }).select()
 
     if (!error && data) {
       let code = null
+      let linked = false
 
-      if (email && data[0]) {
-        try {
-          const res = await fetch('/api/invite-intervenant-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ intervenantId: data[0].id, email, prenom, nom, role, seniorName: selectedSenior?.name })
-          })
-          const result = await res.json()
-          if (result.success) { setEmailSent(prenom + ' ' + nom); code = result.code }
-        } catch (e) { console.error('Erreur email:', e) }
-      }
+      // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
+      try {
+        const res = await fetch('/api/invitation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'intervenant', id: data[0].id })
+        })
+        const result = await res.json()
+        linked = !!result.linked
+        code = result.code || null
+        if (result.success) setEmailSent(linked
+          ? prenom + ' ' + nom + ' (compte existant, espace ajouté à son compte)'
+          : prenom + ' ' + nom)
+      } catch (e) { console.error('Erreur email:', e) }
 
-      if (whatsapp && data[0]) {
+      if (whatsapp && !linked) {
         try {
           const res = await fetch('/api/whatsapp-intervenant', {
             method: 'POST',
@@ -98,12 +102,6 @@ export default function Intervenants() {
           const result = await res.json()
           if (result.code) code = result.code
         } catch (e) { console.error('Erreur WA:', e) }
-      }
-
-      if (!email && !whatsapp && data[0]) {
-        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-        await supabase.from('intervenants').update({ code_acces: newCode }).eq('id', data[0].id)
-        code = newCode
       }
 
       if (code) setCodeModal({ nom: prenom + ' ' + nom, code })
@@ -124,6 +122,23 @@ export default function Intervenants() {
       await supabase.from('intervenants').update({ code_acces: newCode }).eq('id', i.id)
       setCodeModal({ nom: i.name, code: newCode })
     }
+  }
+
+  async function renvoyerEmail(i) {
+    if (!i.email) return alert('Pas d\'email pour cet intervenant.')
+    try {
+      const res = await fetch('/api/invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'intervenant', id: i.id })
+      })
+      const result = await res.json()
+      if (result.success) {
+        alert(result.linked ? 'Compte existant : espace rattaché et email envoyé ✓' : 'Email renvoyé ✓')
+        if (result.linked) loadData()
+      }
+      else alert('Erreur : ' + JSON.stringify(result.error))
+    } catch (e) { alert('Erreur réseau') }
   }
 
   async function renvoyerInvitation(i) {
@@ -281,15 +296,15 @@ export default function Intervenants() {
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <input placeholder="Email (optionnel)" value={email} onChange={e => setEmail(e.target.value)}
+            <input type="email" placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Code d'accès envoyé automatiquement par WhatsApp · Email si renseigné
+              Lien d'accès envoyé par email (création de compte si besoin) · Code aussi envoyé par WhatsApp
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone}
-              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !nom || !role || !telephone) ? 0.5 : 1 }}>
+            <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone || !email}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !nom || !role || !telephone || !email) ? 0.5 : 1 }}>
               {saving ? 'Ajout...' : 'Ajouter'}
             </button>
             <button onClick={() => setShowForm(false)}
@@ -325,6 +340,12 @@ export default function Intervenants() {
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 {!i.user_id && (
                   <>
+                    {i.email && (
+                      <button onClick={() => renvoyerEmail(i)}
+                        style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                        Renvoyer email
+                      </button>
+                    )}
                     <button onClick={() => renvoyerInvitation(i)}
                       style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                       Inviter WA
