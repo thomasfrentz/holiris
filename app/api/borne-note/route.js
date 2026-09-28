@@ -26,7 +26,7 @@ export async function POST(request) {
 
     try {
       const alertCheck = await groq.chat.completions.create({
-        model: 'llama3-8b-8192',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: 'Tu analyses des notes de soins à domicile. Réponds uniquement par JSON: {"alerte": true/false, "raison": "..."}. alerte=true si la note mentionne une chute, douleur intense, détresse, confusion, urgence médicale.' },
           { role: 'user', content: note }
