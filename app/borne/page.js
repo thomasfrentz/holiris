@@ -11,11 +11,13 @@ export default function Borne() {
   const [recording, setRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
   const [sending, setSending] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
   const [error, setError] = useState('')
   const [duration, setDuration] = useState(0)
   const [showInvite, setShowInvite] = useState(false)
   const [inviteNom, setInviteNom] = useState('')
   const [inviteRole, setInviteRole] = useState('')
+  const [noteProposee, setNoteProposee] = useState('')
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -73,6 +75,7 @@ export default function Borne() {
   function choisirPersonne(p) {
     setSelectedPersonne(p)
     setAudioBlob(null)
+    setNoteProposee('')
     setDuration(0)
     setStep('enregistrement')
   }
@@ -113,24 +116,49 @@ export default function Borne() {
     }
   }
 
-  async function envoyerNote() {
-    if (!audioBlob || !selectedPersonne) return
-    setSending(true)
+  async function transcrire() {
+    if (!audioBlob) return
+    setTranscribing(true)
+    setError('')
     try {
       const formData = new FormData()
       formData.append('audio', audioBlob, 'note.webm')
-      formData.append('intervenantId', selectedPersonne.id || '')
-      formData.append('intervenantName', selectedPersonne.name)
-      formData.append('intervenantRole', selectedPersonne.role || '')
-      formData.append('seniorId', borneInfo.senior_id)
+      const res = await fetch('/api/borne-transcribe', { method: 'POST', body: formData })
+      const result = await res.json()
+      if (result.success) {
+        setNoteProposee(result.note)
+        setStep('revision')
+      } else {
+        setError("Erreur lors de la transcription.")
+      }
+    } catch {
+      setError('Erreur réseau.')
+    }
+    setTranscribing(false)
+  }
 
-      const res = await fetch('/api/borne-note', { method: 'POST', body: formData })
+  async function envoyerNote() {
+    if (!noteProposee.trim() || !selectedPersonne) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/borne-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          note: noteProposee,
+          intervenantId: selectedPersonne.id || '',
+          intervenantName: selectedPersonne.name,
+          intervenantRole: selectedPersonne.role || '',
+          seniorId: borneInfo.senior_id
+        })
+      })
       const result = await res.json()
       if (result.success) {
         setStep('confirmation')
         setTimeout(() => {
           setSelectedPersonne(null)
           setAudioBlob(null)
+          setNoteProposee('')
           setDuration(0)
           setStep('accueil')
         }, 3000)
@@ -218,7 +246,6 @@ export default function Borne() {
             </button>
           ))}
 
-          {/* Bouton visiteur non enregistré */}
           {!showInvite ? (
             <button onClick={() => setShowInvite(true)}
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 8, padding: '16px 24px', cursor: 'pointer', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 4 }}>
@@ -226,20 +253,12 @@ export default function Borne() {
             </button>
           ) : (
             <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.25)', borderRadius: 8, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Qui êtes-vous ?</p>
-              <input
-                placeholder="Votre prénom et nom"
-                value={inviteNom}
-                onChange={e => setInviteNom(e.target.value)}
-                style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 4, color: '#FAFCFA', fontSize: 15, outline: 'none', fontFamily: 'inherit' }}
-              />
-              <input
-                placeholder="Votre rôle (ex: Médecin, Ami, Voisin...)"
-                value={inviteRole}
-                onChange={e => setInviteRole(e.target.value)}
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Qui êtes-vous ?</p>
+              <input placeholder="Votre prénom et nom" value={inviteNom} onChange={e => setInviteNom(e.target.value)}
+                style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 4, color: '#FAFCFA', fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
+              <input placeholder="Votre rôle (ex: Médecin, Ami, Voisin...)" value={inviteRole} onChange={e => setInviteRole(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && validerInvite()}
-                style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 4, color: '#FAFCFA', fontSize: 15, outline: 'none', fontFamily: 'inherit' }}
-              />
+                style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 4, color: '#FAFCFA', fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={validerInvite} disabled={!inviteNom.trim()}
                   style={{ flex: 1, background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '12px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: !inviteNom.trim() ? 0.5 : 1 }}>
@@ -286,18 +305,18 @@ export default function Borne() {
             </>
           ) : (
             <>
-              <div style={{ width: 100, height: 100, borderRadius: '50%', background: 'rgba(107,143,113,0.2)', border: '2px solid rgba(107,143,113,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>✅</div>
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(107,143,113,0.2)', border: '2px solid rgba(107,143,113,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>🎙</div>
               <div>
-                <p style={{ color: '#9AB89F', fontSize: 15, marginBottom: 4 }}>Enregistrement terminé</p>
-                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>{formatDuration(duration)}</p>
+                <p style={{ color: '#9AB89F', fontSize: 15, marginBottom: 4 }}>Enregistrement prêt · {formatDuration(duration)}</p>
+                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>L'IA va analyser votre message</p>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
-                <button onClick={envoyerNote} disabled={sending}
+                <button onClick={transcrire} disabled={transcribing}
                   style={{ background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '14px 32px', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
-                  {sending ? 'Envoi...' : 'Envoyer la note'}
+                  {transcribing ? '✨ Analyse en cours...' : '✨ Analyser et prévisualiser'}
                 </button>
                 <button onClick={() => { setAudioBlob(null); setDuration(0) }}
-                  style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '14px 24px', fontSize: 15, cursor: 'pointer' }}>
+                  style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '14px 20px', fontSize: 15, cursor: 'pointer' }}>
                   Recommencer
                 </button>
               </div>
@@ -308,6 +327,41 @@ export default function Borne() {
         <button onClick={() => setStep('accueil')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 13, cursor: 'pointer', marginTop: 40, textDecoration: 'underline' }}>
           ← Retour
         </button>
+      </div>
+    </div>
+  )
+
+  if (step === 'revision') return (
+    <div style={bg}>
+      <div style={{ width: '100%', maxWidth: 560 }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>Note proposée par l'IA</p>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 28, fontWeight: 300, color: '#FAFCFA' }}>{selectedPersonne?.name}</h2>
+        </div>
+
+        {error && <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 4, padding: '10px 14px', fontSize: 13, color: '#e0939a', marginBottom: 16 }}>{error}</div>}
+
+        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 8, padding: 24, marginBottom: 20 }}>
+          <p style={{ fontSize: 11, color: '#9AB89F', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>✨ Suggestion de l'assistant</p>
+          <textarea
+            value={noteProposee}
+            onChange={e => setNoteProposee(e.target.value)}
+            rows={4}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.2)', borderRadius: 4, padding: '12px 14px', color: '#FAFCFA', fontSize: 15, lineHeight: 1.6, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8 }}>Vous pouvez modifier ce texte avant de l'envoyer.</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={envoyerNote} disabled={sending || !noteProposee.trim()}
+            style={{ flex: 1, background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '16px 0', fontSize: 15, fontWeight: 500, cursor: 'pointer', opacity: !noteProposee.trim() ? 0.5 : 1 }}>
+            {sending ? 'Envoi...' : '✅ Envoyer la note'}
+          </button>
+          <button onClick={() => { setStep('enregistrement'); setAudioBlob(null); setDuration(0) }}
+            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '16px 20px', fontSize: 15, cursor: 'pointer' }}>
+            🎙 Ré-enregistrer
+          </button>
+        </div>
       </div>
     </div>
   )
