@@ -288,7 +288,7 @@ export default function Famille() {
             <input type="email" placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Lien d'accès envoyé par email (création de compte si besoin)
+              Lien d'accès envoyé par email (création de compte si besoin) · Avec le numéro WhatsApp, le proche peut aussi envoyer ses notes par WhatsApp
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>

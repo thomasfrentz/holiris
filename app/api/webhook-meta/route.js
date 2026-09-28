@@ -31,28 +31,32 @@ export async function POST(request) {
 
     console.log('Message reçu de:', from, 'type:', messageType)
 
-    // Chercher l'intervenant par numéro WhatsApp (une ligne par senior suivi)
-    const { data: intervenantData } = await supabase
-      .from('intervenants')
-      .select('*')
-      .or(`whatsapp.eq.+${from},whatsapp.eq.${from},phone.eq.+${from}`)
-      .is('archived_at', null)
+    // Chercher l'expéditeur par numéro WhatsApp : intervenants et proches (une ligne par senior suivi)
+    const filtreNumero = variantesNumero(from)
+      .flatMap(n => [`whatsapp.eq.${n}`, `phone.eq.${n}`])
+      .join(',')
+    const [{ data: intervenantData }, { data: familleData }] = await Promise.all([
+      supabase.from('intervenants').select('*').or(filtreNumero).is('archived_at', null),
+      supabase.from('famille').select('*').or(filtreNumero).is('archived_at', null).not('senior_id', 'is', null),
+    ])
+    const expediteurs = [
+      ...(intervenantData || []).map(l => ({ ...l, type: 'intervenant' })),
+      ...(familleData || []).map(l => ({ ...l, type: 'famille' })),
+    ]
 
-    console.log('Intervenant trouvé:', intervenantData?.length > 0 ? intervenantData[0].name : 'aucun')
+    console.log('Expéditeur trouvé:', expediteurs.length ? expediteurs[0].name + ' (' + expediteurs[0].type + ')' : 'aucun')
 
     // Numéro inconnu : on n'attribue pas la note à un senior au hasard
-    if (!intervenantData?.length) return NextResponse.json({ status: 'unknown sender' })
+    if (!expediteurs.length) return NextResponse.json({ status: 'unknown sender' })
 
     // Réponse aux boutons « Cette information est-elle essentielle ? »
     if (messageType === 'interactive' && message.interactive?.button_reply) {
-      await traiterReponseSignalement(from, message.interactive.button_reply.id, intervenantData)
+      await traiterReponseSignalement(from, message.interactive.button_reply.id, expediteurs)
       return NextResponse.json({ status: 'ok' })
     }
 
-    const intervenantName = intervenantData[0].name
-    const intervenantRole = intervenantData[0].role
-    const seniorIds = intervenantData.map(i => i.senior_id).filter(Boolean)
-    const selected = intervenantData.find(i => i.selected_senior_id)?.selected_senior_id
+    const seniorIds = [...new Set(expediteurs.map(e => e.senior_id).filter(Boolean))]
+    const selected = expediteurs.find(e => e.selected_senior_id)?.selected_senior_id
     const seniorId = seniorIds.includes(selected) ? selected : seniorIds[0]
 
     if (!seniorId) return NextResponse.json({ status: 'no senior' })
@@ -75,7 +79,10 @@ export async function POST(request) {
 
     if (noteContent) {
       const finalSeniorId = await findSeniorByName(rawText, seniorId, seniorIds)
-      const intervenant = intervenantData.find(i => i.senior_id === finalSeniorId) || intervenantData[0]
+      // Pour ce senior, le rôle d'intervenant prime si la personne est aussi un proche
+      const auteur = expediteurs.find(e => e.senior_id === finalSeniorId && e.type === 'intervenant')
+        || expediteurs.find(e => e.senior_id === finalSeniorId)
+        || expediteurs[0]
 
       // Filtre médical : seule la partie non médicale est enregistrée
       const result = await enregistrerNote({
@@ -83,12 +90,12 @@ export async function POST(request) {
         texte: noteContent,
         source,
         auteur: {
-          type: 'intervenant',
-          id: intervenant.id,
-          nom: intervenantName,
-          role: intervenantRole,
-          telephone: intervenant.phone || intervenant.whatsapp || '+' + from,
-          email: intervenant.email,
+          type: auteur.type,
+          id: auteur.id,
+          nom: auteur.name,
+          role: auteur.role,
+          telephone: auteur.phone || auteur.whatsapp || '+' + from,
+          email: auteur.email,
         },
       })
       console.log('Note créée pour senior:', finalSeniorId, result.medical ? '(information médicale retirée)' : '')
@@ -103,6 +110,17 @@ export async function POST(request) {
     console.error('Erreur webhook Meta:', error.message)
     return NextResponse.json({ status: 'error' }, { status: 500 })
   }
+}
+
+// WhatsApp transmet le numéro au format 33612345678 ; en base il peut être saisi
+// en +33612345678, 0612345678 ou 06 12 34 56 78
+function variantesNumero(from) {
+  const variantes = ['+' + from, from]
+  if (from.startsWith('33') && from.length === 11) {
+    const national = '0' + from.slice(2)
+    variantes.push(national, national.replace(/(\d{2})(?=\d)/g, '$1 '))
+  }
+  return variantes
 }
 
 async function transcribeMetaAudio(audioId) {
@@ -228,7 +246,7 @@ async function envoyerWhatsApp(to, payload) {
   if (!response.ok) console.error('Erreur envoi WhatsApp:', await response.text())
 }
 
-// L'intervenant vient d'écrire : on peut lui répondre librement (fenêtre de 24 h)
+// L'expéditeur vient d'écrire : on peut lui répondre librement (fenêtre de 24 h)
 async function demanderSiEssentiel(to, signalementId, notePartielle) {
   await envoyerWhatsApp(to, {
     type: 'interactive',
@@ -249,13 +267,13 @@ async function demanderSiEssentiel(to, signalementId, notePartielle) {
   })
 }
 
-async function traiterReponseSignalement(from, buttonId, intervenantData) {
+async function traiterReponseSignalement(from, buttonId, expediteurs) {
   const [action, signalementId] = String(buttonId).split(':')
   if (!signalementId || !['sig_oui', 'sig_non'].includes(action)) return
 
-  // Le signalement doit avoir été créé par cet intervenant
+  // Le signalement doit avoir été créé par cet expéditeur
   const { data: sig } = await supabase.from('signalements_medicaux').select('auteur_id').eq('id', signalementId).maybeSingle()
-  if (!sig || !intervenantData.some(i => i.id === sig.auteur_id)) return
+  if (!sig || !expediteurs.some(e => e.id === sig.auteur_id)) return
 
   const result = await repondreSignalement(signalementId, action === 'sig_oui')
   const texte = !result.ok
