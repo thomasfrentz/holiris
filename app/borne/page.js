@@ -29,12 +29,15 @@ export default function Borne() {
   )
 
   useEffect(() => {
-    const saved = localStorage.getItem('holiris_borne_code')
-    if (saved) loadBorne(saved)
-    else setStep('setup')
+    loadBorne(localStorage.getItem('holiris_borne_code'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chargement unique au montage
   }, [])
 
   async function loadBorne(code) {
+    if (!code) {
+      setStep('setup')
+      return
+    }
     setStep('loading')
     const { data: borne } = await supabase
       .from('bornes')
@@ -308,7 +311,7 @@ export default function Borne() {
               <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(107,143,113,0.2)', border: '2px solid rgba(107,143,113,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>🎙</div>
               <div>
                 <p style={{ color: '#9AB89F', fontSize: 15, marginBottom: 4 }}>Enregistrement prêt · {formatDuration(duration)}</p>
-                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>L'IA va analyser votre message</p>
+                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>L’IA va analyser votre message</p>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
                 <button onClick={transcrire} disabled={transcribing}
@@ -335,21 +338,21 @@ export default function Borne() {
     <div style={bg}>
       <div style={{ width: '100%', maxWidth: 560 }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>Note proposée par l'IA</p>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>Note proposée par l’IA</p>
           <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 28, fontWeight: 300, color: '#FAFCFA' }}>{selectedPersonne?.name}</h2>
         </div>
 
         {error && <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 4, padding: '10px 14px', fontSize: 13, color: '#e0939a', marginBottom: 16 }}>{error}</div>}
 
         <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 8, padding: 24, marginBottom: 20 }}>
-          <p style={{ fontSize: 11, color: '#9AB89F', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>✨ Suggestion de l'assistant</p>
+          <p style={{ fontSize: 11, color: '#9AB89F', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>✨ Suggestion de l’assistant</p>
           <textarea
             value={noteProposee}
             onChange={e => setNoteProposee(e.target.value)}
             rows={4}
             style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.2)', borderRadius: 4, padding: '12px 14px', color: '#FAFCFA', fontSize: 15, lineHeight: 1.6, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
           />
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8 }}>Vous pouvez modifier ce texte avant de l'envoyer.</p>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8 }}>Vous pouvez modifier ce texte avant de l’envoyer.</p>
         </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
@@ -372,7 +375,7 @@ export default function Borne() {
         <div style={{ fontSize: 72, marginBottom: 24 }}>✅</div>
         <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 300, color: '#FAFCFA', marginBottom: 12 }}>Note enregistrée</h2>
         <p style={{ color: '#9AB89F', fontSize: 15 }}>Merci {selectedPersonne?.name}</p>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 8 }}>Retour à l'accueil dans quelques secondes...</p>
+        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 8 }}>Retour à l’accueil dans quelques secondes...</p>
       </div>
     </div>
   )
