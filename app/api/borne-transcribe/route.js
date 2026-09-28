@@ -20,7 +20,7 @@ export async function POST(request) {
     const completion = await groq.chat.completions.create({
       model: 'llama-3.1-8b-instant',
       messages: [
-        { role: 'system', content: 'Tu es l\'assistant de Holiris, un outil de coordination de soins à domicile. Transforme ce message vocal en note clinique courte et naturelle en 1-2 phrases maximum. Conserve les informations importantes (constantes, état, actions réalisées). Commence directement par la note sans introduction.' },
+        { role: 'system', content: 'Tu es l\'assistant de Holiris. Transforme ce message vocal en note clinique courte en 1-2 phrases. Commence directement par la note.' },
         { role: 'user', content: rawText }
       ],
       max_tokens: 150
@@ -30,6 +30,10 @@ export async function POST(request) {
     return NextResponse.json({ success: true, note, rawText })
   } catch (err) {
     console.error('borne-transcribe error:', err)
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+    return NextResponse.json({ 
+      success: false, 
+      error: err.message,
+      details: JSON.stringify(err)
+    }, { status: 500 })
   }
 }
