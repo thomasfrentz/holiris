@@ -18,12 +18,13 @@ export async function POST(request) {
     const rawText = transcription.text
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
+      reasoning_effort: 'low',
       messages: [
         { role: 'system', content: 'Tu es l\'assistant de Holiris. Transforme ce message vocal en note clinique courte en 1-2 phrases. Commence directement par la note.' },
         { role: 'user', content: rawText }
       ],
-      max_tokens: 150
+      max_completion_tokens: 400
     })
 
     const note = completion.choices[0]?.message?.content || rawText

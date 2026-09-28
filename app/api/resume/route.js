@@ -16,8 +16,9 @@ export async function POST(request) {
       : 'Aucune alerte active.'
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      max_tokens: 1000,
+      model: 'openai/gpt-oss-20b',
+      reasoning_effort: 'low',
+      max_completion_tokens: 1300,
       messages: [
         {
           role: 'system',

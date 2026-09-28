@@ -8,12 +8,13 @@ export async function POST(request) {
     const { messages, context } = await request.json()
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
+      reasoning_effort: 'low',
       messages: [
         { role: 'system', content: context },
         ...messages
       ],
-      max_tokens: 500,
+      max_completion_tokens: 800,
     })
 
     const text = completion.choices[0]?.message?.content || 'Désolé je n\'ai pas pu répondre.'

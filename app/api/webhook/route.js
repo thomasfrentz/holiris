@@ -40,7 +40,8 @@ async function transcribeAudio(mediaUrl) {
 async function synthesizeNote(text) {
   try {
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
+      reasoning_effort: 'low',
       messages: [
         {
           role: 'system',
@@ -48,7 +49,7 @@ async function synthesizeNote(text) {
         },
         { role: 'user', content: text }
       ],
-      max_tokens: 150
+      max_completion_tokens: 450
     })
     return completion.choices[0]?.message?.content || text
   } catch {
@@ -74,7 +75,9 @@ function detectSeniorInText(text, seniors) {
 async function analyzeForAlerts(text, seniorId) {
   try {
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
+      reasoning_effort: 'low',
+      response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
@@ -99,7 +102,7 @@ Niveaux : "info", "warning", "danger".`
         },
         { role: 'user', content: text }
       ],
-      max_tokens: 150
+      max_completion_tokens: 450
     })
 
     const response = completion.choices[0]?.message?.content || '{}'

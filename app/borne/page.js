@@ -129,7 +129,7 @@ export default function Borne() {
         setNoteProposee(result.note)
         setStep('revision')
       } else {
-        setError("Erreur lors de la transcription.")
+        setError("Erreur lors de la transcription : " + (result.error || 'inconnue'))
       }
     } catch {
       setError('Erreur réseau.')

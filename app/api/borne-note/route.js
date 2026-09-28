@@ -26,12 +26,14 @@ export async function POST(request) {
 
     try {
       const alertCheck = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
+        reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: 'Tu analyses des notes de soins à domicile. Réponds uniquement par JSON: {"alerte": true/false, "raison": "..."}. alerte=true si la note mentionne une chute, douleur intense, détresse, confusion, urgence médicale.' },
           { role: 'user', content: note }
         ],
-        max_tokens: 80
+        max_completion_tokens: 400
       })
       const alertResult = JSON.parse(alertCheck.choices[0]?.message?.content || '{"alerte":false}')
       if (alertResult.alerte) {
