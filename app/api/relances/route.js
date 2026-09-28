@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
+import { escapeHtml, emailRelanceIntervenant, envoyerEnLots } from '@/lib/emails'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -84,14 +88,50 @@ export async function GET(request) {
       }
     }
 
+    const emailsEnvoyes = await relancerParEmail(events, ilYa7j)
+
     return NextResponse.json({
       success: true,
       relances: relancesEnvoyees,
-      intervenants_contactes: intervenantsVus.size
+      intervenants_contactes: intervenantsVus.size,
+      emails_envoyes: emailsEnvoyes
     })
 
   } catch (error) {
     console.error('Erreur relances:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+// Email aux intervenants passés cette semaine qui n'ont envoyé aucune note pour ce senior
+async function relancerParEmail(events, depuis) {
+  const { data: notes } = await supabase
+    .from('notes')
+    .select('senior_id, intervenant_name')
+    .gte('created_at', depuis.toISOString())
+    .not('intervenant_name', 'is', null)
+
+  const aDonneDesNouvelles = (intervenant) => (notes || []).some(n =>
+    n.senior_id === intervenant.senior_id && n.intervenant_name.startsWith(intervenant.name)
+  )
+
+  // Un seul email par adresse, listant les seniors concernés
+  const parEmail = new Map()
+  for (const event of events) {
+    const intervenant = event.intervenants
+    if (!intervenant?.email || intervenant.archived_at) continue
+    if (aDonneDesNouvelles(intervenant)) continue
+    const email = intervenant.email.toLowerCase()
+    const entree = parEmail.get(email) || { prenom: intervenant.name.split(' ')[0], seniors: new Set() }
+    if (event.seniors?.name) entree.seniors.add(event.seniors.name)
+    parEmail.set(email, entree)
+  }
+
+  const messages = [...parEmail].filter(([, e]) => e.seniors.size).map(([email, e]) => ({
+    from: 'Holiris <contact@holiris.fr>',
+    to: email,
+    subject: 'Des nouvelles de ' + [...e.seniors].join(', ') + ' ?',
+    html: emailRelanceIntervenant({ prenom: escapeHtml(e.prenom), seniorNames: [...e.seniors].map(escapeHtml) }),
+  }))
+  return envoyerEnLots(resend, messages)
 }
