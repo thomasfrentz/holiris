@@ -18,6 +18,7 @@ export default function Famille() {
   const [role, setRole] = useState('')
   const [telephone, setTelephone] = useState('')
   const [email, setEmail] = useState('')
+  const [pdcModifiee, setPdcModifiee] = useState({}) // seniorId -> familleId après désignation
 
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
@@ -126,6 +127,24 @@ export default function Famille() {
     } catch (e) { alert('Erreur réseau') }
   }
 
+  const personneConfianceId = selectedSeniorId in pdcModifiee
+    ? pdcModifiee[selectedSeniorId]
+    : selectedSenior?.personne_confiance_id
+
+  async function designerPersonneConfiance(familleId) {
+    if (!isAdmin) return
+    try {
+      const res = await fetch('/api/personne-confiance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seniorId: selectedSeniorId, familleId })
+      })
+      const result = await res.json()
+      if (result.success) setPdcModifiee(prev => ({ ...prev, [selectedSeniorId]: familleId }))
+      else alert('Erreur : ' + result.error)
+    } catch (e) { alert('Erreur réseau') }
+  }
+
   async function archiverMembre(id) {
     if (!isAdmin) return
     await supabase.from('famille').update({ archived_at: new Date().toISOString() }).eq('id', id)
@@ -162,7 +181,12 @@ export default function Famille() {
           👤
         </div>
         <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{m.name}</div>
+          <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {m.name}
+            {!archivé && m.id === personneConfianceId && (
+              <span style={{ fontSize: 11, fontWeight: 500, color: '#8B6FAA', background: '#F3EDF7', padding: '2px 10px', borderRadius: 20 }}>Personne de confiance</span>
+            )}
+          </div>
           <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{m.role}</div>
           <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {m.phone && <span>{m.phone}</span>}
@@ -197,6 +221,17 @@ export default function Famille() {
                     )}
                   </>
                 )}
+                {m.user_id && (m.id === personneConfianceId ? (
+                  <button onClick={() => designerPersonneConfiance(null)}
+                    style={{ background: '#F4F5F5', color: '#6F7C75', border: '1px solid #E8EFEB', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Retirer confiance
+                  </button>
+                ) : (
+                  <button onClick={() => designerPersonneConfiance(m.id)}
+                    style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                    Personne de confiance
+                  </button>
+                ))}
                 <button onClick={() => archiverMembre(m.id)}
                   style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Archiver
@@ -266,6 +301,12 @@ export default function Famille() {
               Annuler
             </button>
           </div>
+        </div>
+      )}
+
+      {isAdmin && !personneConfianceId && membres.length > 0 && (
+        <div style={{ background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#8B6FAA', lineHeight: 1.5 }}>
+          Aucune personne de confiance n&apos;est désignée pour {selectedSenior?.name}. En cas d&apos;information médicale essentielle, c&apos;est vous qui serez prévenu(e).
         </div>
       )}
 

@@ -18,6 +18,8 @@ export default function Borne() {
   const [inviteNom, setInviteNom] = useState('')
   const [inviteRole, setInviteRole] = useState('')
   const [noteProposee, setNoteProposee] = useState('')
+  const [signalement, setSignalement] = useState(null) // { id, notePartielle }
+  const [reponseMedicale, setReponseMedicale] = useState('')
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -150,21 +152,19 @@ export default function Borne() {
         body: JSON.stringify({
           note: noteProposee,
           intervenantId: selectedPersonne.id || '',
+          personneType: selectedPersonne.type || 'intervenant',
           intervenantName: selectedPersonne.name,
           intervenantRole: selectedPersonne.role || '',
           seniorId: borneInfo.senior_id
         })
       })
       const result = await res.json()
-      if (result.success) {
-        setStep('confirmation')
-        setTimeout(() => {
-          setSelectedPersonne(null)
-          setAudioBlob(null)
-          setNoteProposee('')
-          setDuration(0)
-          setStep('accueil')
-        }, 3000)
+      if (result.success && result.signalementId) {
+        // Information médicale retirée : demander si elle est essentielle
+        setSignalement({ id: result.signalementId, notePartielle: !!result.notePartielle })
+        setStep('medical')
+      } else if (result.success) {
+        terminer()
       } else {
         setError("Erreur lors de l'envoi.")
       }
@@ -172,6 +172,38 @@ export default function Borne() {
       setError('Erreur réseau.')
     }
     setSending(false)
+  }
+
+  function terminer() {
+    setStep('confirmation')
+    setTimeout(() => {
+      setSelectedPersonne(null)
+      setAudioBlob(null)
+      setNoteProposee('')
+      setDuration(0)
+      setSignalement(null)
+      setReponseMedicale('')
+      setStep('accueil')
+    }, 3000)
+  }
+
+  async function repondreMedical(essentiel) {
+    setSending(true)
+    try {
+      const res = await fetch('/api/signalement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: signalement.id, action: essentiel ? 'essentiel' : 'non_essentiel' })
+      })
+      const result = await res.json()
+      setReponseMedicale(!essentiel
+        ? 'L\'information n\'a pas été conservée.'
+        : (result.destinataire ? result.destinataire + ', personne de confiance,' : 'Un responsable Holiris') + ' vous contactera pour en savoir plus.')
+    } catch {
+      setReponseMedicale('')
+    }
+    setSending(false)
+    terminer()
   }
 
   function formatDuration(s) {
@@ -369,12 +401,38 @@ export default function Borne() {
     </div>
   )
 
+  if (step === 'medical') return (
+    <div style={bg}>
+      <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
+        <p style={{ fontSize: 11, color: '#E6B98A', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Information médicale</p>
+        <p style={{ color: '#FAFCFA', fontSize: 17, lineHeight: 1.6, marginBottom: 12 }}>
+          Votre note contient une information médicale. Pour protéger la personne suivie,
+          {signalement?.notePartielle ? ' cette partie n’a pas été enregistrée (le reste de la note a bien été publié).' : ' elle n’a pas été enregistrée.'}
+        </p>
+        <p style={{ color: '#9AB89F', fontSize: 15, lineHeight: 1.6, marginBottom: 32 }}>
+          Cette information est-elle essentielle ? Si oui, la personne de confiance vous contactera.
+        </p>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={() => repondreMedical(true)} disabled={sending}
+            style={{ flex: 1, background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '18px 0', fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>
+            Oui, essentielle
+          </button>
+          <button onClick={() => repondreMedical(false)} disabled={sending}
+            style={{ flex: 1, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '18px 0', fontSize: 16, cursor: 'pointer' }}>
+            Non
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (step === 'confirmation') return (
     <div style={bg}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 72, marginBottom: 24 }}>✅</div>
         <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 300, color: '#FAFCFA', marginBottom: 12 }}>Note enregistrée</h2>
         <p style={{ color: '#9AB89F', fontSize: 15 }}>Merci {selectedPersonne?.name}</p>
+        {reponseMedicale && <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 12, maxWidth: 420 }}>{reponseMedicale}</p>}
         <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 8 }}>Retour à l’accueil dans quelques secondes...</p>
       </div>
     </div>

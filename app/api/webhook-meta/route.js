@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
-import { createClient } from '@supabase/supabase-js'
+import { supabaseAdmin as supabase } from '@/lib/serveur'
+import { enregistrerNote, repondreSignalement } from '@/lib/notesMedicales'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
@@ -46,6 +43,12 @@ export async function POST(request) {
     // Numéro inconnu : on n'attribue pas la note à un senior au hasard
     if (!intervenantData?.length) return NextResponse.json({ status: 'unknown sender' })
 
+    // Réponse aux boutons « Cette information est-elle essentielle ? »
+    if (messageType === 'interactive' && message.interactive?.button_reply) {
+      await traiterReponseSignalement(from, message.interactive.button_reply.id, intervenantData)
+      return NextResponse.json({ status: 'ok' })
+    }
+
     const intervenantName = intervenantData[0].name
     const intervenantRole = intervenantData[0].role
     const seniorIds = intervenantData.map(i => i.senior_id).filter(Boolean)
@@ -72,19 +75,26 @@ export async function POST(request) {
 
     if (noteContent) {
       const finalSeniorId = await findSeniorByName(rawText, seniorId, seniorIds)
+      const intervenant = intervenantData.find(i => i.senior_id === finalSeniorId) || intervenantData[0]
 
-      const { error } = await supabase.from('notes').insert({
-        senior_id: finalSeniorId,
-        content: noteContent,
+      // Filtre médical : seule la partie non médicale est enregistrée
+      const result = await enregistrerNote({
+        seniorId: finalSeniorId,
+        texte: noteContent,
         source,
-        intervenant_name: intervenantName + (intervenantRole ? ' · ' + intervenantRole : ''),
-        created_at: new Date().toISOString()
+        auteur: {
+          type: 'intervenant',
+          id: intervenant.id,
+          nom: intervenantName,
+          role: intervenantRole,
+          telephone: intervenant.phone || intervenant.whatsapp || '+' + from,
+          email: intervenant.email,
+        },
       })
+      console.log('Note créée pour senior:', finalSeniorId, result.medical ? '(information médicale retirée)' : '')
 
-      if (error) console.error('Erreur insertion note:', error)
-      else console.log('Note créée pour senior:', finalSeniorId)
-
-      await analyzeForAlerts(rawText, finalSeniorId)
+      if (result.note) await analyzeForAlerts(result.note, finalSeniorId)
+      if (result.signalementId) await demanderSiEssentiel(from, result.signalementId, !!result.note)
     }
 
     return NextResponse.json({ status: 'ok' })
@@ -205,4 +215,53 @@ Niveaux : "info", "warning", "danger".`
   } catch (error) {
     console.error('Erreur analyse alertes:', error.message)
   }
+}
+async function envoyerWhatsApp(to, payload) {
+  const response = await fetch(
+    'https://graph.facebook.com/v18.0/' + process.env.META_PHONE_NUMBER_ID + '/messages',
+    {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + process.env.META_WHATSAPP_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, ...payload })
+    }
+  )
+  if (!response.ok) console.error('Erreur envoi WhatsApp:', await response.text())
+}
+
+// L'intervenant vient d'écrire : on peut lui répondre librement (fenêtre de 24 h)
+async function demanderSiEssentiel(to, signalementId, notePartielle) {
+  await envoyerWhatsApp(to, {
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: {
+        text: 'Merci pour votre message. Il contient une information médicale : pour protéger la personne suivie, '
+          + (notePartielle ? 'cette partie n\'a pas été enregistrée sur Holiris (le reste de votre note a bien été transmis).' : 'il n\'a pas été enregistré sur Holiris.')
+          + '\n\nCette information est-elle essentielle ? Si oui, la personne de confiance vous contactera pour en savoir plus.'
+      },
+      action: {
+        buttons: [
+          { type: 'reply', reply: { id: 'sig_oui:' + signalementId, title: 'Oui, essentielle' } },
+          { type: 'reply', reply: { id: 'sig_non:' + signalementId, title: 'Non' } },
+        ]
+      }
+    }
+  })
+}
+
+async function traiterReponseSignalement(from, buttonId, intervenantData) {
+  const [action, signalementId] = String(buttonId).split(':')
+  if (!signalementId || !['sig_oui', 'sig_non'].includes(action)) return
+
+  // Le signalement doit avoir été créé par cet intervenant
+  const { data: sig } = await supabase.from('signalements_medicaux').select('auteur_id').eq('id', signalementId).maybeSingle()
+  if (!sig || !intervenantData.some(i => i.id === sig.auteur_id)) return
+
+  const result = await repondreSignalement(signalementId, action === 'sig_oui')
+  const texte = !result.ok
+    ? 'Votre réponse a déjà été prise en compte. Merci !'
+    : action === 'sig_non'
+      ? 'Merci, c\'est noté. L\'information n\'a pas été conservée.'
+      : 'Merci. ' + (result.destinataire ? result.destinataire + ', personne de confiance,' : 'Un responsable Holiris') + ' va vous contacter pour en savoir plus.'
+  await envoyerWhatsApp(from, { type: 'text', text: { body: texte } })
 }

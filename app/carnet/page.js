@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
+import QuestionMedicale from '../components/QuestionMedicale'
 import { useSenior } from '../lib/useSenior'
 
 export default function Carnet() {
@@ -12,6 +13,7 @@ export default function Carnet() {
   const [showForm, setShowForm] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [questionMedicale, setQuestionMedicale] = useState(null)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
 
@@ -44,19 +46,21 @@ export default function Carnet() {
   async function addNote() {
     if (!newNote.trim()) return
     setSaving(true)
-    const authorName = famille?.name || famille?.email?.split('@')[0] || 'Famille'
-    const { data, error } = await supabase.from('notes').insert({
-      senior_id: selectedSeniorId,
-      content: newNote,
-      source: 'famille',
-      intervenant_name: authorName + (famille?.role ? ' · ' + famille.role : ''),
-      created_at: new Date().toISOString()
-    }).select()
-    if (!error && data) {
-      setNotes(prev => [data[0], ...prev])
-      setNewNote('')
-      setShowForm(false)
-    }
+    // Enregistrement côté serveur, avec filtre des informations médicales
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seniorId: selectedSeniorId, texte: newNote, source: 'famille' })
+      })
+      const result = await res.json()
+      if (result.success) {
+        if (result.note) setNotes(prev => [result.note, ...prev])
+        if (result.signalementId) setQuestionMedicale({ id: result.signalementId, notePartielle: !!result.note })
+        setNewNote('')
+        setShowForm(false)
+      }
+    } catch (e) { console.error('Erreur ajout note:', e) }
     setSaving(false)
   }
 
@@ -95,6 +99,10 @@ export default function Carnet() {
       switchSenior={switchSenior}
       isAdmin={isAdmin}
     >
+      {questionMedicale && (
+        <QuestionMedicale signalementId={questionMedicale.id} notePartielle={questionMedicale.notePartielle}
+          onClose={() => setQuestionMedicale(null)} />
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a' }}>📝 Carnet de suivi</h1>
         <button onClick={() => setShowForm(!showForm)}

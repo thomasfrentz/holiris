@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useIntervenant } from '../lib/useIntervenant'
+import QuestionMedicale from '../components/QuestionMedicale'
 
 export default function IntervenantDashboard() {
   const [notes, setNotes] = useState([])
@@ -13,6 +14,7 @@ export default function IntervenantDashboard() {
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [questionMedicale, setQuestionMedicale] = useState(null)
   const [resume, setResume] = useState('')
   const [resumeLoading, setResumeLoading] = useState(false)
 
@@ -69,11 +71,16 @@ export default function IntervenantDashboard() {
   async function addNote() {
     if (!newNote.trim()) return
     setSaving(true)
-    await supabase.from('notes').insert({
-      senior_id: selectedSeniorId, content: newNote,
-      source: 'intervenant', intervenant_name: intervenantName,
-      created_at: new Date().toISOString()
-    })
+    // Enregistrement côté serveur, avec filtre des informations médicales
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seniorId: selectedSeniorId, texte: newNote, source: 'intervenant' })
+      })
+      const result = await res.json()
+      if (result.signalementId) setQuestionMedicale({ id: result.signalementId, notePartielle: !!result.note })
+    } catch (e) { console.error('Erreur ajout note:', e) }
     setNewNote(''); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
     const unMoisAvant = new Date(); unMoisAvant.setMonth(unMoisAvant.getMonth() - 1)
@@ -135,6 +142,11 @@ export default function IntervenantDashboard() {
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif", background: '#F7F9F8', color: '#1F2A24' }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');`}</style>
+
+      {questionMedicale && (
+        <QuestionMedicale signalementId={questionMedicale.id} notePartielle={questionMedicale.notePartielle}
+          onClose={() => setQuestionMedicale(null)} />
+      )}
 
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '14px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>

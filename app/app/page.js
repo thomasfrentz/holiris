@@ -13,6 +13,7 @@ export default function App() {
   const [alertes, setAlertes] = useState([])
   const [ordonnances, setOrdonnances] = useState([])
   const [loading, setLoading] = useState(true)
+  const [aContacter, setAContacter] = useState([])
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
 
@@ -20,6 +21,24 @@ export default function App() {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
+
+  // Demandes de contact suite à une information médicale essentielle
+  useEffect(() => {
+    fetch('/api/signalement')
+      .then(res => res.ok ? res.json() : { signalements: [] })
+      .then(data => setAContacter(data.signalements || []))
+      .catch(() => {})
+  }, [])
+
+  async function marquerContacte(id) {
+    const res = await fetch('/api/signalement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: 'contacte' })
+    })
+    const result = await res.json()
+    if (result.success) setAContacter(prev => prev.filter(s => s.id !== id))
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -111,6 +130,35 @@ export default function App() {
       switchSenior={switchSenior}
       isAdmin={isAdmin}
     >
+      {aContacter.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #E0D0EC', borderLeft: '3px solid #8B6FAA', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#8B6FAA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>À contacter</div>
+          <div style={{ fontSize: 12, color: '#9BB5AA', marginBottom: 12, lineHeight: 1.5 }}>
+            Ces personnes ont une information médicale jugée essentielle. Elle n&apos;est pas enregistrée sur Holiris : appelez-les pour en savoir plus.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {aContacter.map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid #F3EDF7' }}>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#1F2A24' }}>
+                    {s.auteur_nom}{s.auteur_role ? ' · ' + s.auteur_role : ''}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6F7C75', marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <span>Suivi de {s.seniors?.name}</span>
+                    {s.auteur_telephone && <a href={'tel:' + s.auteur_telephone} style={{ color: '#4A8870' }}>{s.auteur_telephone}</a>}
+                    {s.auteur_email && <a href={'mailto:' + s.auteur_email} style={{ color: '#4A8870' }}>{s.auteur_email}</a>}
+                    <span style={{ color: '#9BB5AA' }}>{new Date(s.repondu_at).toLocaleDateString('fr-FR')}</span>
+                  </div>
+                </div>
+                <button onClick={() => marquerContacte(s.id)}
+                  style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                  C&apos;est fait ✓
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <Dashboard
         initialSenior={selectedSenior}
         initialEvents={events}
