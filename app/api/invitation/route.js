@@ -3,6 +3,7 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { randomBytes } from 'crypto'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const supabaseAdmin = createClient(
@@ -12,8 +13,8 @@ const supabaseAdmin = createClient(
 
 const SITE_URL = 'https://holiris.fr'
 
-function generateCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
+function generateToken() {
+  return randomBytes(24).toString('base64url')
 }
 
 function escapeHtml(str) {
@@ -81,8 +82,8 @@ const rappelIntervenant = `
   </div>
 `
 
-function emailNouveauCompte({ prenom, role, seniorName, code, email, type }) {
-  const lien = `${SITE_URL}/activer?code=${code}&email=${encodeURIComponent(email)}`
+function emailNouveauCompte({ prenom, role, seniorName, token, email, type }) {
+  const lien = `${SITE_URL}/rejoindre?token=${token}&type=${type}&email=${encodeURIComponent(email)}`
   return emailLayout(`
     <p style="font-size: 16px; color: #1E2820; margin-bottom: 16px;">Bonjour ${prenom} 👋</p>
     <p style="font-size: 14px; color: #555; line-height: 1.7; margin-bottom: 20px;">
@@ -93,10 +94,6 @@ function emailNouveauCompte({ prenom, role, seniorName, code, email, type }) {
       Votre accès sera activé automatiquement.
     </p>
     ${bouton(lien, 'Créer mon compte →')}
-    <div style="background: #f0f9f4; border: 1px solid #b8d8bc; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 24px;">
-      <p style="font-size: 12px; color: #5a8a6a; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px;">Votre code d'accès</p>
-      <p style="font-size: 32px; font-weight: bold; color: #12201a; letter-spacing: 0.2em; margin: 0;">${code}</p>
-    </div>
     ${type === 'intervenant' ? rappelIntervenant : ''}
   `)
 }
@@ -150,7 +147,7 @@ export async function POST(request) {
     if (existingUserId) {
       // Compte existant → rattachement direct au nouveau senior
       await supabaseAdmin.from(table)
-        .update({ email, user_id: existingUserId })
+        .update({ email, user_id: existingUserId, invite_token: null })
         .eq('id', id)
 
       const { error } = await resend.emails.send({
@@ -166,23 +163,23 @@ export async function POST(request) {
       return NextResponse.json({ success: true, linked: true })
     }
 
-    // Pas encore de compte → code + lien de création de compte
-    const code = membre.code_acces || generateCode()
+    // Pas encore de compte → lien de création de compte (le jeton prouve l'accès à la boîte mail)
+    const token = membre.invite_token || generateToken()
     await supabaseAdmin.from(table)
-      .update({ email, code_acces: code })
+      .update({ email, invite_token: token })
       .eq('id', id)
 
     const { error } = await resend.emails.send({
       from: 'Holiris <contact@holiris.fr>',
       to: email,
       subject: 'Votre accès Holiris — Suivi de ' + membre.seniors?.name,
-      html: emailNouveauCompte({ prenom, role, seniorName, code, email, type }),
+      html: emailNouveauCompte({ prenom, role, seniorName, token, email, type }),
     })
     if (error) {
       console.error('Erreur Resend:', error)
-      return NextResponse.json({ success: false, linked: false, code, error })
+      return NextResponse.json({ success: false, linked: false, error })
     }
-    return NextResponse.json({ success: true, linked: false, code })
+    return NextResponse.json({ success: true, linked: false })
 
   } catch (error) {
     console.error('Erreur invitation:', error.message)

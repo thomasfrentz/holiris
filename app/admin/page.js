@@ -58,21 +58,13 @@ export default function Admin() {
     loadData()
   }
 
-  function generateCode(name) {
-    const prefix = name.split(' ').pop().toUpperCase().slice(0, 4)
-    const year = new Date().getFullYear()
-    const random = Math.floor(Math.random() * 999).toString().padStart(3, '0')
-    return `${prefix}-${year}-${random}`
-  }
-
   async function createSenior() {
     if (!prenom || !nom || !dateNaissance || !city) return
     setLoading(true)
     const fullName = prenom + ' ' + nom
     const age = calculerAge(dateNaissance)
-    const invite_code = generateCode(fullName)
     await supabase.from('seniors').insert({
-      name: fullName, age, date_naissance: dateNaissance, city, status: 'stable', invite_code
+      name: fullName, age, date_naissance: dateNaissance, city, status: 'stable'
     })
     setPrenom(''); setNom(''); setDateNaissance(''); setCity('')
     setShowForm(false)
@@ -254,20 +246,6 @@ export default function Admin() {
                       </div>
                     )}
                   </div>
-                  {s.invite_code && (
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 10, color: '#9BB5AA', marginBottom: 6, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Code invitation</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ background: '#EAF4EF', borderRadius: 6, padding: '6px 12px', fontSize: 13, fontWeight: 600, color: '#4A8870', letterSpacing: '0.08em', fontFamily: 'monospace' }}>
-                          {s.invite_code}
-                        </div>
-                        <button onClick={() => copyCode(s.invite_code)}
-                          style={{ background: copied === s.invite_code ? '#EAF4EF' : '#7FAF9B', color: copied === s.invite_code ? '#4A8870' : '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                          {copied === s.invite_code ? 'Copié ✓' : 'Copier'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
               {seniors.length === 0 && (

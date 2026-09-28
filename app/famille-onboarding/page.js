@@ -4,8 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 
 export default function FamilleOnboarding() {
-  const [etape, setEtape] = useState('choix') // choix | code | creer_senior | creer_profil
-  const [code, setCode] = useState('')
+  const [etape, setEtape] = useState('choix') // choix | creer_senior | creer_profil
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -27,35 +26,6 @@ export default function FamilleOnboarding() {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
-
-  async function activateCode() {
-    if (!code.trim()) return
-    setLoading(true)
-    setError('')
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-
-    const { data: familleData } = await supabase
-      .from('famille').select('*')
-      .eq('code_acces', code.trim().toUpperCase()).limit(1)
-
-    if (!familleData?.length) {
-      setError('Code invalide. Vérifiez le message reçu.')
-      setLoading(false)
-      return
-    }
-
-    const famille = familleData[0]
-    if (famille.user_id && famille.user_id !== user.id) {
-      setError('Ce code a déjà été utilisé.')
-      setLoading(false)
-      return
-    }
-
-    await supabase.from('famille').update({ user_id: user.id }).eq('id', famille.id)
-    router.push('/app')
-  }
 
   async function creerSenior() {
     if (!seniorNom || !seniorPrenom || !seniorDateNaissance || !seniorVille) return
@@ -168,14 +138,9 @@ export default function FamilleOnboarding() {
           <button onClick={() => setEtape('creer_senior')} style={{ ...btnPrimary, marginTop: 0, padding: '16px 0' }}>
             Créer le dossier de mon proche
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1, height: 1, background: '#E8EFEB' }} />
-            <span style={{ fontSize: 11, color: '#C8DDD4', letterSpacing: '0.1em' }}>OU</span>
-            <div style={{ flex: 1, height: 1, background: '#E8EFEB' }} />
-          </div>
-          <button onClick={() => setEtape('code')} style={{ ...btnSecondary }}>
-            J'ai un code d'accès
-          </button>
+          <p style={{ fontSize: 12, color: '#9BB5AA', textAlign: 'center', lineHeight: 1.6, marginTop: 4 }}>
+            Invité(e) par un proche ? Cliquez sur le lien reçu par email pour accéder à son dossier.
+          </p>
         </div>
 
         <div style={{ marginTop: 24, textAlign: 'center' }}>
@@ -185,48 +150,6 @@ export default function FamilleOnboarding() {
     </div>
   )
 
-  // ── Étape 2 : code ──
-  if (etape === 'code') return (
-    <div style={containerStyle}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap');`}</style>
-      <div style={cardStyle}>
-        <Logo />
-        <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 400, color: '#1F2A24', textAlign: 'center', marginBottom: 8 }}>
-          Code d'accès
-        </h2>
-        <p style={{ fontSize: 13, color: '#9BB5AA', textAlign: 'center', lineHeight: 1.6, marginBottom: 28, fontWeight: 300 }}>
-          Entrez le code reçu par WhatsApp pour accéder au suivi de votre proche.
-        </p>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 11, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.15em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Code d'accès</label>
-          <input
-            placeholder="Ex: ABC123"
-            value={code}
-            onChange={e => setCode(e.target.value.toUpperCase())}
-            onKeyDown={e => e.key === 'Enter' && activateCode()}
-            style={{ ...inputStyle, fontFamily: 'monospace', letterSpacing: '0.2em', textAlign: 'center', fontSize: 16 }}
-          />
-        </div>
-
-        {error && (
-          <div style={{ background: '#FBECED', border: '1px solid #F2C4C8', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#C4606A', marginBottom: 16 }}>
-            {error}
-          </div>
-        )}
-
-        <button onClick={activateCode} disabled={loading || !code.trim()} style={btnPrimary}>
-          {loading ? 'Activation...' : 'Activer mon accès →'}
-        </button>
-
-        <div style={{ marginTop: 16, textAlign: 'center' }}>
-          <button onClick={() => { setEtape('choix'); setError('') }} style={{ background: 'none', border: 'none', color: '#9BB5AA', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-            ← Retour
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 
   // ── Étape 3 : créer senior ──
   if (etape === 'creer_senior') return (

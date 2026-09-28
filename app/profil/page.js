@@ -20,10 +20,7 @@ export default function Profil() {
 
   // Ajouter un senior
   const [showAddSenior, setShowAddSenior] = useState(false)
-  const [addMode, setAddMode] = useState(null) // 'code' | 'creer'
-  const [code, setCode] = useState('')
-  const [codeLoading, setCodeLoading] = useState(false)
-  const [codeError, setCodeError] = useState('')
+  const [addMode, setAddMode] = useState(null) // 'creer'
   const [seniorPrenom, setSeniorPrenom] = useState('')
   const [seniorNom, setSeniorNom] = useState('')
   const [seniorDate, setSeniorDate] = useState('')
@@ -76,47 +73,17 @@ export default function Profil() {
     setSaving(false)
   }
 
-  async function activerCode() {
-    if (!code.trim()) return
-    setCodeLoading(true)
-    setCodeError('')
-
-    const { data: familleData } = await supabase
-      .from('famille').select('*')
-      .eq('code_acces', code.trim().toUpperCase()).limit(1)
-
-    if (!familleData?.length) {
-      setCodeError('Code invalide.')
-      setCodeLoading(false)
-      return
-    }
-
-    const famille = familleData[0]
-    if (famille.user_id && famille.user_id !== user.id) {
-      setCodeError('Ce code a déjà été utilisé.')
-      setCodeLoading(false)
-      return
-    }
-
-    await supabase.from('famille').update({ user_id: user.id }).eq('id', famille.id)
-    setCode('')
-    setShowAddSenior(false)
-    setAddMode(null)
-    window.location.reload()
-  }
-
   async function creerSenior() {
     if (!seniorPrenom || !seniorNom || !seniorDate || !seniorVille || !seniorLien) return
     setCreateLoading(true)
 
     const age = Math.floor((new Date() - new Date(seniorDate)) / (365.25 * 24 * 60 * 60 * 1000))
-    const invite_code = seniorNom.toUpperCase().slice(0, 4) + '-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 999).toString().padStart(3, '0')
 
     const { data: senior, error } = await supabase
       .from('seniors').insert({
         name: seniorPrenom + ' ' + seniorNom,
         age, date_naissance: seniorDate, city: seniorVille,
-        status: 'stable', invite_code
+        status: 'stable'
       }).select().single()
 
     if (error) { setCreateLoading(false); return }
@@ -253,31 +220,12 @@ export default function Profil() {
                     style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
                     Créer un nouveau dossier
                   </button>
-                  <button onClick={() => setAddMode('code')}
-                    style={{ background: 'transparent', color: '#4A8870', border: '1.5px solid #7FAF9B', borderRadius: 8, padding: '11px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    J'ai un code d'accès
-                  </button>
+                  <div style={{ fontSize: 12, color: '#9BB5AA', textAlign: 'center', lineHeight: 1.5 }}>
+                    Invité(e) par un proche ? Cliquez sur le lien reçu par email.
+                  </div>
                   <button onClick={() => { setShowAddSenior(false); setAddMode(null) }}
                     style={{ background: 'none', border: 'none', color: '#9BB5AA', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 }}>
                     Annuler
-                  </button>
-                </div>
-              </>
-            ) : addMode === 'code' ? (
-              <>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>Code d'accès</div>
-                <input placeholder="Ex: ABC123" value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-                  onKeyDown={e => e.key === 'Enter' && activerCode()}
-                  style={{ ...inputStyle, fontFamily: 'monospace', letterSpacing: '0.2em', textAlign: 'center', marginBottom: 8 }} />
-                {codeError && <div style={{ fontSize: 12, color: '#D98992', marginBottom: 8 }}>{codeError}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={activerCode} disabled={codeLoading || !code.trim()}
-                    style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flex: 1 }}>
-                    {codeLoading ? '...' : 'Activer'}
-                  </button>
-                  <button onClick={() => { setAddMode(null); setCode(''); setCodeError('') }}
-                    style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    ←
                   </button>
                 </div>
               </>

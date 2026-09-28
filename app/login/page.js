@@ -225,12 +225,6 @@ function LoginContent() {
               </button>
             </div>
 
-            <div style={{ textAlign: 'center' }}>
-              <a href="/famille-onboarding"
-                style={{ fontSize: 12, color: 'rgba(154,184,159,0.6)', textDecoration: 'none' }}>
-                J'ai un code d'accès famille →
-              </a>
-            </div>
           </div>
         )}
 

@@ -12,7 +12,8 @@ function RejoindreContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
-  const typeParam = searchParams.get('type') // 'famille' ou null (intervenant)
+  const typeParam = searchParams.get('type') // 'famille' ou 'intervenant'
+  const emailParam = searchParams.get('email')
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -45,7 +46,9 @@ function RejoindreContent() {
   async function activer() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      router.push('/login?signup=true&redirect=/rejoindre?token=' + token + (typeParam ? '&type=' + typeParam : ''))
+      const email = emailParam || membre?.email || ''
+      const redirect = '/rejoindre?token=' + token + (typeParam ? '&type=' + typeParam : '')
+      router.push(`/login?signup=true&email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirect)}`)
       return
     }
 
@@ -53,6 +56,14 @@ function RejoindreContent() {
     await supabase.from(table)
       .update({ user_id: user.id, invite_token: null })
       .eq('invite_token', token)
+
+    // Rattacher aussi les autres seniors en attente pour ce même email
+    if (membre?.email) {
+      await supabase.from(table)
+        .update({ user_id: user.id, invite_token: null })
+        .ilike('email', membre.email)
+        .is('user_id', null)
+    }
 
     setStatus('success')
     setTimeout(() => router.push(typeParam === 'famille' ? '/app' : '/espace-intervenant'), 2000)
@@ -118,7 +129,7 @@ function RejoindreContent() {
         </button>
 
         <div style={{ fontSize: 11, color: '#C8DDD4', marginTop: 16 }}>
-          Vous devrez créer un compte ou vous connecter
+          Pas encore de compte ? Vous serez invité(e) à le créer, puis votre accès sera activé.
         </div>
       </div>
     </div>

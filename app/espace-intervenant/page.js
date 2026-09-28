@@ -13,11 +13,6 @@ export default function IntervenantDashboard() {
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [showCodeInput, setShowCodeInput] = useState(false)
-  const [newCode, setNewCode] = useState('')
-  const [codeLoading, setCodeLoading] = useState(false)
-  const [codeError, setCodeError] = useState('')
-  const [codeSuccess, setCodeSuccess] = useState(false)
   const [resume, setResume] = useState('')
   const [resumeLoading, setResumeLoading] = useState(false)
 
@@ -87,22 +82,6 @@ export default function IntervenantDashboard() {
     setSaving(false)
   }
 
-  async function activateCode() {
-    if (!newCode.trim()) return
-    setCodeLoading(true); setCodeError('')
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: intervenantData } = await supabase.from('intervenants').select('*').eq('code_acces', newCode.trim().toUpperCase()).limit(1)
-
-    if (!intervenantData?.length) { setCodeError('Code invalide.'); setCodeLoading(false); return }
-    const intervenant = intervenantData[0]
-    if (intervenant.user_id && intervenant.user_id !== user.id) { setCodeError('Ce code a déjà été utilisé.'); setCodeLoading(false); return }
-
-    await supabase.from('intervenants').update({ user_id: user.id }).eq('id', intervenant.id)
-    if (intervenant.email) await supabase.from('intervenants').update({ user_id: user.id }).eq('email', intervenant.email)
-    setCodeSuccess(true)
-    setTimeout(() => window.location.reload(), 1500)
-  }
-
   async function logout() {
     await supabase.auth.signOut()
     window.location.href = '/'
@@ -135,12 +114,9 @@ export default function IntervenantDashboard() {
         </svg>
         <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 400, color: '#1F2A24', marginBottom: 12 }}>Activez votre compte</h2>
         <p style={{ fontSize: 14, color: '#6F7C75', lineHeight: 1.7, marginBottom: 28, fontWeight: 300 }}>
-          Vous avez reçu un code d'accès par email pour activer votre espace intervenant.
+          Cliquez sur le lien reçu par email pour activer votre espace intervenant.
+          Pensez à vérifier vos courriers indésirables.
         </p>
-        <button onClick={() => router.push('/espace-intervenant/onboarding')}
-          style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '13px 32px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
-          Entrer mon code d'accès →
-        </button>
         <div style={{ marginTop: 16 }}>
           <button onClick={logout} style={{ background: 'none', border: 'none', color: '#9BB5AA', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', fontFamily: "'Inter', sans-serif" }}>
             Se déconnecter
@@ -207,27 +183,6 @@ export default function IntervenantDashboard() {
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 500, color: '#1F2A24' }}>{selectedSenior?.name}</div>
               <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{selectedSenior?.age} ans · {selectedSenior?.city}</div>
-            </div>
-          )}
-          {!showCodeInput ? (
-            <button onClick={() => setShowCodeInput(true)}
-              style={{ background: 'none', border: '1px dashed #C8DDD4', borderRadius: 8, padding: '8px 16px', fontSize: 12, color: '#9BB5AA', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>
-              + Ajouter un senior avec un code
-            </button>
-          ) : (
-            <div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input placeholder="Code d'accès" value={newCode} onChange={e => setNewCode(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && activateCode()}
-                  style={{ flex: 1, padding: '9px 12px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'monospace', letterSpacing: '0.15em' }} />
-                <button onClick={activateCode} disabled={codeLoading || !newCode.trim()}
-                  style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {codeLoading ? '...' : 'Activer'}
-                </button>
-                <button onClick={() => { setShowCodeInput(false); setNewCode(''); setCodeError('') }}
-                  style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
-              </div>
-              {codeError && <div style={{ fontSize: 12, color: '#D98992', marginTop: 6 }}>{codeError}</div>}
-              {codeSuccess && <div style={{ fontSize: 12, color: '#4A8870', marginTop: 6 }}>Senior ajouté — rechargement...</div>}
             </div>
           )}
         </div>

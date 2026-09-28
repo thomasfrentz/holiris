@@ -13,7 +13,6 @@ export default function Intervenants() {
   const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [emailSent, setEmailSent] = useState(null)
-  const [codeModal, setCodeModal] = useState(null)
   const [messageModal, setMessageModal] = useState(null)
   const [messageTexte, setMessageTexte] = useState('')
   const [messageSending, setMessageSending] = useState(false)
@@ -74,7 +73,6 @@ export default function Intervenants() {
     }).select()
 
     if (!error && data) {
-      let code = null
 
       // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
       try {
@@ -84,13 +82,11 @@ export default function Intervenants() {
           body: JSON.stringify({ type: 'intervenant', id: data[0].id })
         })
         const result = await res.json()
-        code = result.code || null
         if (result.success) setEmailSent(result.linked
           ? prenom + ' ' + nom + ' (compte existant, espace ajouté à son compte)'
           : prenom + ' ' + nom)
       } catch (e) { console.error('Erreur email:', e) }
 
-      if (code) setCodeModal({ nom: prenom + ' ' + nom, code })
 
       setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
       setShowForm(false)
@@ -98,16 +94,6 @@ export default function Intervenants() {
       loadData()
     }
     setSaving(false)
-  }
-
-  async function afficherCode(i) {
-    if (i.code_acces) {
-      setCodeModal({ nom: i.name, code: i.code_acces })
-    } else {
-      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-      await supabase.from('intervenants').update({ code_acces: newCode }).eq('id', i.id)
-      setCodeModal({ nom: i.name, code: newCode })
-    }
   }
 
   async function renvoyerEmail(i) {
@@ -173,29 +159,6 @@ export default function Intervenants() {
   return (
     <Layout senior={selectedSenior} seniors={seniors} selectedSeniorId={selectedSeniorId} switchSenior={switchSenior} isAdmin={isAdmin}>
 
-      {/* Modal code */}
-      {codeModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 400, boxShadow: '0 8px 40px rgba(0,0,0,0.15)', textAlign: 'center' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>Code d'accès</div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 500, color: '#1F2A24', marginBottom: 20 }}>
-              {codeModal.nom}
-            </div>
-            <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 12, padding: '20px 24px', marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: '#7FAF9B', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>Code d'accès</div>
-              <div style={{ fontFamily: 'monospace', fontSize: 32, fontWeight: 700, color: '#1F2A24', letterSpacing: '0.2em' }}>{codeModal.code}</div>
-            </div>
-            <div style={{ fontSize: 12, color: '#9BB5AA', marginBottom: 20 }}>
-              Partagez ce code avec {codeModal.nom.split(' ')[0]}.<br/>
-              Il devra créer un compte sur holiris.fr puis entrer ce code.
-            </div>
-            <button onClick={() => setCodeModal(null)}
-              style={{ width: '100%', background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Modal message libre */}
       {messageModal && (
@@ -318,10 +281,6 @@ export default function Intervenants() {
                         Renvoyer email
                       </button>
                     )}
-                    <button onClick={() => afficherCode(i)}
-                      style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                      Voir code
-                    </button>
                   </>
                 )}
                 <button onClick={() => { setMessageModal(i); setMessageTexte(''); setMessageResult(null) }}
