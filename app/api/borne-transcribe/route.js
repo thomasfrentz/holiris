@@ -30,10 +30,6 @@ export async function POST(request) {
     return NextResponse.json({ success: true, note, rawText })
   } catch (err) {
     console.error('borne-transcribe error:', err)
-    return NextResponse.json({ 
-      success: false, 
-      error: err.message,
-      details: JSON.stringify(err)
-    }, { status: 500 })
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
   }
 }
