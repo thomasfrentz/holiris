@@ -12,7 +12,7 @@ export async function POST(request) {
 
     const transcription = await groq.audio.transcriptions.create({
       file: audioFile,
-      model: 'whisper-large-v3',
+      model: 'whisper-large-v3-turbo',
       language: 'fr'
     })
     const rawText = transcription.text
