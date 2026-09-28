@@ -77,7 +77,6 @@ export default function Famille() {
 
     if (!error && data) {
       let code = null
-      let linked = false
 
       // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
       try {
@@ -87,24 +86,11 @@ export default function Famille() {
           body: JSON.stringify({ type: 'famille', id: data[0].id })
         })
         const result = await res.json()
-        linked = !!result.linked
         code = result.code || null
-        if (result.success) setInviteSent(linked
+        if (result.success) setInviteSent(result.linked
           ? nomComplet + ' (compte existant, espace ajouté à son compte)'
           : nomComplet)
       } catch (e) { console.error('Erreur email famille:', e) }
-
-      if (whatsapp && !linked) {
-        try {
-          const res = await fetch('/api/invite-famille', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ familleId: data[0].id, prenom, seniorName: selectedSenior?.name, whatsapp })
-          })
-          const result = await res.json()
-          if (result.code) code = result.code
-        } catch (e) { console.error('Erreur invitation WA:', e) }
-      }
 
       if (code) setCodeModal({ nom: nomComplet, code })
 
@@ -150,20 +136,6 @@ export default function Famille() {
           setMembres(updated || [])
         }
       }
-      else alert('Erreur : ' + JSON.stringify(result.error))
-    } catch (e) { alert('Erreur réseau') }
-  }
-
-  async function renvoyerInvitation(m) {
-    if (!m.whatsapp) return alert('Pas de numéro WhatsApp pour ce membre.')
-    try {
-      const res = await fetch('/api/invite-famille', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familleId: m.id, prenom: m.name.split(' ')[0], seniorName: selectedSenior?.name, whatsapp: m.whatsapp })
-      })
-      const result = await res.json()
-      if (result.success) alert('Invitation renvoyée ✓')
       else alert('Erreur : ' + JSON.stringify(result.error))
     } catch (e) { alert('Erreur réseau') }
   }
@@ -237,10 +209,6 @@ export default function Famille() {
                         Renvoyer email
                       </button>
                     )}
-                    <button onClick={() => renvoyerInvitation(m)}
-                      style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                      Inviter WA
-                    </button>
                     <button onClick={() => afficherCode(m)}
                       style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                       Voir code
@@ -319,14 +287,14 @@ export default function Famille() {
               <option value="">Lien avec le senior *</option>
               {roles.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <input placeholder="WhatsApp (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
+            <input placeholder="WhatsApp (optionnel)" value={telephone} onChange={e => setTelephone(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ marginBottom: 16 }}>
             <input type="email" placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Lien d'accès envoyé par email (création de compte si besoin) · WhatsApp si renseigné
+              Lien d'accès envoyé par email (création de compte si besoin)
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>

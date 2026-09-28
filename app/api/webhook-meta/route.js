@@ -34,27 +34,23 @@ export async function POST(request) {
 
     console.log('Message reçu de:', from, 'type:', messageType)
 
-    // Chercher l'intervenant par numéro WhatsApp
+    // Chercher l'intervenant par numéro WhatsApp (une ligne par senior suivi)
     const { data: intervenantData } = await supabase
       .from('intervenants')
       .select('*')
       .or(`whatsapp.eq.+${from},whatsapp.eq.${from},phone.eq.+${from}`)
-      .limit(1)
+      .is('archived_at', null)
 
     console.log('Intervenant trouvé:', intervenantData?.length > 0 ? intervenantData[0].name : 'aucun')
 
-    let seniorId = null
-    let intervenantName = 'Intervenant inconnu'
-    let intervenantRole = ''
+    // Numéro inconnu : on n'attribue pas la note à un senior au hasard
+    if (!intervenantData?.length) return NextResponse.json({ status: 'unknown sender' })
 
-    if (intervenantData?.length > 0) {
-      seniorId = intervenantData[0].senior_id
-      intervenantName = intervenantData[0].name
-      intervenantRole = intervenantData[0].role
-    } else {
-      const { data: seniors } = await supabase.from('seniors').select('id').limit(1)
-      seniorId = seniors?.[0]?.id
-    }
+    const intervenantName = intervenantData[0].name
+    const intervenantRole = intervenantData[0].role
+    const seniorIds = intervenantData.map(i => i.senior_id).filter(Boolean)
+    const selected = intervenantData.find(i => i.selected_senior_id)?.selected_senior_id
+    const seniorId = seniorIds.includes(selected) ? selected : seniorIds[0]
 
     if (!seniorId) return NextResponse.json({ status: 'no senior' })
 
@@ -75,7 +71,7 @@ export async function POST(request) {
     console.log('Note à créer:', noteContent)
 
     if (noteContent) {
-      const finalSeniorId = await findSeniorByName(rawText, seniorId)
+      const finalSeniorId = await findSeniorByName(rawText, seniorId, seniorIds)
 
       const { error } = await supabase.from('notes').insert({
         senior_id: finalSeniorId,
@@ -138,8 +134,10 @@ async function synthesizeNote(text) {
   }
 }
 
-async function findSeniorByName(text, fallbackSeniorId) {
-  const { data: seniors } = await supabase.from('seniors').select('id, name')
+// Cherche le senior cité dans le message, parmi ceux suivis par cet intervenant uniquement
+async function findSeniorByName(text, fallbackSeniorId, seniorIds) {
+  if (seniorIds.length <= 1) return fallbackSeniorId
+  const { data: seniors } = await supabase.from('seniors').select('id, name').in('id', seniorIds)
   if (!seniors?.length) return fallbackSeniorId
 
   const textLower = text.toLowerCase()

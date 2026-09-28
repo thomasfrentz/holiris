@@ -75,7 +75,6 @@ export default function Intervenants() {
 
     if (!error && data) {
       let code = null
-      let linked = false
 
       // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
       try {
@@ -85,24 +84,11 @@ export default function Intervenants() {
           body: JSON.stringify({ type: 'intervenant', id: data[0].id })
         })
         const result = await res.json()
-        linked = !!result.linked
         code = result.code || null
-        if (result.success) setEmailSent(linked
+        if (result.success) setEmailSent(result.linked
           ? prenom + ' ' + nom + ' (compte existant, espace ajouté à son compte)'
           : prenom + ' ' + nom)
       } catch (e) { console.error('Erreur email:', e) }
-
-      if (whatsapp && !linked) {
-        try {
-          const res = await fetch('/api/whatsapp-intervenant', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ whatsapp, prenom, seniorName: selectedSenior?.name, type: 'template', intervenantId: data[0].id })
-          })
-          const result = await res.json()
-          if (result.code) code = result.code
-        } catch (e) { console.error('Erreur WA:', e) }
-      }
 
       if (code) setCodeModal({ nom: prenom + ' ' + nom, code })
 
@@ -141,20 +127,6 @@ export default function Intervenants() {
     } catch (e) { alert('Erreur réseau') }
   }
 
-  async function renvoyerInvitation(i) {
-    if (!i.whatsapp) return alert('Pas de numéro WhatsApp.')
-    try {
-      const res = await fetch('/api/whatsapp-intervenant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsapp: i.whatsapp, prenom: i.name.split(' ')[0], seniorName: selectedSenior?.name, type: 'template', intervenantId: i.id })
-      })
-      const data = await res.json()
-      if (data.success) alert('Invitation renvoyée ✓')
-      else alert('Erreur : ' + JSON.stringify(data.error))
-    } catch (e) { alert('Erreur réseau') }
-  }
-
   async function envoyerMessageLibre() {
     if (!messageTexte.trim() || !messageModal) return
     setMessageSending(true)
@@ -163,7 +135,7 @@ export default function Intervenants() {
       const res = await fetch('/api/whatsapp-intervenant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsapp: messageModal.whatsapp, type: 'libre', message: messageTexte })
+        body: JSON.stringify({ whatsapp: messageModal.whatsapp, message: messageTexte })
       })
       const data = await res.json()
       if (data.success) {
@@ -299,7 +271,7 @@ export default function Intervenants() {
             <input type="email" placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Lien d'accès envoyé par email (création de compte si besoin) · Code aussi envoyé par WhatsApp
+              Lien d'accès envoyé par email · Le numéro WhatsApp permet à l'intervenant d'envoyer ses notes
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -346,10 +318,6 @@ export default function Intervenants() {
                         Renvoyer email
                       </button>
                     )}
-                    <button onClick={() => renvoyerInvitation(i)}
-                      style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                      Inviter WA
-                    </button>
                     <button onClick={() => afficherCode(i)}
                       style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                       Voir code
