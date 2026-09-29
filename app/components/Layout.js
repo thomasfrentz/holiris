@@ -81,6 +81,10 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         .hl-bottom-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; text-decoration: none; }
         .hl-card { background: #fff; border: 1px solid #E8EFEB; border-radius: 12px; transition: box-shadow 0.2s, border-color 0.2s; }
         .hl-card:hover { box-shadow: 0 4px 16px rgba(127,175,155,0.12); border-color: #C8DDD4; }
+
+        .hl-install-mobile { display: none; }
+        @media (max-width: 768px) { .hl-install-mobile { display: flex; } }
+        @media (display-mode: standalone) { .hl-install, .hl-install-mobile { display: none !important; } }
       `}</style>
 
       <div className="hl-wrap">
@@ -141,6 +145,11 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
             })}
           </nav>
 
+          <Link href="/note" className="hl-install" style={{ textDecoration: 'none', marginTop: 16, display: 'block', padding: '10px 12px', background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: '#8B6FAA' }}>📲 Installer l&apos;application</div>
+            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 2 }}>Dictez vos notes depuis le téléphone</div>
+          </Link>
+
           {isAdmin && (
             <div style={{ marginTop: 16, padding: '8px 12px', background: '#FEF0F1', borderRadius: 8 }}>
               <div style={{ fontSize: 10, color: '#C47A82', fontWeight: 500 }}>Mode Admin actif</div>
@@ -152,6 +161,11 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         <main className="hl-main hl-scroll" style={{
           flex: 1, padding: '36px 40px', overflowY: 'auto', background: '#F7F9F8',
         }}>
+          <Link href="/note" className="hl-install-mobile" style={{ textDecoration: 'none', alignItems: 'center', gap: 10, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 10, padding: '10px 14px', marginBottom: 18 }}>
+            <span style={{ fontSize: 18 }}>📲</span>
+            <span style={{ flex: 1, fontSize: 13, color: '#6F7C75' }}><strong style={{ color: '#8B6FAA' }}>Installer l&apos;application</strong> pour dicter vos notes</span>
+            <span style={{ color: '#8B6FAA' }}>→</span>
+          </Link>
           {children}
         </main>
 

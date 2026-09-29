@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { supabaseAdmin as supabase } from '@/lib/serveur'
-import { enregistrerNote, repondreSignalement } from '@/lib/notesMedicales'
+import { analyserNote, enregistrerNote, repondreSignalement } from '@/lib/notesMedicales'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -49,10 +49,28 @@ export async function POST(request) {
     // Numéro inconnu : on n'attribue pas la note à un senior au hasard
     if (!expediteurs.length) return NextResponse.json({ status: 'unknown sender' })
 
-    // Réponse aux boutons « Cette information est-elle essentielle ? »
+    // Réponse aux boutons : validation d'une note, ou « Cette information est-elle essentielle ? »
     if (messageType === 'interactive' && message.interactive?.button_reply) {
-      await traiterReponseSignalement(from, message.interactive.button_reply.id, expediteurs)
+      const buttonId = String(message.interactive.button_reply.id)
+      if (buttonId.startsWith('note_')) await traiterReponseNote(from, buttonId)
+      else await traiterReponseSignalement(from, buttonId, expediteurs)
       return NextResponse.json({ status: 'ok' })
+    }
+
+    // Les notes non validées sous 24 h sont abandonnées
+    await supabase.from('notes_en_attente').delete().lt('created_at', new Date(Date.now() - DELAI_VALIDATION).toISOString())
+
+    // L'auteur a demandé à corriger sa note : le texte qu'il envoie la remplace tel quel
+    const { data: aCorriger } = await supabase.from('notes_en_attente').select('*')
+      .eq('numero', from).eq('statut', 'a_corriger')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (aCorriger) {
+      if (messageType === 'text') {
+        await enregistrerCorrection(from, aCorriger, message.text.body)
+        return NextResponse.json({ status: 'ok' })
+      }
+      // Un autre type de message (vocal…) repart de zéro, avec une nouvelle proposition
+      await supabase.from('notes_en_attente').delete().eq('id', aCorriger.id)
     }
 
     const seniorIds = [...new Set(expediteurs.map(e => e.senior_id).filter(Boolean))]
@@ -84,24 +102,38 @@ export async function POST(request) {
         || expediteurs.find(e => e.senior_id === finalSeniorId)
         || expediteurs[0]
 
-      // Filtre médical : seule la partie non médicale est enregistrée
-      const result = await enregistrerNote({
-        seniorId: finalSeniorId,
-        texte: noteContent,
-        source,
-        auteur: {
-          type: auteur.type,
-          id: auteur.id,
-          nom: auteur.name,
-          role: auteur.role,
-          telephone: auteur.phone || auteur.whatsapp || '+' + from,
-          email: auteur.email,
-        },
-      })
-      console.log('Note créée pour senior:', finalSeniorId, result.medical ? '(information médicale retirée)' : '')
+      const auteurNote = {
+        type: auteur.type,
+        id: auteur.id,
+        nom: auteur.name,
+        role: auteur.role,
+        telephone: auteur.phone || auteur.whatsapp || '+' + from,
+        email: auteur.email,
+      }
 
-      if (result.note) await analyzeForAlerts(result.note, finalSeniorId)
-      if (result.signalementId) await demanderSiEssentiel(from, result.signalementId, !!result.note)
+      // Filtre médical avant la relecture : l'auteur valide exactement ce qui sera publié
+      const analyse = await analyserNote(noteContent)
+
+      if (!analyse.note) {
+        // Rien à publier : seul le signalement médical est créé
+        const result = await enregistrerNote({ seniorId: finalSeniorId, texte: noteContent, source, auteur: auteurNote, analyse })
+        if (result.signalementId) await demanderSiEssentiel(from, result.signalementId, false)
+        return NextResponse.json({ status: 'ok' })
+      }
+
+      // Comme sur la borne, la note n'est enregistrée qu'après validation par son auteur
+      const { data: enAttente, error } = await supabase.from('notes_en_attente').insert({
+        senior_id: finalSeniorId,
+        numero: from,
+        auteur: auteurNote,
+        source,
+        texte: analyse.note,
+        medical: analyse.medical,
+      }).select().single()
+      if (error) throw error
+      console.log('Note à valider pour senior:', finalSeniorId, analyse.medical ? '(information médicale retirée)' : '')
+
+      await proposerNote(from, enAttente)
     }
 
     return NextResponse.json({ status: 'ok' })
@@ -282,4 +314,97 @@ async function traiterReponseSignalement(from, buttonId, expediteurs) {
       ? 'Merci, c\'est noté. L\'information n\'a pas été conservée.'
       : 'Merci. ' + (result.destinataire ? result.destinataire + ', personne de confiance,' : 'Un responsable Holiris') + ' va vous contacter pour en savoir plus.'
   await envoyerWhatsApp(from, { type: 'text', text: { body: texte } })
+}
+
+// Au-delà, WhatsApp ne permet plus de répondre librement à l'auteur
+const DELAI_VALIDATION = 24 * 60 * 60 * 1000
+
+async function proposerNote(to, enAttente) {
+  const { data: senior } = await supabase.from('seniors').select('name').eq('id', enAttente.senior_id).maybeSingle()
+  const texte = enAttente.texte.length > 700 ? enAttente.texte.slice(0, 700) + '…' : enAttente.texte
+  await envoyerWhatsApp(to, {
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: {
+        text: 'Voici la note qui sera ajoutée au carnet' + (senior?.name ? ' de ' + senior.name : '') + ' :\n\n« ' + texte + ' »'
+          + (enAttente.medical ? '\n\nUne information médicale a été retirée : pour protéger la personne suivie, elle n\'est jamais enregistrée sur Holiris.' : '')
+          + '\n\nLa validez-vous ?'
+      },
+      action: {
+        buttons: [
+          { type: 'reply', reply: { id: 'note_ok:' + enAttente.id, title: 'Valider' } },
+          { type: 'reply', reply: { id: 'note_mod:' + enAttente.id, title: 'Corriger' } },
+          { type: 'reply', reply: { id: 'note_non:' + enAttente.id, title: 'Annuler' } },
+        ]
+      }
+    }
+  })
+}
+
+async function traiterReponseNote(from, buttonId) {
+  const [action, id] = buttonId.split(':')
+  if (!id || !['note_ok', 'note_mod', 'note_non'].includes(action)) return
+
+  // La note doit avoir été proposée à cet expéditeur, et ne pas avoir déjà été traitée
+  const filtre = q => q.eq('id', id).eq('numero', from).in('statut', ['a_valider', 'a_corriger'])
+    .gte('created_at', new Date(Date.now() - DELAI_VALIDATION).toISOString())
+
+  if (action === 'note_non') {
+    const { data } = await filtre(supabase.from('notes_en_attente').delete()).select('id')
+    await envoyerWhatsApp(from, { type: 'text', text: { body: data?.length ? 'C\'est noté, la note n\'a pas été enregistrée.' : 'Cette note a déjà été traitée.' } })
+    return
+  }
+
+  if (action === 'note_mod') {
+    const { data } = await filtre(supabase.from('notes_en_attente').update({ statut: 'a_corriger' })).select('id')
+    await envoyerWhatsApp(from, { type: 'text', text: { body: data?.length
+      ? 'Envoyez-moi la note corrigée dans un message écrit : elle remplacera celle-ci.'
+      : 'Cette note a déjà été traitée.' } })
+    return
+  }
+
+  // Le passage à « enregistrement » évite d'enregistrer deux fois la note en cas de double appui
+  const { data: enAttente } = await filtre(supabase.from('notes_en_attente').update({ statut: 'enregistrement' })).select().maybeSingle()
+  if (!enAttente) {
+    await envoyerWhatsApp(from, { type: 'text', text: { body: 'Cette note a déjà été traitée.' } })
+    return
+  }
+  await publierNote(from, enAttente, { medical: enAttente.medical, note: enAttente.texte })
+}
+
+async function enregistrerCorrection(from, enAttente, texte) {
+  const { data: reservee } = await supabase.from('notes_en_attente').update({ statut: 'enregistrement' })
+    .eq('id', enAttente.id).eq('statut', 'a_corriger').select('id').maybeSingle()
+  if (!reservee) return
+
+  // La version corrigée passe aussi par le filtre médical
+  const analyse = await analyserNote(texte)
+  await publierNote(from, enAttente, { medical: analyse.medical || enAttente.medical, note: analyse.note })
+}
+
+async function publierNote(from, enAttente, analyse) {
+  let result
+  try {
+    result = await enregistrerNote({
+      seniorId: enAttente.senior_id,
+      texte: analyse.note,
+      source: enAttente.source,
+      auteur: enAttente.auteur,
+      analyse,
+    })
+  } catch (error) {
+    // La note reste en attente : l'auteur peut appuyer de nouveau sur « Valider » ou renvoyer sa correction
+    await supabase.from('notes_en_attente').update({ statut: enAttente.statut === 'a_corriger' ? 'a_corriger' : 'a_valider' }).eq('id', enAttente.id)
+    await envoyerWhatsApp(from, { type: 'text', text: { body: 'La note n\'a pas pu être enregistrée. Merci de réessayer dans quelques instants.' } })
+    // Pas d'erreur 500 : Meta renverrait l'appui sur le bouton et la note pourrait être enregistrée à l'insu de l'auteur
+    console.error('Erreur enregistrement note validée:', error.message)
+    return
+  }
+  await supabase.from('notes_en_attente').delete().eq('id', enAttente.id)
+  console.log('Note validée pour senior:', enAttente.senior_id, analyse.medical ? '(information médicale retirée)' : '')
+
+  if (result.note) await analyzeForAlerts(result.note, enAttente.senior_id)
+  if (result.signalementId) await demanderSiEssentiel(from, result.signalementId, !!result.note)
+  else if (result.note) await envoyerWhatsApp(from, { type: 'text', text: { body: '✅ Merci, votre note a bien été enregistrée.' } })
 }

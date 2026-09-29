@@ -142,7 +142,9 @@ export default function IntervenantDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif", background: '#F7F9F8', color: '#1F2A24' }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
+        @media (display-mode: standalone) { .hl-install { display: none !important; } }
+        @media (max-width: 560px) { .hl-nom-interv { display: none; } }`}</style>
 
       {questionMedicale && (
         <QuestionMedicale signalementId={questionMedicale.id} notePartielle={questionMedicale.notePartielle}
@@ -164,7 +166,8 @@ export default function IntervenantDashboard() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 13, color: '#6F7C75' }}>{intervenantName}</span>
+          <span className="hl-nom-interv" style={{ fontSize: 13, color: '#6F7C75' }}>{intervenantName}</span>
+          <Link href="/note" className="hl-install" style={{ textDecoration: 'none', fontSize: 13, color: '#8B6FAA', fontWeight: 500, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 6, padding: '5px 10px' }}>📲 Installer l&apos;app</Link>
           <Link href="/agenda" style={{ textDecoration: 'none', fontSize: 13, color: '#4A8870', fontWeight: 500 }}>Agenda</Link>
           <button onClick={logout} style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
             Déconnexion
