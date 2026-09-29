@@ -4,20 +4,25 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 
-// Structure dont l'utilisateur connecté est gestionnaire (nom), ou null
-function useStructure() {
+// Rôle de l'utilisateur connecté : structure dont il est gestionnaire (nom), et admin Holiris
+function useRole() {
   const [structure, setStructure] = useState(null)
+  const [adminHoliris, setAdminHoliris] = useState(false)
   useEffect(() => {
     const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
     async function charger() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('structure_membres').select('structures(nom)').eq('user_id', user.id).limit(1)
-      if (data?.[0]?.structures) setStructure(data[0].structures)
+      const [{ data: gestion }, { data: admin }] = await Promise.all([
+        supabase.from('structure_membres').select('structures(nom)').eq('user_id', user.id).limit(1),
+        supabase.from('famille').select('id').eq('user_id', user.id).eq('is_admin', true).is('archived_at', null).limit(1),
+      ])
+      if (gestion?.[0]?.structures) setStructure(gestion[0].structures)
+      if (admin?.length) setAdminHoliris(true)
     }
     charger()
   }, [])
-  return structure
+  return { structure, adminHoliris }
 }
 
 const Icon = ({ type, active, size = 18 }) => {
@@ -39,7 +44,7 @@ const Icon = ({ type, active, size = 18 }) => {
 
 export default function Layout({ children, senior, seniors, selectedSeniorId, switchSenior, isAdmin, isIntervenant = false }) {
   const pathname = usePathname()
-  const structure = useStructure()
+  const { structure, adminHoliris } = useRole()
 
   const navItemsAdmin = [
     { icon: 'flux', label: 'Flux en temps réel', href: '/app' },
@@ -103,8 +108,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         .hl-card { background: #fff; border: 1px solid #E8EFEB; border-radius: 12px; transition: box-shadow 0.2s, border-color 0.2s; }
         .hl-card:hover { box-shadow: 0 4px 16px rgba(127,175,155,0.12); border-color: #C8DDD4; }
 
-        .hl-install-mobile { display: none; }
-        @media (max-width: 768px) { .hl-install-mobile { display: flex; } }
+        .hl-install-mobile, .hl-admin-mobile { display: none; }
+        @media (max-width: 768px) { .hl-install-mobile, .hl-admin-mobile { display: flex; } }
         @media (display-mode: standalone) { .hl-install, .hl-install-mobile { display: none !important; } }
       `}</style>
 
@@ -175,10 +180,22 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
             <div style={{ marginTop: 16, padding: '8px 12px', background: '#EAF4EF', borderRadius: 8 }}>
               <div style={{ fontSize: 10, color: '#4A8870', fontWeight: 500 }}>Structure · {structure.nom}</div>
             </div>
-          ) : isAdmin && (
+          ) : isAdmin && !adminHoliris && (
             <div style={{ marginTop: 16, padding: '8px 12px', background: '#FEF0F1', borderRadius: 8 }}>
               <div style={{ fontSize: 10, color: '#C47A82', fontWeight: 500 }}>Mode Admin actif</div>
             </div>
+          )}
+
+          {/* Fonctions d'administration : réservées à l'admin Holiris */}
+          {adminHoliris && (
+            <Link href="/admin" style={{ textDecoration: 'none', marginTop: 16, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#FEF0F1', border: '1px solid #F2C4C8', borderRadius: 8 }}>
+              <span style={{ fontSize: 15 }}>⚙️</span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#C4606A' }}>Administration</span>
+                <span style={{ display: 'block', fontSize: 10, color: '#C47A82' }}>Demandes d&apos;accès, structures, bornes…</span>
+              </span>
+              <span style={{ color: '#C4606A' }}>→</span>
+            </Link>
           )}
         </aside>
 
@@ -186,6 +203,13 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         <main className="hl-main hl-scroll" style={{
           flex: 1, padding: '36px 40px', overflowY: 'auto', background: '#F7F9F8',
         }}>
+          {adminHoliris && (
+            <Link href="/admin" className="hl-admin-mobile" style={{ textDecoration: 'none', alignItems: 'center', gap: 10, background: '#FEF0F1', border: '1px solid #F2C4C8', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
+              <span style={{ fontSize: 16 }}>⚙️</span>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#C4606A' }}>Administration</span>
+              <span style={{ color: '#C4606A' }}>→</span>
+            </Link>
+          )}
           <Link href="/note" className="hl-install-mobile" style={{ textDecoration: 'none', alignItems: 'center', gap: 10, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 10, padding: '10px 14px', marginBottom: 18 }}>
             <span style={{ fontSize: 18 }}>📲</span>
             <span style={{ flex: 1, fontSize: 13, color: '#6F7C75' }}><strong style={{ color: '#8B6FAA' }}>Installer l&apos;application</strong> pour dicter vos notes</span>

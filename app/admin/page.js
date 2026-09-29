@@ -201,7 +201,8 @@ export default function Admin() {
             <div style={{ fontSize: 9, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Admin</div>
           </div>
         </div>
-        <div style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', gap: 16 }}>
+        <div style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', gap: 16, alignItems: 'center' }}>
+          <a href="/app" style={{ color: '#4A8870', textDecoration: 'none', fontWeight: 500 }}>← Retour à l&apos;application</a>
           <span>{seniors.length} senior{seniors.length > 1 ? 's' : ''}</span>
           <span>{utilisateurs.length} utilisateur{utilisateurs.length > 1 ? 's' : ''}</span>
         </div>
