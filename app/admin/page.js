@@ -108,7 +108,7 @@ export default function Admin() {
   }
 
   async function actionUtilisateur(u, action) {
-    if (action === 'supprimer' && !confirm('Supprimer définitivement ' + (u.name || 'cet utilisateur') + ' ? Son accès au dossier et sa fiche seront effacés.')) return
+    if (action === 'supprimer' && !confirm('Supprimer définitivement ' + (u.name || 'cet utilisateur') + ' ?\n\nSa fiche et son accès au dossier seront effacés. S\'il ne suit aucun autre senior, son compte de connexion sera aussi supprimé.')) return
     const res = await fetch('/api/admin/utilisateurs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -116,6 +116,9 @@ export default function Admin() {
     })
     const result = await res.json()
     if (!result.success) alert('Erreur : ' + result.error)
+    else if (action === 'supprimer') alert(result.compteSupprime
+      ? 'Utilisateur supprimé, ainsi que son compte de connexion.'
+      : 'Utilisateur supprimé. Son compte de connexion est conservé : il a encore accès à d\'autres dossiers.')
     loadData()
   }
 
