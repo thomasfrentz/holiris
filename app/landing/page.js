@@ -274,13 +274,13 @@ export default function Landing() {
           <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, maxWidth: 760 }}>
             {[
               {
-                name: 'Famille', price: '29',
+                name: 'Famille',
                 desc: 'Pour les familles qui souhaitent suivre le bien-être d\'un proche à domicile.',
                 features: ['Tableau de bord temps réel', 'Notes illimitées (WhatsApp, borne, application)', 'Alertes IA signaux faibles', 'Agenda et relances auto', 'Assistant IA', 'Membres famille illimités'],
                 cta: 'Demander un accès', href: '/demande-acces', highlight: false,
               },
               {
-                name: 'Structure', price: '149',
+                name: 'Structure',
                 desc: 'Pour les CCAS, SSIAD et structures d\'aide à domicile.',
                 features: ["Jusqu'à 20 dossiers seniors", 'Tout le plan Famille', 'Tableau multi-seniors', 'Rapports hebdomadaires', 'Support prioritaire', 'Formation incluse'],
                 cta: 'Nous contacter', href: 'mailto:thomas.frentz@holiris.fr?subject=Holiris%20pour%20ma%20structure', highlight: true,
@@ -299,7 +299,7 @@ export default function Landing() {
                 )}
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>{plan.name}</div>
                 <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 8 }}>
-                  {plan.price}€<span style={{ fontSize: 18, color: '#9BB5AA', fontWeight: 300 }}>/mois</span>
+                  Gratuit<span style={{ fontSize: 18, color: '#9BB5AA', fontWeight: 300 }}> pendant le pilote</span>
                 </div>
                 <p style={{ fontSize: 13, color: '#6F7C75', marginBottom: 24, lineHeight: 1.6, fontWeight: 300 }}>{plan.desc}</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
@@ -320,6 +320,7 @@ export default function Landing() {
           </div>
           <p style={{ fontSize: 13, color: '#6F7C75', marginTop: 18, maxWidth: 760, lineHeight: 1.6 }}>
             Pendant la phase pilote, Holiris est <strong style={{ color: '#4A8870', fontWeight: 500 }}>gratuit pendant 2 mois</strong>, avec un accompagnement pour la mise en place.
+            Le tarif sera communiqué à l&apos;issue du pilote, sans aucun engagement de votre part.
           </p>
         </div>
       </div>
