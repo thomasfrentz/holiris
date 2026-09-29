@@ -58,6 +58,7 @@ export default function Landing() {
           .steps-grid { grid-template-columns: 1fr 1fr !important; gap: 28px !important; }
           .pricing-grid { grid-template-columns: 1fr !important; }
           .canaux-grid { grid-template-columns: 1fr !important; }
+          .alertes-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
           .footer-inner { flex-direction: column !important; text-align: center !important; }
           .section-pad { padding: 64px 24px !important; }
         }
@@ -76,6 +77,7 @@ export default function Landing() {
         <Logo size={28} />
         <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
           <a href="#fonctionnalites" className="nav-link">Fonctionnalités</a>
+          <a href="#alertes" className="nav-link">Alertes</a>
           <a href="#comment" className="nav-link">Comment ça marche</a>
           <a href="#tarifs" className="nav-link">Tarifs</a>
         </div>
@@ -202,6 +204,68 @@ export default function Landing() {
             <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.7, fontWeight: 300 }}>
               Holiris partage le moral, l&apos;état général et la vie quotidienne. Un diagnostic ou un traitement n&apos;est jamais enregistré :
               s&apos;il est essentiel, la personne de confiance désignée par la famille est invitée à recontacter directement l&apos;intervenant.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── ALERTES ── */}
+      <div id="alertes" className="section-pad" style={{ padding: '96px 48px', maxWidth: 1100, margin: '0 auto' }}>
+        <div className="alertes-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 56, alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: 14 }}>Alertes</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(34px, 4vw, 50px)', fontWeight: 400, color: '#1F2A24', lineHeight: 1.1, marginBottom: 20 }}>
+              Les signaux faibles,
+              <br /><span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>repérés à temps</span>
+            </h2>
+            <p style={{ fontSize: 15, color: '#6F7C75', lineHeight: 1.75, fontWeight: 300, marginBottom: 22 }}>
+              Chaque note, qu&apos;elle arrive par WhatsApp, par la borne ou par l&apos;application, est relue par l&apos;IA.
+              Elle repère ce qui mérite votre attention, même quand l&apos;intervenant ne l&apos;a pas formulé comme une inquiétude.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 26 }}>
+              {['Moral bas, isolement', 'Appétit, alimentation', 'Chute ou risque de chute', 'Douleurs', 'Mémoire, confusion', 'Mobilité', 'Médicaments non pris', 'Symptôme inhabituel'].map(s => (
+                <span key={s} style={{ fontSize: 12, color: '#4A8870', background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 20, padding: '5px 12px' }}>{s}</span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+              <div style={{ fontSize: 14, color: '#3A4A40', lineHeight: 1.6 }}>
+                <strong style={{ color: '#C4844A', fontWeight: 600 }}>Attention</strong> : un signal à surveiller dans les prochains jours.
+              </div>
+              <div style={{ fontSize: 14, color: '#3A4A40', lineHeight: 1.6 }}>
+                <strong style={{ color: '#C4606A', fontWeight: 600 }}>Urgent</strong> : une situation à traiter rapidement, comme une chute.
+              </div>
+            </div>
+            <p style={{ fontSize: 14, color: '#6F7C75', lineHeight: 1.7, fontWeight: 300 }}>
+              L&apos;alerte apparaît aussitôt sur le tableau de bord de la famille et dans l&apos;espace des intervenants,
+              puis dans le résumé du dimanche. Les ordonnances à renouveler sont aussi signalées.
+            </p>
+          </div>
+
+          {/* Exemple : une note et les alertes qu'elle déclenche */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 14, padding: '18px 20px' }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#9BB5AA', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>Note de Sylvie · aide à domicile</div>
+              <p style={{ fontSize: 14, color: '#1F2A24', lineHeight: 1.6 }}>
+                Jeanne a très peu mangé ce midi et dit ne pas avoir faim depuis deux jours. Un peu fatiguée.
+              </p>
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#BC84C6', fontWeight: 500 }}>✨ L&apos;IA repère un signal</div>
+            {[
+              { niveau: 'Attention', color: '#E6B98A', texte: '#C4844A', bg: '#FDF3E7', border: '#F0D9B5', message: 'Manque d\'appétit depuis deux jours' },
+              { niveau: 'Urgent', color: '#D98992', texte: '#C4606A', bg: '#FBECED', border: '#F2C4C8', message: 'Chute dans la cuisine, impossible de se relever seule', exemple: true },
+            ].map(a => (
+              <div key={a.niveau} style={{ background: a.bg, border: '1px solid ' + a.border, borderLeft: '3px solid ' + a.color, borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', opacity: a.exemple ? 0.75 : 1 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: a.color, marginTop: 6, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 10, color: a.texte, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 3 }}>
+                    {a.niveau}{a.exemple ? ' · autre exemple' : ''}
+                  </div>
+                  <div style={{ fontSize: 14, color: '#1F2A24' }}>{a.message}</div>
+                </div>
+              </div>
+            ))}
+            <p style={{ fontSize: 12, color: '#9BB5AA', lineHeight: 1.6, marginTop: 4 }}>
+              Holiris ne remplace ni un avis médical ni les secours. En cas d&apos;urgence, appelez le 15 ou le 112.
             </p>
           </div>
         </div>
@@ -337,7 +401,7 @@ export default function Landing() {
         </div>
         <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(34px, 4vw, 52px)', fontWeight: 400, color: '#1F2A24', marginBottom: 16, lineHeight: 1.1 }}>
           Commencez
-          <br /><span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>dès aujourd'hui</span>
+          <br /><span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>dès aujourd&apos;hui</span>
         </h2>
         <p style={{ fontSize: 15, color: '#6F7C75', maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.7, fontWeight: 300 }}>
           Holiris ouvre ses portes aux premières familles et structures d&apos;aide à domicile des Pyrénées-Orientales.

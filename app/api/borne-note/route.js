@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import Groq from 'groq-sdk'
 import { enregistrerNote } from '@/lib/notesMedicales'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 export async function POST(request) {
   try {
@@ -24,29 +22,6 @@ export async function POST(request) {
 
     // Filtre médical : seule la partie non médicale est enregistrée
     const result = await enregistrerNote({ seniorId, texte: note, source: 'borne', auteur })
-    if (!result.note) return NextResponse.json({ success: true, medical: result.medical, signalementId: result.signalementId, notePartielle: !!result.note })
-
-    try {
-      const alertCheck = await groq.chat.completions.create({
-        model: 'openai/gpt-oss-120b',
-        reasoning_effort: 'low',
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: 'Tu analyses des notes de soins à domicile. Réponds uniquement par JSON: {"alerte": true/false, "raison": "..."}. alerte=true si la note mentionne une chute, douleur intense, détresse, confusion, urgence médicale.' },
-          { role: 'user', content: result.note }
-        ],
-        max_completion_tokens: 400
-      })
-      const alertResult = JSON.parse(alertCheck.choices[0]?.message?.content || '{"alerte":false}')
-      if (alertResult.alerte) {
-        await supabase.from('alertes').insert({
-          senior_id: seniorId,
-          note_content: result.note,
-          raison: alertResult.raison,
-          created_at: new Date().toISOString()
-        })
-      }
-    } catch {}
 
     return NextResponse.json({ success: true, medical: result.medical, signalementId: result.signalementId, notePartielle: !!result.note })
   } catch (err) {

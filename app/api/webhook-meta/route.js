@@ -215,57 +215,6 @@ async function findSeniorByName(text, fallbackSeniorId, seniorIds) {
   return fallbackSeniorId
 }
 
-async function analyzeForAlerts(text, seniorId) {
-  try {
-    const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-20b',
-      reasoning_effort: 'low',
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: `Tu es l'assistant IA de Holiris. Analyse ce message et détecte les signaux faibles qui méritent une alerte pour la famille.
-
-Signaux à surveiller :
-- Douleurs (genou, dos, tête, abdomen...)
-- Chute ou risque de chute
-- Problèmes alimentaires (ne mange pas, perd du poids...)
-- Troubles cognitifs (confusion, mémoire, désorienté...)
-- Problèmes de mobilité
-- Moral bas, tristesse, isolement
-- Médicaments non pris
-- Symptômes inhabituels
-
-Réponds UNIQUEMENT en JSON :
-{"alerte": true, "niveau": "warning", "message": "Description courte"}
-ou
-{"alerte": false}
-
-Niveaux : "info", "warning", "danger".`
-        },
-        { role: 'user', content: text }
-      ],
-      max_completion_tokens: 450
-    })
-
-    const response = completion.choices[0]?.message?.content || '{}'
-    const clean = response.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(clean)
-
-    if (parsed.alerte && parsed.message) {
-      await supabase.from('alertes').insert({
-        senior_id: seniorId,
-        type: 'signal_faible',
-        message: parsed.message,
-        niveau: parsed.niveau || 'warning',
-        created_at: new Date().toISOString()
-      })
-      console.log('Alerte créée:', parsed.message)
-    }
-  } catch (error) {
-    console.error('Erreur analyse alertes:', error.message)
-  }
-}
 async function envoyerWhatsApp(to, payload) {
   const response = await fetch(
     'https://graph.facebook.com/v18.0/' + process.env.META_PHONE_NUMBER_ID + '/messages',
@@ -404,7 +353,6 @@ async function publierNote(from, enAttente, analyse) {
   await supabase.from('notes_en_attente').delete().eq('id', enAttente.id)
   console.log('Note validée pour senior:', enAttente.senior_id, analyse.medical ? '(information médicale retirée)' : '')
 
-  if (result.note) await analyzeForAlerts(result.note, enAttente.senior_id)
   if (result.signalementId) await demanderSiEssentiel(from, result.signalementId, !!result.note)
   else if (result.note) await envoyerWhatsApp(from, { type: 'text', text: { body: '✅ Merci, votre note a bien été enregistrée.' } })
 }
