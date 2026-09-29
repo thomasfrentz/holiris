@@ -1,14 +1,9 @@
 -- Schéma complet de la base Holiris, reconstitué le 2026-09-29 depuis l API Supabase.
 -- Permet de recréer la base (nouveau projet, environnement de test, migration HDS).
 --
--- Limites de cette reconstitution (non exposées par l API) :
---   - NOT NULL n est indiqué que pour les colonnes obligatoires sans valeur par défaut ;
---   - le comportement « on delete » des clés étrangères, les contraintes « unique » et les index
---     ne sont pas repris : voir les scripts détaillés de ce dossier pour les tables récentes ;
---   - les règles d accès (RLS) et le trigger proteger_is_admin sont à part.
---
--- Les tables sont créées sans clés étrangères, ajoutées ensuite (dépendances circulaires
--- entre seniors et famille).
+-- Limite : NOT NULL n est indiqué que pour les colonnes obligatoires sans valeur par défaut.
+-- Les tables sont créées sans clés étrangères (dépendances circulaires entre seniors et famille) :
+-- elles sont ajoutées par 0001_regles_et_contraintes.sql.
 
 create table if not exists seniors (
   id uuid primary key default gen_random_uuid(),
@@ -196,24 +191,5 @@ create table if not exists salaries (
   created_at timestamp with time zone default now() not null
 );
 
--- Clés étrangères
-alter table seniors add foreign key (personne_confiance_id) references famille(id);
-alter table seniors add foreign key (structure_id) references structures(id);
-alter table famille add foreign key (senior_id) references seniors(id);
-alter table famille add foreign key (selected_senior_id) references seniors(id);
-alter table intervenants add foreign key (senior_id) references seniors(id);
-alter table intervenants add foreign key (selected_senior_id) references seniors(id);
-alter table intervenants add foreign key (salarie_id) references salaries(id);
-alter table events add foreign key (senior_id) references seniors(id);
-alter table events add foreign key (intervenant_id) references intervenants(id);
-alter table notes add foreign key (senior_id) references seniors(id);
-alter table notes add foreign key (intervenant_id) references intervenants(id);
-alter table alertes add foreign key (senior_id) references seniors(id);
-alter table ordonnances add foreign key (senior_id) references seniors(id);
-alter table relances add foreign key (event_id) references events(id);
-alter table bornes add foreign key (senior_id) references seniors(id);
-alter table signalements_medicaux add foreign key (senior_id) references seniors(id);
-alter table signalements_medicaux add foreign key (destinataire_famille_id) references famille(id);
-alter table notes_en_attente add foreign key (senior_id) references seniors(id);
-alter table structure_membres add foreign key (structure_id) references structures(id);
-alter table salaries add foreign key (structure_id) references structures(id);
+-- Les clés étrangères, contraintes « unique », index, fonctions et triggers exacts sont dans
+-- 0001_regles_et_contraintes.sql.
