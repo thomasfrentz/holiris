@@ -57,6 +57,7 @@ export default function Landing() {
           .features-grid { grid-template-columns: 1fr !important; }
           .steps-grid { grid-template-columns: 1fr 1fr !important; gap: 28px !important; }
           .pricing-grid { grid-template-columns: 1fr !important; }
+          .canaux-grid { grid-template-columns: 1fr !important; }
           .footer-inner { flex-direction: column !important; text-align: center !important; }
           .section-pad { padding: 64px 24px !important; }
         }
@@ -146,6 +147,10 @@ export default function Landing() {
             </a>
           </div>
 
+          <p style={{ fontSize: 13, color: '#6F7C75', marginTop: 18 }}>
+            Pilote gratuit de 2 mois · Pyrénées-Orientales · Accès sur validation
+          </p>
+
           <div style={{ marginTop: 52, display: 'flex', gap: 36, justifyContent: 'center', flexWrap: 'wrap' }}>
             {[
               { label: 'Familles', color: '#7FAF9B' },
@@ -173,12 +178,12 @@ export default function Landing() {
 
         <div className="features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
           {[
-            { color: '#7FAF9B', bg: '#EAF4EF', title: 'Notes WhatsApp', desc: 'Les intervenants envoient un message vocal ou texte après chaque passage. L\'IA le transforme en note structurée automatiquement.' },
+            { color: '#7FAF9B', bg: '#EAF4EF', title: 'Notes en quelques secondes', desc: 'Après chaque passage, un message vocal ou écrit : par WhatsApp, sur la borne installée au domicile ou depuis l\'application Holiris. L\'IA le transforme en note claire.' },
             { color: '#BC84C6', bg: '#F3EDF7', title: 'Alertes intelligentes', desc: 'L\'IA détecte les signaux faibles — douleurs, moral bas, alimentation — et vous alerte en temps réel.' },
             { color: '#E6B98A', bg: '#FDF3E7', title: 'Agenda partagé', desc: 'Planifiez les passages et consultations. Suivez les présences et recevez des relances automatiques.' },
-            { color: '#4A8870', bg: '#EAF4EF', title: 'Coordination famille', desc: 'Tous les membres de la famille accèdent au même tableau de bord. Chacun peut ajouter des notes et consulter l\'historique.' },
+            { color: '#4A8870', bg: '#EAF4EF', title: 'Coordination famille', desc: 'Tous les membres de la famille accèdent au même tableau de bord, ajoutent leurs notes et reçoivent un résumé de la semaine chaque dimanche.' },
             { color: '#8B6FAA', bg: '#F3EDF7', title: 'Assistant IA', desc: 'Posez vos questions à notre assistant qui connaît la situation de votre proche. Résumés, conseils, aides disponibles.' },
-            { color: '#D98992', bg: '#FBECED', title: 'Relances automatiques', desc: 'Si un intervenant ne donne pas de nouvelles après un passage prévu, Holiris lui envoie un rappel bienveillant.' },
+            { color: '#D98992', bg: '#FBECED', title: 'Relances automatiques', desc: 'Si un intervenant ne donne pas de nouvelles après un passage prévu, Holiris lui envoie un rappel bienveillant par WhatsApp et par email.' },
           ].map((f, i) => (
             <div key={i} className="feature-card">
               <div style={{ width: 42, height: 42, borderRadius: 10, background: f.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
@@ -188,6 +193,17 @@ export default function Landing() {
               <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.7, fontWeight: 300 }}>{f.desc}</p>
             </div>
           ))}
+        </div>
+
+        <div style={{ marginTop: 14, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 14, padding: '20px 24px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 22 }}>🔒</div>
+          <div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>Les informations médicales restent protégées</div>
+            <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.7, fontWeight: 300 }}>
+              Holiris partage le moral, l&apos;état général et la vie quotidienne. Un diagnostic ou un traitement n&apos;est jamais enregistré :
+              s&apos;il est essentiel, la personne de confiance désignée par la famille est invitée à recontacter directement l&apos;intervenant.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -204,8 +220,8 @@ export default function Landing() {
 
           <div className="steps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 40 }}>
             {[
-              { num: '01', color: '#7FAF9B', title: 'Créez le dossier', desc: 'Renseignez les informations de votre proche et invitez les intervenants et membres de la famille.' },
-              { num: '02', color: '#BC84C6', title: 'Les intervenants envoient', desc: 'Après chaque passage, un simple message vocal sur WhatsApp. 20 secondes suffisent.' },
+              { num: '01', color: '#7FAF9B', title: 'Créez le dossier', desc: 'Demandez votre accès, puis créez le dossier de votre proche et invitez les intervenants et membres de la famille.' },
+              { num: '02', color: '#BC84C6', title: 'Les intervenants envoient', desc: 'Après chaque passage, un message vocal de quelques secondes : par WhatsApp, sur la borne ou depuis l\'application Holiris.' },
               { num: '03', color: '#E6B98A', title: "L'IA analyse", desc: 'Holiris transforme les messages en notes et détecte automatiquement les signaux importants.' },
               { num: '04', color: '#4A8870', title: 'La famille suit', desc: 'Vous recevez les informations en temps réel sur votre tableau de bord, depuis n\'importe quel appareil.' },
             ].map((step, i) => (
@@ -215,6 +231,31 @@ export default function Landing() {
                 <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.7, fontWeight: 300 }}>{step.desc}</p>
               </div>
             ))}
+          </div>
+
+          {/* Les trois moyens d'envoyer une note */}
+          <div style={{ marginTop: 64 }}>
+            <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 400, color: '#1F2A24', marginBottom: 20 }}>
+              Trois façons d&apos;envoyer une note, <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>au choix</span>
+            </h3>
+            <div className="canaux-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+              {[
+                { icone: '💬', bg: '#EAF4EF', titre: 'WhatsApp', desc: 'Un message vocal ou écrit au numéro Holiris, depuis son propre téléphone. Rien à installer.' },
+                { icone: '🖥️', bg: '#F3EDF7', titre: 'La borne au domicile', desc: 'Une tablette installée chez votre proche : on touche son nom et on parle. Idéal pour les intervenants de passage.' },
+                { icone: '📱', bg: '#FDF3E7', titre: 'L\'application Holiris', desc: 'Installée sur l\'écran d\'accueil du téléphone, elle s\'ouvre directement sur l\'enregistrement vocal.' },
+              ].map(c => (
+                <div key={c.titre} className="feature-card" style={{ display: 'flex', gap: 16, alignItems: 'flex-start', padding: '22px 22px' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{c.icone}</div>
+                  <div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24', marginBottom: 6 }}>{c.titre}</div>
+                    <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.65, fontWeight: 300 }}>{c.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 13, color: '#9BB5AA', marginTop: 16, lineHeight: 1.6 }}>
+              Les proches peuvent eux aussi partager leurs nouvelles par les mêmes moyens, ou directement depuis le carnet de suivi.
+            </p>
           </div>
         </div>
       </div>
@@ -235,14 +276,14 @@ export default function Landing() {
               {
                 name: 'Famille', price: '29',
                 desc: 'Pour les familles qui souhaitent suivre le bien-être d\'un proche à domicile.',
-                features: ['Tableau de bord temps réel', 'Notes WhatsApp illimitées', 'Alertes IA signaux faibles', 'Agenda et relances auto', 'Assistant IA', 'Membres famille illimités'],
-                cta: 'Demander un accès', highlight: false,
+                features: ['Tableau de bord temps réel', 'Notes illimitées (WhatsApp, borne, application)', 'Alertes IA signaux faibles', 'Agenda et relances auto', 'Assistant IA', 'Membres famille illimités'],
+                cta: 'Demander un accès', href: '/demande-acces', highlight: false,
               },
               {
                 name: 'Structure', price: '149',
                 desc: 'Pour les CCAS, SSIAD et structures d\'aide à domicile.',
                 features: ["Jusqu'à 20 dossiers seniors", 'Tout le plan Famille', 'Tableau multi-seniors', 'Rapports hebdomadaires', 'Support prioritaire', 'Formation incluse'],
-                cta: 'Nous contacter', highlight: true,
+                cta: 'Nous contacter', href: 'mailto:thomas.frentz@holiris.fr?subject=Holiris%20pour%20ma%20structure', highlight: true,
               },
             ].map((plan) => (
               <div key={plan.name} style={{
@@ -253,7 +294,7 @@ export default function Landing() {
               }}>
                 {plan.highlight && (
                   <div style={{ position: 'absolute', top: 20, right: 20, background: '#7FAF9B', color: '#fff', fontSize: 9, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: 20 }}>
-                    Populaire
+                    Pilote gratuit
                   </div>
                 )}
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>{plan.name}</div>
@@ -271,12 +312,15 @@ export default function Landing() {
                     </div>
                   ))}
                 </div>
-                <Link href="/demande-acces" className="btn-primary" style={{ display: 'block', textAlign: 'center' }}>
+                <a href={plan.href} className="btn-primary" style={{ display: 'block', textAlign: 'center' }}>
                   {plan.cta}
-                </Link>
+                </a>
               </div>
             ))}
           </div>
+          <p style={{ fontSize: 13, color: '#6F7C75', marginTop: 18, maxWidth: 760, lineHeight: 1.6 }}>
+            Pendant la phase pilote, Holiris est <strong style={{ color: '#4A8870', fontWeight: 500 }}>gratuit pendant 2 mois</strong>, avec un accompagnement pour la mise en place.
+          </p>
         </div>
       </div>
 
@@ -295,7 +339,7 @@ export default function Landing() {
           <br /><span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>dès aujourd'hui</span>
         </h2>
         <p style={{ fontSize: 15, color: '#6F7C75', maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.7, fontWeight: 300 }}>
-          Prendre soin de ceux qui nous sont chers — rejoignez les familles qui font confiance à Holiris.
+          Holiris ouvre ses portes aux premières familles et structures d&apos;aide à domicile des Pyrénées-Orientales.
         </p>
         <Link href="/demande-acces" className="btn-primary" style={{ fontSize: 15, padding: '14px 44px' }}>
           Demander un accès →
@@ -307,6 +351,7 @@ export default function Landing() {
         <div className="footer-inner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <Logo size={24} />
           <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+            <a href="mailto:thomas.frentz@holiris.fr" style={{ fontSize: 12, color: '#9BB5AA', textDecoration: 'none' }}>thomas.frentz@holiris.fr</a>
             <Link href="/privacy" style={{ fontSize: 12, color: '#9BB5AA', textDecoration: 'none' }}>Confidentialité</Link>
             <span style={{ fontSize: 12, color: '#C8D4CD' }}>© 2026 Holiris · Pyrénées-Orientales</span>
           </div>
