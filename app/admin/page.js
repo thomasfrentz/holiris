@@ -107,6 +107,18 @@ export default function Admin() {
     }
   }
 
+  async function actionUtilisateur(u, action) {
+    if (action === 'supprimer' && !confirm('Supprimer définitivement ' + (u.name || 'cet utilisateur') + ' ? Son accès au dossier et sa fiche seront effacés.')) return
+    const res = await fetch('/api/admin/utilisateurs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: u.id, action })
+    })
+    const result = await res.json()
+    if (!result.success) alert('Erreur : ' + result.error)
+    loadData()
+  }
+
   async function toggleAdmin(familleId, currentValue) {
     const res = await fetch('/api/admin/role', {
       method: 'POST',
@@ -446,7 +458,7 @@ export default function Admin() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {utilisateursFiltres.map((u) => (
-                <div key={u.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div key={u.id} style={{ background: '#fff', border: '1px solid ' + (u.archived_at ? '#F0D9B5' : '#E8EFEB'), borderRadius: 12, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', opacity: u.archived_at ? 0.75 : 1 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{u.name || '—'}</div>
@@ -456,6 +468,9 @@ export default function Admin() {
                       {u.user_id && (
                         <span style={{ background: '#F3EDF7', color: '#8B6FAA', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Compte actif</span>
                       )}
+                      {u.archived_at && (
+                        <span style={{ background: '#FDF3E7', color: '#C4844A', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Archivé le {new Date(u.archived_at).toLocaleDateString('fr-FR')}</span>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: '#9BB5AA' }}>
                       {u.email || u.phone || '—'}
@@ -463,6 +478,25 @@ export default function Admin() {
                       {u.role && <span> · {u.role}</span>}
                     </div>
                   </div>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+                  {u.archived_at ? (
+                    <>
+                      <button onClick={() => actionUtilisateur(u, 'restaurer')}
+                        style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Restaurer
+                      </button>
+                      <button onClick={() => actionUtilisateur(u, 'supprimer')} title="Supprimer définitivement"
+                        style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 8, padding: '7px 10px', fontSize: 12, cursor: 'pointer' }}>
+                        🗑️
+                      </button>
+                    </>
+                  ) : !u.is_admin && (
+                    <button onClick={() => actionUtilisateur(u, 'archiver')}
+                      style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Archiver
+                    </button>
+                  )}
+                  {!u.archived_at && (
                   <button onClick={() => toggleAdmin(u.id, u.is_admin)} style={{
                     background: u.is_admin ? '#FBECED' : '#EAF4EF',
                     color: u.is_admin ? '#C4606A' : '#4A8870',
@@ -472,6 +506,8 @@ export default function Admin() {
                   }}>
                     {u.is_admin ? 'Retirer admin' : 'Rendre admin'}
                   </button>
+                  )}
+                  </div>
                 </div>
               ))}
               {utilisateursFiltres.length === 0 && (
