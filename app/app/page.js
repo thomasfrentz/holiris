@@ -47,12 +47,12 @@ export default function App() {
 
       const { data: familleData } = await supabase
         .from('famille').select('senior_id')
-        .eq('user_id', user.id).limit(1)
+        .eq('user_id', user.id).is('archived_at', null).limit(1)
 
       if (!familleData?.length) {
         const { data: intervenantData } = await supabase
           .from('intervenants').select('id')
-          .eq('user_id', user.id).limit(1)
+          .eq('user_id', user.id).is('archived_at', null).limit(1)
         router.push(intervenantData?.length > 0 ? '/espace-intervenant' : '/famille-onboarding')
         return
       }

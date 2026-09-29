@@ -22,6 +22,10 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
   const [notes, setNotes] = useState(initialNotes || [])
   const [totalNotes, setTotalNotes] = useState(initialTotalNotes || 0)
   const [alertes, setAlertes] = useState(initialAlertes || [])
+  // Les alertes « ordonnance » sont recalculées à chaque visite : leur lecture est mémorisée sur l'appareil
+  const [ordonnancesLues, setOrdonnancesLues] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('holiris_ordonnances_lues') || '[]') } catch { return [] }
+  })
 
   // Resync notes/alertes quand le senior change
   useEffect(() => {
@@ -86,14 +90,25 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     return () => { ch1.unsubscribe(); ch2.unsubscribe() }
   }, [initialSenior?.id, supabaseUrl, supabaseKey])
 
-  async function marquerLu(id) {
-    if (String(id).startsWith('ordonnance-')) { setAlertes(prev => prev.filter(a => a.id !== id)); return }
-    const supabase = createClient(supabaseUrl, supabaseKey)
-    await supabase.from('alertes').update({ lu: true }).eq('id', id)
-    setAlertes(prev => prev.filter(a => a.id !== id))
+  async function marquerLu(ids) {
+    const liste = [].concat(ids)
+    const ordonnances = liste.filter(id => String(id).startsWith('ordonnance-'))
+    const enBase = liste.filter(id => !String(id).startsWith('ordonnance-'))
+    if (ordonnances.length) {
+      const lues = [...new Set([...ordonnancesLues, ...ordonnances])]
+      setOrdonnancesLues(lues)
+      try { localStorage.setItem('holiris_ordonnances_lues', JSON.stringify(lues)) } catch {}
+    }
+    if (enBase.length) {
+      const supabase = createClient(supabaseUrl, supabaseKey)
+      await supabase.from('alertes').update({ lu: true }).in('id', enBase)
+    }
+    setAlertes(prev => prev.filter(a => !liste.includes(a.id)))
   }
 
-  const alertesNonLues = alertes.filter(a => !a.lu)
+  const alertesNonLues = alertes
+    .filter(a => !a.lu && !ordonnancesLues.includes(a.id))
+    .sort((a, b) => (b.niveau === 'danger') - (a.niveau === 'danger'))
 
   const noteSourceLabel = (s) => s === 'whatsapp_audio' ? 'Note vocale' : s === 'whatsapp_text' ? 'WhatsApp' : 'Note'
   const noteSourceColor = (s) => {
@@ -139,29 +154,51 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
         </div>
       </div>
 
-      {/* Alertes */}
+      {/* Alertes : pop-up fixé en haut de l'écran jusqu'à ce qu'elles soient lues */}
       {alertesNonLues.length > 0 && (
-        <div style={{ marginBottom: 32 }}>
-          {alertesNonLues.map(a => {
-            const danger = a.niveau === 'danger'
-            const color = danger ? '#D98992' : '#E6B98A'
-            const bg = danger ? '#FBECED' : '#FDF3E7'
-            const border = danger ? '#F2C4C8' : '#F0D9B5'
-            return (
-              <div key={a.id} style={{ background: bg, border: '1px solid ' + border, borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
-                <div style={{ width: 3, height: 38, borderRadius: 2, background: color, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color, letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 5 }}>
-                    {danger ? 'Urgent' : 'Attention'}
+        <div className="hl-alertes-popup" role="alertdialog" aria-label="Alertes non lues">
+          <style>{`
+            .hl-alertes-popup {
+              position: fixed; top: 16px; left: calc(50% + 128px); transform: translateX(-50%);
+              width: min(560px, calc(100vw - 32px)); z-index: 150;
+              background: #fff; border-radius: 14px; box-shadow: 0 12px 40px rgba(31,42,36,0.18);
+              border: 1px solid #F0D9B5; overflow: hidden; animation: hl-popup-entree 0.25s ease-out;
+            }
+            @media (max-width: 768px) { .hl-alertes-popup { left: 50%; top: 12px; } }
+            @keyframes hl-popup-entree { from { opacity: 0; transform: translate(-50%, -12px) } to { opacity: 1; transform: translate(-50%, 0) } }
+          `}</style>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#FDF3E7', borderBottom: '1px solid #F0D9B5' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#C4844A', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              🔔 {alertesNonLues.length} alerte{alertesNonLues.length > 1 ? 's' : ''} à lire
+            </div>
+            {alertesNonLues.length > 1 && (
+              <button onClick={() => marquerLu(alertesNonLues.map(a => a.id))}
+                style={{ background: 'none', border: 'none', color: '#C4844A', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>
+                Tout marquer comme lu
+              </button>
+            )}
+          </div>
+          <div style={{ maxHeight: '55vh', overflowY: 'auto', padding: '10px 12px' }}>
+            {alertesNonLues.map(a => {
+              const danger = a.niveau === 'danger'
+              const color = danger ? '#D98992' : '#E6B98A'
+              const bg = danger ? '#FBECED' : '#FDF3E7'
+              const border = danger ? '#F2C4C8' : '#F0D9B5'
+              return (
+                <div key={a.id} style={{ background: bg, border: '1px solid ' + border, borderLeft: '3px solid ' + color, borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color, letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>
+                      {danger ? 'Urgent' : 'Attention'} · {formatRelative(a.created_at)}
+                    </div>
+                    <div style={{ fontSize: 14, color: '#1F2A24', lineHeight: 1.5 }}>{a.message}</div>
                   </div>
-                  <div style={{ fontSize: 14, color: '#1F2A24', fontWeight: 400, lineHeight: 1.5 }}>{a.message}</div>
+                  <button onClick={() => marquerLu(a.id)} style={{ background: '#fff', border: '1px solid ' + border, color: '#6F7C75', padding: '7px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: 6, fontFamily: 'inherit', flexShrink: 0 }}>
+                    Lu ✓
+                  </button>
                 </div>
-                <button onClick={() => marquerLu(a.id)} style={{ background: '#fff', border: '1px solid ' + border, color: '#6F7C75', padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: 6, fontFamily: 'inherit' }}>
-                  Lu
-                </button>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
 

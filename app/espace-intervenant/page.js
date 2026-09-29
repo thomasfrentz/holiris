@@ -27,6 +27,18 @@ export default function IntervenantDashboard() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
+  // Pas de fiche intervenant active mais un accès famille : direction le tableau de bord famille
+  useEffect(() => {
+    if (loading || isIntervenant) return
+    async function verifierFamille() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('famille').select('id').eq('user_id', user.id).is('archived_at', null).limit(1)
+      if (data?.length) router.replace('/app')
+    }
+    verifierFamille()
+  }, [loading, isIntervenant])
+
   useEffect(() => {
     if (!selectedSeniorId || !selectedSenior) return
     async function loadData() {

@@ -42,9 +42,10 @@ function LoginContent() {
       return
     }
 
+    // Les fiches archivées ne comptent pas : un accès retiré ne doit pas décider de l'espace
     const { data: intervenantData } = await supabase
       .from('intervenants').select('id')
-      .eq('user_id', user.id).limit(1)
+      .eq('user_id', user.id).is('archived_at', null).limit(1)
 
     if (intervenantData?.length > 0) {
       router.push('/espace-intervenant')
@@ -53,7 +54,7 @@ function LoginContent() {
 
     const { data: familleData } = await supabase
       .from('famille').select('id')
-      .eq('user_id', user.id).limit(1)
+      .eq('user_id', user.id).is('archived_at', null).limit(1)
 
     if (familleData?.length > 0) {
       router.push('/app')
