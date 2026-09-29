@@ -51,7 +51,7 @@ export async function GET() {
   if (!structureId) return NextResponse.json({ error: 'Réservé aux gestionnaires de structure' }, { status: 403 })
 
   const [structure, seniors, salaries, gestionnaires] = await Promise.all([
-    supabaseAdmin.from('structures').select('id, nom').eq('id', structureId).single(),
+    supabaseAdmin.from('structures').select('id, nom, adresse, adresse_facturation').eq('id', structureId).single(),
     supabaseAdmin.from('seniors').select('id, name, city, age, date_naissance').eq('structure_id', structureId).order('name'),
     supabaseAdmin.from('salaries').select('*').eq('structure_id', structureId).is('archived_at', null).order('nom'),
     supabaseAdmin.from('structure_membres').select('id, nom, email, user_id, created_at').eq('structure_id', structureId).order('created_at'),
@@ -134,6 +134,16 @@ export async function POST(request) {
       const maintenant = new Date().toISOString()
       await supabaseAdmin.from('salaries').update({ archived_at: maintenant }).eq('id', salarie.id)
       await supabaseAdmin.from('intervenants').update({ archived_at: maintenant }).eq('salarie_id', salarie.id).is('archived_at', null)
+      return NextResponse.json({ success: true })
+    }
+
+    if (body.action === 'modifier_structure') {
+      const adresse = champ(body.adresse, 300) || null
+      const { error } = await supabaseAdmin.from('structures').update({
+        adresse,
+        adresse_facturation: body.facturationIdentique ? adresse : (champ(body.adresseFacturation, 300) || null),
+      }).eq('id', structureId)
+      if (error) throw error
       return NextResponse.json({ success: true })
     }
 

@@ -17,6 +17,13 @@ export default function Profil() {
   const [nom, setNom] = useState('')
   const [lien, setLien] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [adresse, setAdresse] = useState('')
+  // Structure : adresse et adresse de facturation (communes à tous ses gestionnaires)
+  const [adresseStructure, setAdresseStructure] = useState('')
+  const [adresseFacturation, setAdresseFacturation] = useState('')
+  const [facturationIdentique, setFacturationIdentique] = useState(true)
+  const [savingStructure, setSavingStructure] = useState(false)
+  const [savedStructure, setSavedStructure] = useState(false)
   // Gestionnaire de structure (sans fiche famille) : profil propre, sans lien avec un proche
   const [gestionnaire, setGestionnaire] = useState(null)
 
@@ -55,12 +62,17 @@ export default function Profil() {
         setNom(parts.slice(1).join(' ') || '')
         setLien(f.role || '')
         setWhatsapp(f.whatsapp || '')
+        setAdresse(f.adresse || '')
       } else {
         const { data: gestion } = await supabase
-          .from('structure_membres').select('id, nom, email, structures(nom)').eq('user_id', user.id).limit(1)
+          .from('structure_membres').select('id, nom, email, structures(nom, adresse, adresse_facturation)').eq('user_id', user.id).limit(1)
         if (gestion?.length) {
           const g = gestion[0]
           setGestionnaire(g)
+          const st = g.structures || {}
+          setAdresseStructure(st.adresse || '')
+          setAdresseFacturation(st.adresse_facturation || '')
+          setFacturationIdentique(!st.adresse_facturation || st.adresse_facturation === st.adresse)
           const parts = (g.nom || '').split(' ')
           setPrenom(parts[0] || '')
           setNom(parts.slice(1).join(' ') || '')
@@ -79,13 +91,28 @@ export default function Profil() {
     } else {
       const whatsappFormatted = whatsapp.replace(/\s/g, '').replace(/^0/, '+33')
       await supabase.from('famille')
-        .update({ name: prenom + ' ' + nom, role: lien, whatsapp: whatsappFormatted || null })
+        .update({ name: prenom + ' ' + nom, role: lien, whatsapp: whatsappFormatted || null, adresse: adresse.trim() || null })
         .eq('user_id', user.id)
     }
 
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
     setSaving(false)
+  }
+
+  async function saveStructure() {
+    setSavingStructure(true)
+    const res = await fetch('/api/structure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'modifier_structure', adresse: adresseStructure, adresseFacturation, facturationIdentique })
+    })
+    const result = await res.json()
+    setSavingStructure(false)
+    if (!result.success) { alert('Erreur : ' + (result.error || 'inconnue')); return }
+    if (facturationIdentique) setAdresseFacturation(adresseStructure)
+    setSavedStructure(true)
+    setTimeout(() => setSavedStructure(false), 3000)
   }
 
   async function creerSenior() {
@@ -178,6 +205,11 @@ export default function Profil() {
             Renseignez votre numéro pour envoyer et recevoir des notes via WhatsApp
           </div>
         </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={labelStyle}>Adresse</label>
+          <textarea rows={2} placeholder="N° et rue, code postal, ville" value={adresse} onChange={e => setAdresse(e.target.value)}
+            style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+        </div>
         </>)}
         {gestionnaire && <div style={{ marginBottom: 8 }} />}
         {saved && (
@@ -196,13 +228,40 @@ export default function Profil() {
         <div style={cardStyle}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>Ma structure</div>
           <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>{gestionnaire.structures?.nom}</div>
-          <div style={{ fontSize: 13, color: '#6F7C75', marginBottom: 16, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13, color: '#6F7C75', marginBottom: 18, lineHeight: 1.6 }}>
             {seniors.length} client{seniors.length > 1 ? 's' : ''} suivi{seniors.length > 1 ? 's' : ''}. Les dossiers clients, les salariés intervenants et les gestionnaires se gèrent depuis l&apos;espace de la structure.
           </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={labelStyle}>Adresse</label>
+            <textarea rows={2} placeholder="N° et rue, code postal, ville" value={adresseStructure} onChange={e => setAdresseStructure(e.target.value)}
+              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#6F7C75', marginBottom: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={facturationIdentique} onChange={e => setFacturationIdentique(e.target.checked)} style={{ accentColor: '#7FAF9B' }} />
+            Adresse de facturation identique
+          </label>
+          {!facturationIdentique && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Adresse de facturation</label>
+              <textarea rows={2} placeholder="Raison sociale, n° et rue, code postal, ville" value={adresseFacturation} onChange={e => setAdresseFacturation(e.target.value)}
+                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+            </div>
+          )}
+          {savedStructure && (
+            <div style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 500 }}>
+              Adresses enregistrées ✓
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+            <button onClick={saveStructure} disabled={savingStructure}
+              style={{ background: '#fff', color: '#4A8870', border: '1px solid #7FAF9B', borderRadius: 8, padding: '11px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {savingStructure ? 'Enregistrement...' : 'Enregistrer les adresses'}
+            </button>
           <button onClick={() => router.push('/structure')}
             style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
             Gérer ma structure →
           </button>
+          </div>
         </div>
       ) : (
       /* Mes proches */
