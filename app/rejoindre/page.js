@@ -48,7 +48,8 @@ function RejoindreContent() {
     if (!user) {
       const email = emailParam || membre?.email || ''
       const redirect = '/rejoindre?token=' + token + (typeParam ? '&type=' + typeParam : '')
-      router.push(`/login?signup=true&email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirect)}`)
+      const typeInvit = typeParam === 'famille' ? 'famille' : 'intervenant'
+      router.push(`/login?signup=true&type=${typeInvit}&jeton=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirect)}`)
       return
     }
 

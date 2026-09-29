@@ -12,7 +12,10 @@ function calculerAge(dateNaissance) {
 export default function Admin() {
   const [authenticated, setAuthenticated] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
-  const [onglet, setOnglet] = useState('seniors')
+  const [onglet, setOnglet] = useState('demandes')
+  const [demandes, setDemandes] = useState([])
+  const [demandesErreur, setDemandesErreur] = useState('')
+  const [demandeEnCours, setDemandeEnCours] = useState(null)
   const [bornes, setBornes] = useState([])
   const [borneSenior, setBorneSenior] = useState('')
   const [borneCreating, setBorneCreating] = useState(false)
@@ -46,11 +49,34 @@ export default function Admin() {
     })))
     setUtilisateurs(data.utilisateurs || [])
 
+    // Demandes d'accès : nécessite d'être connecté avec un compte admin
+    const resDemandes = await fetch('/api/admin/demandes')
+    if (resDemandes.ok) {
+      setDemandes((await resDemandes.json()).demandes || [])
+      setDemandesErreur('')
+    } else {
+      setDemandesErreur('Connectez-vous à Holiris avec votre compte admin pour voir les demandes d\'accès.')
+    }
+
     const { data: bornesData } = await supabase
       .from('bornes')
       .select('*, seniors(name)')
       .order('created_at', { ascending: false })
     setBornes(bornesData || [])
+  }
+
+  async function traiterDemande(id, action) {
+    if (action === 'refuser' && !confirm('Refuser cette demande ? Aucun email ne sera envoyé.')) return
+    setDemandeEnCours(id)
+    const res = await fetch('/api/admin/demandes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action })
+    })
+    const result = await res.json()
+    if (!result.success) alert('Erreur : ' + result.error)
+    setDemandeEnCours(null)
+    loadData()
   }
 
   async function toggleAdmin(familleId, currentValue) {
@@ -158,6 +184,7 @@ export default function Admin() {
 
       <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '0 32px', display: 'flex' }}>
         {[
+          { key: 'demandes', label: 'Demandes d\'accès' + (demandes.filter(d => d.statut === 'en_attente').length ? ' (' + demandes.filter(d => d.statut === 'en_attente').length + ')' : '') },
           { key: 'seniors', label: 'Dossiers seniors' },
           { key: 'utilisateurs', label: 'Utilisateurs & Admins' },
           { key: 'bornes', label: 'Bornes' },
@@ -176,6 +203,77 @@ export default function Admin() {
       </div>
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '36px 24px' }}>
+
+        {onglet === 'demandes' && (
+          <>
+            <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Inscriptions</div>
+            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 8 }}>Demandes d&apos;accès</h1>
+            <p style={{ fontSize: 13, color: '#9BB5AA', marginBottom: 24 }}>Valider envoie au demandeur un email pour créer son compte et le dossier de son proche.</p>
+
+            {demandesErreur && (
+              <div style={{ background: '#FDF3E7', border: '1px solid #F0D9B5', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#C4844A', marginBottom: 16 }}>{demandesErreur}</div>
+            )}
+
+            {!demandesErreur && demandes.length === 0 && (
+              <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center', fontSize: 14, color: '#9BB5AA' }}>Aucune demande pour le moment.</div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {demandes.map(d => {
+                const statuts = {
+                  en_attente: { label: 'En attente', color: '#C4844A', bg: '#FDF3E7' },
+                  validee: { label: 'Validée · lien envoyé', color: '#4A8870', bg: '#EAF4EF' },
+                  inscrite: { label: 'Compte créé', color: '#4A8870', bg: '#EAF4EF' },
+                  refusee: { label: 'Refusée', color: '#9BB5AA', bg: '#F4F5F5' },
+                }
+                const st = statuts[d.statut] || statuts.en_attente
+                return (
+                  <div key={d.id} style={{ background: '#fff', border: '1px solid ' + (d.statut === 'en_attente' ? '#F0D9B5' : '#E8EFEB'), borderRadius: 12, padding: '16px 20px', opacity: d.statut === 'refusee' ? 0.6 : 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 15, fontWeight: 500 }}>{d.prenom} {d.nom}</span>
+                          <span style={{ fontSize: 11, fontWeight: 500, color: st.color, background: st.bg, padding: '2px 10px', borderRadius: 20 }}>{st.label}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#6F7C75', marginTop: 5, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <a href={'mailto:' + d.email} style={{ color: '#4A8870' }}>{d.email}</a>
+                          {d.telephone && <a href={'tel:' + d.telephone} style={{ color: '#4A8870' }}>{d.telephone}</a>}
+                          <span style={{ color: '#9BB5AA' }}>{new Date(d.created_at).toLocaleDateString('fr-FR')}</span>
+                        </div>
+                        {(d.senior_nom || d.lien) && (
+                          <div style={{ fontSize: 13, color: '#1F2A24', marginTop: 8 }}>
+                            Pour : <strong>{d.senior_nom || '—'}</strong>{d.senior_ville ? ' (' + d.senior_ville + ')' : ''}{d.lien ? ' · ' + d.lien : ''}
+                          </div>
+                        )}
+                        {d.message && <div style={{ fontSize: 13, color: '#6F7C75', marginTop: 6, fontStyle: 'italic', lineHeight: 1.5 }}>« {d.message} »</div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        {d.statut === 'en_attente' && (
+                          <>
+                            <button onClick={() => traiterDemande(d.id, 'valider')} disabled={demandeEnCours === d.id}
+                              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              {demandeEnCours === d.id ? '…' : 'Valider'}
+                            </button>
+                            <button onClick={() => traiterDemande(d.id, 'refuser')} disabled={demandeEnCours === d.id}
+                              style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              Refuser
+                            </button>
+                          </>
+                        )}
+                        {d.statut === 'validee' && (
+                          <button onClick={() => traiterDemande(d.id, 'valider')} disabled={demandeEnCours === d.id}
+                            style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            Renvoyer le lien
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
 
         {onglet === 'seniors' && (
           <>

@@ -16,6 +16,10 @@ function LoginContent() {
 
   const router = useRouter()
   const searchParams = useSearchParams()
+  // L'inscription n'est possible qu'avec un lien d'invitation ou de demande validée
+  const jeton = searchParams.get('jeton')
+  const typeInscription = searchParams.get('type')
+  const peutSInscrire = !!(jeton && typeInscription)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -23,7 +27,7 @@ function LoginContent() {
   )
 
   useEffect(() => {
-    if (searchParams.get('signup') === 'true') setIsSignup(true)
+    if (searchParams.get('signup') === 'true' && searchParams.get('jeton')) setIsSignup(true)
     if (searchParams.get('email')) setEmail(searchParams.get('email'))
   }, [searchParams])
 
@@ -74,20 +78,23 @@ function LoginContent() {
         return
       }
 
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) { setError(error.message); setLoading(false); return }
+      // Création du compte côté serveur, après vérification du lien
+      const res = await fetch('/api/inscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, jeton, type: typeInscription })
+      })
+      const result = await res.json()
+      if (!result.success) {
+        setError(result.error || 'Inscription impossible.')
+        if (result.compteExistant) setIsSignup(false)
+        setLoading(false)
+        return
+      }
 
-      if (data.user) {
-        await fetch('/api/confirm-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: data.user.id })
-        })
-
-        const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
-        if (signInData?.user) {
-          await redirectAfterAuth(signInData.user)
-        }
+      const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInData?.user) {
+        await redirectAfterAuth(signInData.user)
       }
       setLoading(false)
       return
@@ -219,10 +226,16 @@ function LoginContent() {
             )}
 
             <div style={{ textAlign: 'center' }}>
-              <button onClick={() => { setIsSignup(!isSignup); setError(''); setConfirmPassword('') }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
-                {isSignup ? 'Déjà un compte ? Se connecter' : 'Créer un compte'}
-              </button>
+              {peutSInscrire ? (
+                <button onClick={() => { setIsSignup(!isSignup); setError(''); setConfirmPassword('') }}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
+                  {isSignup ? 'Déjà un compte ? Se connecter' : 'Créer mon compte'}
+                </button>
+              ) : (
+                <a href="/demande-acces" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textDecoration: 'underline' }}>
+                  Pas encore de compte ? Demander un accès
+                </a>
+              )}
             </div>
 
           </div>

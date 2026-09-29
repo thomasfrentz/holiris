@@ -82,8 +82,8 @@ export default function Landing() {
           <Link href="/login" style={{ fontSize: 14, color: '#4A8870', fontWeight: 500, textDecoration: 'none' }}>
             Se connecter
           </Link>
-          <Link href="/login?signup=true" className="btn-primary" style={{ padding: '9px 22px', fontSize: 13 }}>
-            Essayer gratuitement
+          <Link href="/demande-acces" className="btn-primary" style={{ padding: '9px 22px', fontSize: 13 }}>
+            Demander un accès
           </Link>
         </div>
       </nav>
@@ -138,8 +138,8 @@ export default function Landing() {
           </p>
 
           <div className="hero-btns" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/login?signup=true" className="btn-primary">
-              Commencer gratuitement →
+            <Link href="/demande-acces" className="btn-primary">
+              Demander un accès →
             </Link>
             <a href="#fonctionnalites" className="btn-outline">
               Découvrir
@@ -236,7 +236,7 @@ export default function Landing() {
                 name: 'Famille', price: '29',
                 desc: 'Pour les familles qui souhaitent suivre le bien-être d\'un proche à domicile.',
                 features: ['Tableau de bord temps réel', 'Notes WhatsApp illimitées', 'Alertes IA signaux faibles', 'Agenda et relances auto', 'Assistant IA', 'Membres famille illimités'],
-                cta: 'Commencer gratuitement', highlight: false,
+                cta: 'Demander un accès', highlight: false,
               },
               {
                 name: 'Structure', price: '149',
@@ -271,7 +271,7 @@ export default function Landing() {
                     </div>
                   ))}
                 </div>
-                <Link href="/login?signup=true" className="btn-primary" style={{ display: 'block', textAlign: 'center' }}>
+                <Link href="/demande-acces" className="btn-primary" style={{ display: 'block', textAlign: 'center' }}>
                   {plan.cta}
                 </Link>
               </div>
@@ -297,8 +297,8 @@ export default function Landing() {
         <p style={{ fontSize: 15, color: '#6F7C75', maxWidth: 440, margin: '0 auto 36px', lineHeight: 1.7, fontWeight: 300 }}>
           Prendre soin de ceux qui nous sont chers — rejoignez les familles qui font confiance à Holiris.
         </p>
-        <Link href="/login?signup=true" className="btn-primary" style={{ fontSize: 15, padding: '14px 44px' }}>
-          Créer un compte gratuit →
+        <Link href="/demande-acces" className="btn-primary" style={{ fontSize: 15, padding: '14px 44px' }}>
+          Demander un accès →
         </Link>
       </div>
 
