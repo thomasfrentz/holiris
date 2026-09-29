@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useIntervenant } from '../lib/useIntervenant'
 import QuestionMedicale from '../components/QuestionMedicale'
+import NoteVocale from '../components/NoteVocale'
 
 export default function IntervenantDashboard() {
   const [notes, setNotes] = useState([])
@@ -253,7 +254,7 @@ export default function IntervenantDashboard() {
             style={{ width: '100%', padding: '12px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box', marginBottom: 10, color: '#1F2A24', background: '#FAFCFC' }}
           />
           <div style={{ background: '#FDF3E7', border: '1px solid #F0D9B5', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: '#C4844A', marginBottom: 14, fontWeight: 400 }}>
-            Ne partagez pas de diagnostics, ordonnances ou données médicales confidentielles.
+            Les informations médicales (diagnostic, traitement, résultat) ne sont pas enregistrées : si elles sont essentielles, la personne de confiance vous recontactera.
           </div>
           {saved && (
             <div style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 500 }}>
@@ -264,6 +265,12 @@ export default function IntervenantDashboard() {
             style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 28px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!newNote.trim() || saving) ? 0.5 : 1 }}>
             {saving ? 'Publication...' : 'Publier la note'}
           </button>
+
+          <div style={{ borderTop: '1px solid #EBF0EC', marginTop: 20, paddingTop: 18 }}>
+            <div style={{ fontSize: 12, color: '#9BB5AA', textAlign: 'center', marginBottom: 12 }}>ou dictez votre note</div>
+            <NoteVocale key={selectedSeniorId} seniorId={selectedSeniorId} source="intervenant"
+              onNoteAjoutee={note => setNotes(prev => [note, ...prev])} />
+          </div>
         </div>
 
         {/* Passages semaine */}

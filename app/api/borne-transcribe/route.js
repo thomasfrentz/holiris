@@ -8,7 +8,10 @@ export async function POST(request) {
     const formData = await request.formData()
     const audio = formData.get('audio')
     const buffer = await audio.arrayBuffer()
-    const audioFile = new File([buffer], 'note.webm', { type: 'audio/webm' })
+    // Safari (iPhone) enregistre en mp4, Chrome et Android en webm
+    const type = audio.type || 'audio/webm'
+    const extension = type.includes('mp4') || type.includes('aac') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm'
+    const audioFile = new File([buffer], 'note.' + extension, { type })
 
     const transcription = await groq.audio.transcriptions.create({
       file: audioFile,
@@ -21,7 +24,7 @@ export async function POST(request) {
       model: 'openai/gpt-oss-120b',
       reasoning_effort: 'low',
       messages: [
-        { role: 'system', content: 'Tu es l\'assistant de Holiris. Transforme ce message vocal en note clinique courte en 1-2 phrases. Commence directement par la note.' },
+        { role: 'system', content: 'Tu es l\'assistant de Holiris. Transforme ce message vocal en note courte et naturelle en 1-2 phrases : moral, état général, activités. Sois factuel. Commence directement par la note, sans formule de politesse.' },
         { role: 'user', content: rawText }
       ],
       max_completion_tokens: 400

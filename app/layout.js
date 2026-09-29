@@ -17,6 +17,16 @@ const dmSans = DM_Sans({
 export const metadata = {
   title: 'Holiris — Prendre soin de ceux qui nous sont chers',
   description: 'Plateforme de coordination familiale pour le suivi du bien-être des personnes âgées',
+  // Application installable sur l'écran d'accueil (voir app/manifest.js)
+  appleWebApp: { capable: true, title: 'Holiris', statusBarStyle: 'default' },
+  icons: {
+    icon: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
+  },
+}
+
+export const viewport = {
+  themeColor: '#7FAF9B',
 }
 
 export default function RootLayout({ children }) {

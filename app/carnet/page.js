@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import QuestionMedicale from '../components/QuestionMedicale'
+import NoteVocale from '../components/NoteVocale'
 import { useSenior } from '../lib/useSenior'
 
 export default function Carnet() {
@@ -129,6 +130,11 @@ export default function Carnet() {
               style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, cursor: 'pointer' }}>
               Annuler
             </button>
+          </div>
+          <div style={{ borderTop: '1px solid #eee', marginTop: 18, paddingTop: 16 }}>
+            <div style={{ fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 12 }}>ou dictez votre note</div>
+            <NoteVocale key={selectedSeniorId} seniorId={selectedSeniorId} source="famille"
+              onNoteAjoutee={note => setNotes(prev => [note, ...prev])} />
           </div>
         </div>
       )}
