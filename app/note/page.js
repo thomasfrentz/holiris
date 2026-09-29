@@ -12,6 +12,7 @@ export default function NoteRapide() {
   const [prenom, setPrenom] = useState('')
   const [installation, setInstallation] = useState(null) // null | 'ios' | 'android'
   const [promptAndroid, setPromptAndroid] = useState(null)
+  const [userId, setUserId] = useState(null)
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -26,11 +27,16 @@ export default function NoteRapide() {
 
       const [{ data: interv }, { data: fam }] = await Promise.all([
         supabase.from('intervenants').select('name, senior_id, selected_senior_id, seniors!intervenants_senior_id_fkey(id, name)').eq('user_id', user.id).is('archived_at', null),
-        supabase.from('famille').select('name, senior_id, selected_senior_id, seniors!famille_senior_id_fkey(id, name)').eq('user_id', user.id).is('archived_at', null),
+        supabase.from('famille').select('name, senior_id, selected_senior_id, is_admin, seniors!famille_senior_id_fkey(id, name)').eq('user_id', user.id).is('archived_at', null),
       ])
 
       // Un senior par ligne ; le rôle d'intervenant prime si la personne est aussi un proche
       const liste = new Map()
+      // L'admin voit tous les dossiers, comme sur le site
+      if ((fam || []).some(l => l.is_admin)) {
+        const { data: tousSeniors } = await supabase.from('seniors').select('id, name')
+        for (const sr of tousSeniors || []) liste.set(sr.id, { ...sr, source: 'famille' })
+      }
       for (const l of fam || []) if (l.seniors) liste.set(l.seniors.id, { ...l.seniors, source: 'famille' })
       for (const l of interv || []) if (l.seniors) liste.set(l.seniors.id, { ...l.seniors, source: 'intervenant' })
       const tous = [...liste.values()].sort((a, b) => a.name.localeCompare(b.name))
@@ -39,6 +45,7 @@ export default function NoteRapide() {
 
       setSeniors(tous)
       setSeniorId(prefere || tous[0]?.id || null)
+      setUserId(user.id)
       setPrenom(lignes[0]?.name?.split(' ')[0] || '')
 
       // Aide à l'installation si l'application n'est pas déjà sur l'écran d'accueil
@@ -62,6 +69,16 @@ export default function NoteRapide() {
   }
 
   const senior = seniors.find(s => s.id === seniorId)
+
+  // Le senior choisi devient aussi le dossier actif sur le site et pour WhatsApp
+  async function choisirSenior(id) {
+    setSeniorId(id)
+    if (!userId) return
+    await Promise.all([
+      supabase.from('famille').update({ selected_senior_id: id }).eq('user_id', userId),
+      supabase.from('intervenants').update({ selected_senior_id: id }).eq('user_id', userId),
+    ])
+  }
 
   return (
     <div style={{ minHeight: '100dvh', background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 55%, #F5F0FA 100%)', fontFamily: "'Inter', system-ui, sans-serif", color: '#1F2A24', display: 'flex', flexDirection: 'column' }}>
@@ -101,7 +118,7 @@ export default function NoteRapide() {
             <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 14, padding: '12px 16px', marginBottom: 28 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 4 }}>Note pour</div>
               {seniors.length > 1 ? (
-                <select value={seniorId || ''} onChange={e => setSeniorId(e.target.value)}
+                <select value={seniorId || ''} onChange={e => choisirSenior(e.target.value)}
                   style={{ width: '100%', border: 'none', background: 'transparent', fontSize: 18, fontFamily: "'Cormorant Garamond', serif", fontWeight: 500, color: '#1F2A24', outline: 'none', padding: '2px 0', cursor: 'pointer' }}>
                   {seniors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
