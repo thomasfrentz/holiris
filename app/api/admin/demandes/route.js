@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { randomBytes } from 'crypto'
-import { supabaseAdmin, utilisateurCourant, lignesFamille } from '@/lib/serveur'
+import { supabaseAdmin, verifierAdmin } from '@/lib/serveur'
 import { escapeHtml, emailDemandeValidee } from '@/lib/emails'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 async function estAdmin() {
-  const user = await utilisateurCourant()
-  if (!user) return false
-  const lignes = await lignesFamille(user.id)
-  return lignes.some(l => l.is_admin)
+  return (await verifierAdmin()).admin
 }
 
 // Liste des demandes d'accès (admin connecté uniquement)

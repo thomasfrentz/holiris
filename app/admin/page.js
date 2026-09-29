@@ -1,8 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-
-const ADMIN_PASSWORD = 'holiris2024'
+import { useRouter } from 'next/navigation'
 
 function calculerAge(dateNaissance) {
   if (!dateNaissance) return null
@@ -10,8 +9,8 @@ function calculerAge(dateNaissance) {
 }
 
 export default function Admin() {
-  const [authenticated, setAuthenticated] = useState(false)
-  const [adminPassword, setAdminPassword] = useState('')
+  const [acces, setAcces] = useState('verification') // verification | ok | refuse
+  const router = useRouter()
   const [onglet, setOnglet] = useState('demandes')
   const [demandes, setDemandes] = useState([])
   const [demandesErreur, setDemandesErreur] = useState('')
@@ -36,12 +35,14 @@ export default function Admin() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  useEffect(() => {
-    if (authenticated) loadData()
-  }, [authenticated])
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
+    // Accès réservé au compte admin connecté (vérifié côté serveur)
     const res = await fetch('/api/admin/data')
+    if (res.status === 401) { router.push('/login?redirect=' + encodeURIComponent('/admin')); return }
+    if (!res.ok) { setAcces('refuse'); return }
+    setAcces('ok')
     const data = await res.json()
     setSeniors((data.seniors || []).map(s => ({
       ...s,
@@ -80,7 +81,13 @@ export default function Admin() {
   }
 
   async function toggleAdmin(familleId, currentValue) {
-    await supabase.from('famille').update({ is_admin: !currentValue }).eq('id', familleId)
+    const res = await fetch('/api/admin/role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familleId, isAdmin: !currentValue })
+    })
+    const result = await res.json()
+    if (!result.success) alert('Erreur : ' + result.error)
     loadData()
   }
 
@@ -132,29 +139,20 @@ export default function Admin() {
     u.email?.toLowerCase().includes(searchUser.toLowerCase())
   )
 
-  if (!authenticated) return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 50%, #F5F0FA 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif" }}>
+  if (acces !== 'ok') return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 50%, #F5F0FA 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", padding: 24 }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap');`}</style>
-      <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 16, padding: '40px 36px', width: 360, textAlign: 'center', boxShadow: '0 4px 24px rgba(127,175,155,0.1)' }}>
-        <svg width="44" height="44" viewBox="0 0 64 64" fill="none" style={{ marginBottom: 16 }}>
-          <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="1.5" fill="none"/>
-          <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="1.5" fill="none"/>
-          <circle cx="32" cy="32" r="5" fill="#7FAF9B"/>
-          <circle cx="32" cy="32" r="2.2" fill="#fff"/>
-        </svg>
+      <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 16, padding: '40px 36px', width: 380, textAlign: 'center', boxShadow: '0 4px 24px rgba(127,175,155,0.1)' }}>
         <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>Holiris</div>
-        <div style={{ fontSize: 10, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 28 }}>Espace Admin</div>
-        <input
-          type="password" placeholder="Mot de passe admin"
-          value={adminPassword} onChange={e => setAdminPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && adminPassword === ADMIN_PASSWORD && setAuthenticated(true)}
-          style={{ ...inputStyle, marginBottom: 12, textAlign: 'center' }}
-        />
-        <button
-          onClick={() => adminPassword === ADMIN_PASSWORD ? setAuthenticated(true) : alert('Mot de passe incorrect')}
-          style={{ width: '100%', background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '13px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Accéder →
-        </button>
+        <div style={{ fontSize: 10, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 24 }}>Espace Admin</div>
+        {acces === 'verification' ? (
+          <div style={{ fontSize: 14, color: '#9BB5AA' }}>Vérification…</div>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, color: '#6F7C75', lineHeight: 1.6, marginBottom: 20 }}>Cet espace est réservé aux administrateurs Holiris.</div>
+            <a href="/app" style={{ fontSize: 13, color: '#4A8870' }}>← Retour à mon espace</a>
+          </>
+        )}
       </div>
     </div>
   )
