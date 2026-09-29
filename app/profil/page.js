@@ -17,6 +17,8 @@ export default function Profil() {
   const [nom, setNom] = useState('')
   const [lien, setLien] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  // Gestionnaire de structure (sans fiche famille) : profil propre, sans lien avec un proche
+  const [gestionnaire, setGestionnaire] = useState(null)
 
   // Ajouter un senior
   const [showAddSenior, setShowAddSenior] = useState(false)
@@ -53,6 +55,16 @@ export default function Profil() {
         setNom(parts.slice(1).join(' ') || '')
         setLien(f.role || '')
         setWhatsapp(f.whatsapp || '')
+      } else {
+        const { data: gestion } = await supabase
+          .from('structure_membres').select('id, nom, email, structures(nom)').eq('user_id', user.id).limit(1)
+        if (gestion?.length) {
+          const g = gestion[0]
+          setGestionnaire(g)
+          const parts = (g.nom || '').split(' ')
+          setPrenom(parts[0] || '')
+          setNom(parts.slice(1).join(' ') || '')
+        }
       }
       setLoading(false)
     }
@@ -62,11 +74,14 @@ export default function Profil() {
   async function saveProfil() {
     if (!prenom || !nom) return
     setSaving(true)
-    const whatsappFormatted = whatsapp.replace(/\s/g, '').replace(/^0/, '+33')
-
-    await supabase.from('famille')
-      .update({ name: prenom + ' ' + nom, role: lien, whatsapp: whatsappFormatted || null })
-      .eq('user_id', user.id)
+    if (gestionnaire) {
+      await supabase.from('structure_membres').update({ nom: prenom + ' ' + nom }).eq('user_id', user.id)
+    } else {
+      const whatsappFormatted = whatsapp.replace(/\s/g, '').replace(/^0/, '+33')
+      await supabase.from('famille')
+        .update({ name: prenom + ' ' + nom, role: lien, whatsapp: whatsappFormatted || null })
+        .eq('user_id', user.id)
+    }
 
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -129,7 +144,9 @@ export default function Profil() {
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Compte</div>
         <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Mon profil</h1>
-        <p style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>{user?.email}</p>
+        <p style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>
+          {user?.email}{gestionnaire?.structures?.nom && <span> · Gestionnaire de {gestionnaire.structures.nom}</span>}
+        </p>
       </div>
 
       {/* Mes informations */}
@@ -145,6 +162,7 @@ export default function Profil() {
             <input placeholder="Votre nom" value={nom} onChange={e => setNom(e.target.value)} style={inputStyle} />
           </div>
         </div>
+        {!gestionnaire && (<>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Lien avec {selectedSenior?.name}</label>
           <select value={lien} onChange={e => setLien(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }}>
@@ -160,6 +178,8 @@ export default function Profil() {
             Renseignez votre numéro pour envoyer et recevoir des notes via WhatsApp
           </div>
         </div>
+        </>)}
+        {gestionnaire && <div style={{ marginBottom: 8 }} />}
         {saved && (
           <div style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 500 }}>
             Profil sauvegardé ✓
@@ -171,7 +191,21 @@ export default function Profil() {
         </button>
       </div>
 
-      {/* Mes proches */}
+      {/* Gestionnaire : ses clients se gèrent dans « Ma structure » */}
+      {gestionnaire ? (
+        <div style={cardStyle}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>Ma structure</div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>{gestionnaire.structures?.nom}</div>
+          <div style={{ fontSize: 13, color: '#6F7C75', marginBottom: 16, lineHeight: 1.6 }}>
+            {seniors.length} client{seniors.length > 1 ? 's' : ''} suivi{seniors.length > 1 ? 's' : ''}. Les dossiers clients, les salariés intervenants et les gestionnaires se gèrent depuis l&apos;espace de la structure.
+          </div>
+          <button onClick={() => router.push('/structure')}
+            style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Gérer ma structure →
+          </button>
+        </div>
+      ) : (
+      /* Mes proches */
       <div style={cardStyle}>
         <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Mes proches</div>
 
@@ -267,6 +301,7 @@ export default function Profil() {
           </div>
         )}
       </div>
+      )}
 
       {/* Déconnexion */}
       <div style={{ maxWidth: 520 }}>
