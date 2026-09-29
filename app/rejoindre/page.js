@@ -24,20 +24,15 @@ function RejoindreContent() {
     async function checkToken() {
       if (!token) { setStatus('invalid'); return }
 
-      const table = typeParam === 'famille' ? 'famille' : 'intervenants'
-      const fkey = typeParam === 'famille' ? 'famille_senior_id_fkey' : 'intervenants_senior_id_fkey'
       setType(typeParam === 'famille' ? 'famille' : 'intervenant')
 
-      const { data } = await supabase
-        .from(table)
-        .select(`*, seniors!${fkey}(*)`)
-        .eq('invite_token', token)
-        .limit(1)
+      // Lecture de l'invitation par le serveur (les fiches ne sont pas lisibles sans connexion)
+      const res = await fetch('/api/rejoindre?token=' + encodeURIComponent(token) + '&type=' + (typeParam || 'intervenant'))
+      if (!res.ok) { setStatus('invalid'); return }
+      const data = await res.json()
 
-      if (!data?.length) { setStatus('invalid'); return }
-
-      setMembre(data[0])
-      setSenior(data[0].seniors)
+      setMembre(data.membre)
+      setSenior(data.senior)
       setStatus('valid')
     }
     checkToken()
@@ -53,18 +48,14 @@ function RejoindreContent() {
       return
     }
 
-    const table = typeParam === 'famille' ? 'famille' : 'intervenants'
-    await supabase.from(table)
-      .update({ user_id: user.id, invite_token: null })
-      .eq('invite_token', token)
-
-    // Rattacher aussi les autres seniors en attente pour ce même email
-    if (membre?.email) {
-      await supabase.from(table)
-        .update({ user_id: user.id, invite_token: null })
-        .ilike('email', membre.email)
-        .is('user_id', null)
-    }
+    // Activation par le serveur : rattache ce dossier et les autres invitations du même email
+    const res = await fetch('/api/rejoindre', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, type: typeParam || 'intervenant' })
+    })
+    const result = await res.json()
+    if (!result.success) { alert(result.error || 'Activation impossible.'); return }
 
     setStatus('success')
     setTimeout(() => router.push(typeParam === 'famille' ? '/app' : '/espace-intervenant'), 2000)

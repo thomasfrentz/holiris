@@ -7,7 +7,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY // tâche serveur : les tables ne sont pas lisibles avec la clé publique
 )
 
 export async function GET(request) {

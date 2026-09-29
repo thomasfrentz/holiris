@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 
 export default function Borne() {
   const [step, setStep] = useState('loading')
@@ -25,10 +24,6 @@ export default function Borne() {
   const chunksRef = useRef([])
   const timerRef = useRef(null)
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
 
   useEffect(() => {
     loadBorne(localStorage.getItem('holiris_borne_code'))
@@ -41,11 +36,8 @@ export default function Borne() {
       return
     }
     setStep('loading')
-    const { data: borne } = await supabase
-      .from('bornes')
-      .select('*, seniors(name)')
-      .eq('code', code.toUpperCase())
-      .single()
+    const res = await fetch('/api/borne?code=' + encodeURIComponent(code.toUpperCase()))
+    const { borne, personnes: liste } = res.ok ? await res.json() : {}
 
     if (!borne) {
       localStorage.removeItem('holiris_borne_code')
@@ -53,16 +45,6 @@ export default function Borne() {
       setError('Code borne invalide.')
       return
     }
-
-    const [{ data: intervenants }, { data: famille }] = await Promise.all([
-      supabase.from('intervenants').select('id, name, role').eq('senior_id', borne.senior_id).order('name'),
-      supabase.from('famille').select('id, name, role').eq('senior_id', borne.senior_id).is('archived_at', null).order('name'),
-    ])
-
-    const liste = [
-      ...(intervenants || []).map(p => ({ ...p, type: 'intervenant' })),
-      ...(famille || []).map(p => ({ ...p, type: 'famille' })),
-    ].sort((a, b) => a.name.localeCompare(b.name))
 
     setBorneInfo(borne)
     setPersonnes(liste)

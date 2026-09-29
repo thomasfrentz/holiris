@@ -77,24 +77,17 @@ export default function Profil() {
     if (!seniorPrenom || !seniorNom || !seniorDate || !seniorVille || !seniorLien) return
     setCreateLoading(true)
 
-    const age = Math.floor((new Date() - new Date(seniorDate)) / (365.25 * 24 * 60 * 60 * 1000))
-
-    const { data: senior, error } = await supabase
-      .from('seniors').insert({
-        name: seniorPrenom + ' ' + seniorNom,
-        age, date_naissance: seniorDate, city: seniorVille,
-        status: 'stable'
-      }).select().single()
-
-    if (error) { setCreateLoading(false); return }
-
-    await supabase.from('famille').insert({
-      senior_id: senior.id,
-      user_id: user.id,
-      name: prenom + ' ' + nom,
-      role: seniorLien,
-      email: user.email,
+    // Le serveur crée le senior et la fiche famille ensemble
+    const res = await fetch('/api/dossier', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        seniorPrenom, seniorNom, seniorDateNaissance: seniorDate, seniorVille,
+        profilNom: prenom + ' ' + nom, profilLien: seniorLien,
+      })
     })
+    const result = await res.json()
+    if (!result.success) { setCreateLoading(false); return }
 
     setShowAddSenior(false)
     setAddMode(null)

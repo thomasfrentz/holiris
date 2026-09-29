@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 const Tag = ({ children, color = '#7FAF9B', bg = '#EAF4EF' }) => (
   <span style={{ fontSize: 11, fontWeight: 500, color, background: bg, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.04em' }}>
@@ -62,7 +62,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
   // Realtime Supabase — filtré par senior
   useEffect(() => {
     if (!supabaseUrl || !supabaseKey || !initialSenior?.id) return
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createBrowserClient(supabaseUrl, supabaseKey)
 
     const ch1 = supabase.channel('db-notes-' + initialSenior.id)
       .on('postgres_changes', {
@@ -100,7 +100,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       try { localStorage.setItem('holiris_ordonnances_lues', JSON.stringify(lues)) } catch {}
     }
     if (enBase.length) {
-      const supabase = createClient(supabaseUrl, supabaseKey)
+      const supabase = createBrowserClient(supabaseUrl, supabaseKey)
       await supabase.from('alertes').update({ lu: true }).in('id', enBase)
     }
     setAlertes(prev => prev.filter(a => !liste.includes(a.id)))

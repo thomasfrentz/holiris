@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 
 export default function FamilleOnboarding() {
@@ -18,61 +17,38 @@ export default function FamilleOnboarding() {
   const [profilPrenom, setProfilPrenom] = useState('')
   const [profilNom, setProfilNom] = useState('')
   const [profilLien, setProfilLien] = useState('')
-  const [seniorCreatedId, setSeniorCreatedId] = useState(null)
 
   const router = useRouter()
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
 
-  async function creerSenior() {
+  // Étape 1 : les informations du senior sont gardées, le dossier est créé à l'étape 2
+  function creerSenior() {
     if (!seniorNom || !seniorPrenom || !seniorDateNaissance || !seniorVille) return
-    setLoading(true)
     setError('')
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-
-    // Calculer l'âge
-    const age = Math.floor((new Date() - new Date(seniorDateNaissance)) / (365.25 * 24 * 60 * 60 * 1000))
-
-    const { data: senior, error: seniorError } = await supabase
-      .from('seniors').insert({
-        name: seniorPrenom + ' ' + seniorNom,
-        age,
-        date_naissance: seniorDateNaissance,
-        city: seniorVille,
-      }).select().single()
-
-    if (seniorError) {
-      setError('Erreur lors de la création du dossier.')
-      setLoading(false)
-      return
-    }
-
-    setSeniorCreatedId(senior.id)
-    setLoading(false)
     setEtape('creer_profil')
   }
 
+  // Étape 2 : création du dossier et de la fiche famille du créateur, par le serveur
   async function creerProfil() {
     if (!profilPrenom || !profilNom || !profilLien) return
     setLoading(true)
     setError('')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-
-    await supabase.from('famille').insert({
-      senior_id: seniorCreatedId,
-      user_id: user.id,
-      name: profilPrenom + ' ' + profilNom,
-      role: profilLien,
-      email: user.email,
+    const res = await fetch('/api/dossier', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        seniorPrenom, seniorNom, seniorDateNaissance, seniorVille,
+        profilNom: profilPrenom + ' ' + profilNom, profilLien,
+      })
     })
-
+    if (res.status === 401) { router.push('/login'); return }
+    const result = await res.json()
+    if (!result.success) {
+      setError(result.error || 'Erreur lors de la création du dossier.')
+      setLoading(false)
+      return
+    }
     router.push('/app')
   }
 
