@@ -42,6 +42,14 @@ function LoginContent() {
       return
     }
 
+    // Gestionnaire de structure : arrivée sur « Ma structure »
+    const { data: gestionData } = await supabase
+      .from('structure_membres').select('id').eq('user_id', user.id).limit(1)
+    if (gestionData?.length > 0) {
+      router.push('/structure')
+      return
+    }
+
     // Les fiches archivées ne comptent pas : un accès retiré ne doit pas décider de l'espace
     const { data: intervenantData } = await supabase
       .from('intervenants').select('id')

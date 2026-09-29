@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin, utilisateurCourant, lignesFamille } from '@/lib/serveur'
+import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
 
 // Désignation de la personne de confiance d'un senior (admin uniquement)
 export async function POST(request) {
@@ -9,8 +9,7 @@ export async function POST(request) {
 
     const user = await utilisateurCourant()
     if (!user) return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 })
-    const lignes = await lignesFamille(user.id)
-    if (!lignes.some(l => l.is_admin)) return NextResponse.json({ success: false, error: 'Réservé à l\'admin' }, { status: 403 })
+    if (!await peutGererSenior(user.id, seniorId)) return NextResponse.json({ success: false, error: 'Réservé à l\'admin ou à la structure' }, { status: 403 })
 
     // familleId null = retirer la désignation
     if (familleId) {

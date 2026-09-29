@@ -16,7 +16,14 @@ export async function POST(request) {
 
     // Vérifier le jeton et que l'email correspond à celui de l'invitation
     let demandeId = null
-    if (type === 'demande') {
+    let gestionnaireId = null
+    if (type === 'structure') {
+      const { data } = await supabaseAdmin.from('structure_membres')
+        .select('id, email').eq('invite_token', jeton).maybeSingle()
+      if (!data) return NextResponse.json({ success: false, error: 'Ce lien n\'est plus valide.' }, { status: 400 })
+      if (data.email.toLowerCase() !== adresse) return NextResponse.json({ success: false, error: 'Utilisez l\'adresse email à laquelle vous avez reçu le lien.' }, { status: 400 })
+      gestionnaireId = data.id
+    } else if (type === 'demande') {
       const { data } = await supabaseAdmin.from('demandes_acces')
         .select('id, email, statut').eq('jeton', jeton).maybeSingle()
       if (!data || data.statut !== 'validee') return NextResponse.json({ success: false, error: 'Ce lien n\'est plus valide.' }, { status: 400 })
@@ -44,6 +51,13 @@ export async function POST(request) {
         compteExistant: existe,
         error: existe ? 'Un compte existe déjà avec cet email : connectez-vous.' : error.message,
       }, { status: 400 })
+    }
+
+    // Gestionnaire de structure : rattaché directement (le jeton a prouvé l'accès à la boîte mail)
+    if (gestionnaireId) {
+      await supabaseAdmin.from('structure_membres')
+        .update({ user_id: created.user.id, invite_token: null })
+        .eq('id', gestionnaireId)
     }
 
     if (demandeId) {

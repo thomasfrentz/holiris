@@ -25,9 +25,10 @@ export default function NoteRapide() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login?redirect=' + encodeURIComponent('/note')); return }
 
-      const [{ data: interv }, { data: fam }] = await Promise.all([
+      const [{ data: interv }, { data: fam }, { data: gestion }] = await Promise.all([
         supabase.from('intervenants').select('name, senior_id, selected_senior_id, seniors!intervenants_senior_id_fkey(id, name)').eq('user_id', user.id).is('archived_at', null),
         supabase.from('famille').select('name, senior_id, selected_senior_id, is_admin, seniors!famille_senior_id_fkey(id, name)').eq('user_id', user.id).is('archived_at', null),
+        supabase.from('structure_membres').select('nom, structure_id, selected_senior_id').eq('user_id', user.id),
       ])
 
       // Un senior par ligne ; le rôle d'intervenant prime si la personne est aussi un proche
@@ -37,10 +38,15 @@ export default function NoteRapide() {
         const { data: tousSeniors } = await supabase.from('seniors').select('id, name')
         for (const sr of tousSeniors || []) liste.set(sr.id, { ...sr, source: 'famille' })
       }
+      // Le gestionnaire voit les dossiers de sa structure
+      if (gestion?.length) {
+        const { data: seniorsStructure } = await supabase.from('seniors').select('id, name').in('structure_id', gestion.map(g => g.structure_id))
+        for (const sr of seniorsStructure || []) liste.set(sr.id, { ...sr, source: 'famille' })
+      }
       for (const l of fam || []) if (l.seniors) liste.set(l.seniors.id, { ...l.seniors, source: 'famille' })
       for (const l of interv || []) if (l.seniors) liste.set(l.seniors.id, { ...l.seniors, source: 'intervenant' })
       const tous = [...liste.values()].sort((a, b) => a.name.localeCompare(b.name))
-      const lignes = [...(interv || []), ...(fam || [])]
+      const lignes = [...(interv || []), ...(fam || []), ...(gestion || []).map(g => ({ ...g, name: g.nom }))]
       const prefere = lignes.find(l => l.selected_senior_id && liste.has(l.selected_senior_id))?.selected_senior_id
 
       setSeniors(tous)
@@ -77,6 +83,7 @@ export default function NoteRapide() {
     await Promise.all([
       supabase.from('famille').update({ selected_senior_id: id }).eq('user_id', userId),
       supabase.from('intervenants').update({ selected_senior_id: id }).eq('user_id', userId),
+      supabase.from('structure_membres').update({ selected_senior_id: id }).eq('user_id', userId),
     ])
   }
 

@@ -15,6 +15,9 @@ export default function Admin() {
   const [demandes, setDemandes] = useState([])
   const [demandesErreur, setDemandesErreur] = useState('')
   const [demandeEnCours, setDemandeEnCours] = useState(null)
+  const [structures, setStructures] = useState([])
+  const [nouvelleStructure, setNouvelleStructure] = useState({ nom: '', nomResponsable: '', email: '' })
+  const [structureEnvoi, setStructureEnvoi] = useState(false)
   const [bornes, setBornes] = useState([])
   const [borneSenior, setBorneSenior] = useState('')
   const [borneCreating, setBorneCreating] = useState(false)
@@ -59,6 +62,9 @@ export default function Admin() {
       setDemandesErreur('Connectez-vous à Holiris avec votre compte admin pour voir les demandes d\'accès.')
     }
 
+    const resStructures = await fetch('/api/admin/structures')
+    if (resStructures.ok) setStructures((await resStructures.json()).structures || [])
+
     const { data: bornesData } = await supabase
       .from('bornes')
       .select('*, seniors(name)')
@@ -78,6 +84,27 @@ export default function Admin() {
     if (!result.success) alert('Erreur : ' + result.error)
     setDemandeEnCours(null)
     loadData()
+  }
+
+  async function actionStructure(corps) {
+    setStructureEnvoi(true)
+    const res = await fetch('/api/admin/structures', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps)
+    })
+    const result = await res.json()
+    setStructureEnvoi(false)
+    if (!result.success) { alert('Erreur : ' + result.error); return false }
+    loadData()
+    return true
+  }
+
+  async function creerStructure() {
+    if (await actionStructure({ action: 'creer', ...nouvelleStructure })) {
+      alert('Structure créée ✓ — ' + (nouvelleStructure.email) + ' a reçu son invitation par email.')
+      setNouvelleStructure({ nom: '', nomResponsable: '', email: '' })
+    }
   }
 
   async function toggleAdmin(familleId, currentValue) {
@@ -184,6 +211,7 @@ export default function Admin() {
         {[
           { key: 'demandes', label: 'Demandes d\'accès' + (demandes.filter(d => d.statut === 'en_attente').length ? ' (' + demandes.filter(d => d.statut === 'en_attente').length + ')' : '') },
           { key: 'seniors', label: 'Dossiers seniors' },
+          { key: 'structures', label: 'Structures' },
           { key: 'utilisateurs', label: 'Utilisateurs & Admins' },
           { key: 'bornes', label: 'Bornes' },
         ].map(o => (
@@ -273,6 +301,48 @@ export default function Admin() {
           </>
         )}
 
+        {onglet === 'structures' && (
+          <>
+            <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Professionnels</div>
+            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 8 }}>Structures</h1>
+            <p style={{ fontSize: 13, color: '#9BB5AA', marginBottom: 24 }}>
+              Une structure (SAAD, CCAS…) gère ses propres clients et salariés. Ses gestionnaires ont les droits d&apos;admin, uniquement sur les dossiers de la structure.
+            </p>
+
+            <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: 22, marginBottom: 20 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 14 }}>Nouvelle structure</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 14 }}>
+                <input placeholder="Nom de la structure *" value={nouvelleStructure.nom} onChange={e => setNouvelleStructure({ ...nouvelleStructure, nom: e.target.value })} style={inputStyle} />
+                <input placeholder="Nom du responsable" value={nouvelleStructure.nomResponsable} onChange={e => setNouvelleStructure({ ...nouvelleStructure, nomResponsable: e.target.value })} style={inputStyle} />
+                <input type="email" placeholder="Email du responsable *" value={nouvelleStructure.email} onChange={e => setNouvelleStructure({ ...nouvelleStructure, email: e.target.value })} style={inputStyle} />
+              </div>
+              <button onClick={creerStructure} disabled={structureEnvoi || !nouvelleStructure.nom || !nouvelleStructure.email}
+                style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!nouvelleStructure.nom || !nouvelleStructure.email) ? 0.5 : 1 }}>
+                {structureEnvoi ? 'Création…' : 'Créer et inviter le responsable'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {structures.length === 0 && (
+                <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '36px 20px', textAlign: 'center', fontSize: 14, color: '#9BB5AA' }}>Aucune structure pour le moment.</div>
+              )}
+              {structures.map(st => (
+                <div key={st.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 20px' }}>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24' }}>{st.nom}</div>
+                  <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>{st.nbSeniors} client{st.nbSeniors > 1 ? 's' : ''}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {st.gestionnaires.map(g => (
+                      <span key={g.email} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: g.compteActif ? '#EAF4EF' : '#FDF3E7', color: g.compteActif ? '#4A8870' : '#C4844A' }}>
+                        {g.nom || g.email} · {g.compteActif ? 'compte actif' : 'invitation envoyée'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         {onglet === 'seniors' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
@@ -332,6 +402,14 @@ export default function Admin() {
                       {s.age} ans · {s.city}
                       {s.date_naissance && <span> · Né(e) le {new Date(s.date_naissance).toLocaleDateString('fr-FR')}</span>}
                     </div>
+                    {structures.length > 0 && (
+                      <select value={s.structure_id || ''} disabled={structureEnvoi}
+                        onChange={e => actionStructure({ action: 'rattacher', seniorId: s.id, structureId: e.target.value || null })}
+                        style={{ marginTop: 8, padding: '4px 8px', border: '1px solid #E8EFEB', borderRadius: 6, fontSize: 12, color: '#6F7C75', background: '#FAFCFC', fontFamily: 'inherit' }}>
+                        <option value="">Sans structure (famille)</option>
+                        {structures.map(st => <option key={st.id} value={st.id}>Structure : {st.nom}</option>)}
+                      </select>
+                    )}
                     {s.famille?.length > 0 && (
                       <div style={{ fontSize: 12, color: '#4A8870', marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {s.famille.map((f, i) => (

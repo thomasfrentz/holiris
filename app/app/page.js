@@ -14,13 +14,19 @@ export default function App() {
   const [ordonnances, setOrdonnances] = useState([])
   const [loading, setLoading] = useState(true)
   const [aContacter, setAContacter] = useState([])
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
+  const [estGestionnaire, setEstGestionnaire] = useState(false)
   const router = useRouter()
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
+
+  // Gestionnaire sans client pour l'instant : direction « Ma structure » pour créer un premier dossier
+  useEffect(() => {
+    if (estGestionnaire && !seniorsLoading && !seniors.length) router.push('/structure')
+  }, [estGestionnaire, seniorsLoading, seniors.length])
 
   // Demandes de contact suite à une information médicale essentielle
   useEffect(() => {
@@ -49,7 +55,13 @@ export default function App() {
         .from('famille').select('senior_id')
         .eq('user_id', user.id).is('archived_at', null).limit(1)
 
-      if (!familleData?.length) {
+      // Un gestionnaire de structure accède au tableau de bord de ses clients sans ligne famille
+      const { data: gestionData } = familleData?.length ? { data: [] }
+        : await supabase.from('structure_membres').select('id').eq('user_id', user.id).limit(1)
+
+      if (gestionData?.length) setEstGestionnaire(true)
+
+      if (!familleData?.length && !gestionData?.length) {
         const { data: intervenantData } = await supabase
           .from('intervenants').select('id')
           .eq('user_id', user.id).is('archived_at', null).limit(1)

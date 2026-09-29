@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin, utilisateurCourant, lignesFamille } from '@/lib/serveur'
+import { supabaseAdmin, utilisateurCourant, lignesFamille, structuresGerees, peutGererSenior } from '@/lib/serveur'
 import { repondreSignalement } from '@/lib/notesMedicales'
 
 // Signalements « à contacter » visibles par l'utilisateur connecté :
-// ceux dont il est la personne de confiance, et ceux sans personne de confiance s'il est admin
+// ceux dont il est la personne de confiance, et ceux sans personne de confiance
+// qui lui reviennent : seniors de sa structure (gestionnaire), ou hors structure (admin)
 export async function GET() {
   const user = await utilisateurCourant()
   if (!user) return NextResponse.json({ signalements: [] }, { status: 401 })
@@ -11,15 +12,16 @@ export async function GET() {
   const lignes = await lignesFamille(user.id)
   const idsFamille = lignes.map(l => l.id)
   const estAdmin = lignes.some(l => l.is_admin)
+  const structures = await structuresGerees(user.id)
 
   let query = supabaseAdmin.from('signalements_medicaux')
-    .select('id, senior_id, auteur_nom, auteur_role, auteur_telephone, auteur_email, repondu_at, destinataire_famille_id, seniors(name)')
+    .select('id, senior_id, auteur_nom, auteur_role, auteur_telephone, auteur_email, repondu_at, destinataire_famille_id, seniors(name, structure_id)')
     .eq('statut', 'a_contacter')
     .order('repondu_at', { ascending: false })
 
   const filtres = []
   if (idsFamille.length) filtres.push(`destinataire_famille_id.in.(${idsFamille.join(',')})`)
-  if (estAdmin) filtres.push('destinataire_famille_id.is.null')
+  if (estAdmin || structures.length) filtres.push('destinataire_famille_id.is.null')
   if (!filtres.length) return NextResponse.json({ signalements: [] })
   query = query.or(filtres.join(','))
 
@@ -28,7 +30,10 @@ export async function GET() {
     console.error('Lecture signalements:', error.message)
     return NextResponse.json({ signalements: [] })
   }
-  return NextResponse.json({ signalements: data })
+  const pourMoi = data.filter(s => s.destinataire_famille_id
+    ? idsFamille.includes(s.destinataire_famille_id)
+    : (s.seniors?.structure_id ? structures.includes(s.seniors.structure_id) : estAdmin))
+  return NextResponse.json({ signalements: pourMoi })
 }
 
 // action : 'essentiel' | 'non_essentiel' (réponse de l'auteur) ou 'contacte' (personne de confiance)
@@ -49,9 +54,9 @@ export async function POST(request) {
       if (!user) return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 })
       const lignes = await lignesFamille(user.id)
       const { data: sig } = await supabaseAdmin.from('signalements_medicaux')
-        .select('destinataire_famille_id').eq('id', id).single()
+        .select('destinataire_famille_id, senior_id').eq('id', id).single()
       const autorise = sig && (lignes.some(l => l.id === sig.destinataire_famille_id)
-        || (!sig.destinataire_famille_id && lignes.some(l => l.is_admin)))
+        || (!sig.destinataire_famille_id && await peutGererSenior(user.id, sig.senior_id)))
       if (!autorise) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
 
       await supabaseAdmin.from('signalements_medicaux')
