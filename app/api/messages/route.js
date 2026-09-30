@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
 import { analyserNote, creerSignalement } from '@/lib/notesMedicales'
+import { marquerLu } from '@/lib/messagesNonLus'
 import { escapeHtml, emailNouveauMessage, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
 
 // Fil de discussion d'un senior : envoi d'un message (filtre médical, puis notification par email).
@@ -97,6 +98,7 @@ export async function POST(request) {
     }
     const signalementId = medical ? await creerSignalement({ seniorId, auteur, source: 'messages' }) : null
     const notifies = message ? await notifier(senior, user.id, auteur, contenu) : 0
+    await marquerLu(user.id, seniorId)
 
     return NextResponse.json({ success: true, message, medical, signalementId, notePartielle: !!contenu, notifies })
   } catch (error) {

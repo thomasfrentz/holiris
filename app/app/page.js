@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Dashboard from '../dashboard'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
+import { useNonLus } from '../lib/useNonLus'
+import BandeauMessages from '../components/BandeauMessages'
 
 export default function App() {
   const [events, setEvents] = useState([])
@@ -16,6 +18,7 @@ export default function App() {
   const [aContacter, setAContacter] = useState([])
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const [estGestionnaire, setEstGestionnaire] = useState(false)
+  const nonLus = useNonLus()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -142,6 +145,7 @@ export default function App() {
       switchSenior={switchSenior}
       isAdmin={isAdmin}
     >
+      <BandeauMessages nonLus={nonLus} seniorId={selectedSeniorId} />
       {aContacter.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #E0D0EC', borderLeft: '3px solid #8B6FAA', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#8B6FAA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>À contacter</div>

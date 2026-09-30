@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useIntervenant } from '../lib/useIntervenant'
 import QuestionMedicale from '../components/QuestionMedicale'
 import NoteVocale from '../components/NoteVocale'
+import BandeauMessages from '../components/BandeauMessages'
+import { useNonLus } from '../lib/useNonLus'
 
 export default function IntervenantDashboard() {
   const [notes, setNotes] = useState([])
@@ -20,6 +22,7 @@ export default function IntervenantDashboard() {
   const [resumeLoading, setResumeLoading] = useState(false)
 
   const { seniorsList, selectedSenior, selectedSeniorId, switchSenior, isIntervenant, intervenantName, loading } = useIntervenant()
+  const nonLus = useNonLus()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -189,6 +192,8 @@ export default function IntervenantDashboard() {
       </div>
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 20px' }}>
+
+        <BandeauMessages nonLus={nonLus} seniorId={selectedSeniorId} />
 
         {/* Header page */}
         <div style={{ marginBottom: 28 }}>

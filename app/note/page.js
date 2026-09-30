@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import NoteVocale from '../components/NoteVocale'
+import { useNonLus } from '../lib/useNonLus'
 
 // Écran « Note rapide » : point d'entrée de l'application installée sur le téléphone
 export default function NoteRapide() {
@@ -14,6 +15,7 @@ export default function NoteRapide() {
   const [promptAndroid, setPromptAndroid] = useState(null)
   const [userId, setUserId] = useState(null)
   const router = useRouter()
+  const nonLus = useNonLus()
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -138,6 +140,9 @@ export default function NoteRapide() {
 
             <a href="/messages" style={{ display: 'block', textAlign: 'center', marginTop: 26, padding: '12px 16px', background: '#fff', border: '1px solid #C8DDD4', borderRadius: 12, color: '#4A8870', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>
               💬 Messages de l&apos;équipe
+              {nonLus.total > 0 && (
+                <span style={{ marginLeft: 8, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10, background: '#D98992', color: '#fff', fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', verticalAlign: 'middle' }}>{nonLus.total}</span>
+              )}
             </a>
 
             <div style={{ fontSize: 12, color: '#9BB5AA', textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>

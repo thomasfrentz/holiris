@@ -63,6 +63,12 @@ export default function Messages() {
 
   useEffect(() => { finRef.current?.scrollIntoView({ block: 'end' }) }, [messages.length])
 
+  // Fil affiché = fil lu (ouverture et messages reçus pendant la lecture)
+  useEffect(() => {
+    if (!seniorId || chargement || document.visibilityState !== 'visible') return
+    fetch('/api/messages/non-lus', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId }) }).catch(() => {})
+  }, [seniorId, chargement, messages.length])
+
   async function envoyer() {
     if (!texte.trim() || envoi) return
     setEnvoi(true); setErreur('')

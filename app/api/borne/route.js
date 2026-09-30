@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/serveur'
+import { nonLusPour } from '@/lib/messagesNonLus'
 
 // Chargement d'une borne par son code (la borne n'a pas de compte connecté).
 // Le code de la borne sert de clé : il ne donne accès qu'au nom du senior et à la liste des personnes.
@@ -10,6 +11,16 @@ export async function GET(request) {
   const { data: borne } = await supabaseAdmin.from('bornes')
     .select('id, code, senior_id, seniors(name)').eq('code', code).maybeSingle()
   if (!borne) return NextResponse.json({ error: 'Code borne invalide' }, { status: 404 })
+
+  // Messages non lus de la personne qui a touché son nom : nombre et prénoms seulement, jamais le contenu
+  const personneId = new URL(request.url).searchParams.get('nonlus')
+  if (personneId) {
+    const table = new URL(request.url).searchParams.get('type') === 'famille' ? 'famille' : 'intervenants'
+    const { data: p } = await supabaseAdmin.from(table).select('user_id, senior_id').eq('id', personneId).maybeSingle()
+    if (!p?.user_id || p.senior_id !== borne.senior_id) return NextResponse.json({ nombre: 0, auteurs: [] })
+    const { parSenior } = await nonLusPour(p.user_id, [borne.senior_id])
+    return NextResponse.json(parSenior[borne.senior_id] || { nombre: 0, auteurs: [] })
+  }
 
   // Alertes non lues, demandées quand une personne de la liste choisit son nom (jamais sur l'accueil)
   if (new URL(request.url).searchParams.get('alertes')) {

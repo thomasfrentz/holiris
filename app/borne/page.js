@@ -20,6 +20,7 @@ export default function Borne() {
   const [signalement, setSignalement] = useState(null) // { id, notePartielle }
   const [reponseMedicale, setReponseMedicale] = useState('')
   const [alertesBorne, setAlertesBorne] = useState([])
+  const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs }
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -66,6 +67,14 @@ export default function Borne() {
     setNoteProposee('')
     setDuration(0)
     setAlertesBorne([])
+    setMessagesBorne(null)
+    // Messages non lus de cette personne : annonce seulement (nombre et prénoms, jamais le contenu)
+    if (p.type !== 'invite' && p.id && borneInfo?.code) {
+      fetch('/api/borne?code=' + encodeURIComponent(borneInfo.code) + '&nonlus=' + p.id + '&type=' + p.type)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => setMessagesBorne(data?.nombre ? data : null))
+        .catch(() => {})
+    }
     setStep('enregistrement')
     // Alertes en cours : seulement pour les personnes de la liste, pas pour un visiteur
     if (p.type !== 'invite' && borneInfo?.code) {
@@ -316,6 +325,17 @@ export default function Borne() {
           <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 32, fontWeight: 300, color: '#FAFCFA' }}>{selectedPersonne?.name}</h2>
           <p style={{ fontSize: 13, color: 'rgba(154,184,159,0.6)' }}>{selectedPersonne?.role}</p>
         </div>
+
+        {messagesBorne && (
+          <div style={{ textAlign: 'left', background: 'rgba(127,175,155,0.1)', border: '1px solid rgba(127,175,155,0.35)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 22 }}>💬</span>
+            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+              Vous avez <strong style={{ color: '#9AB89F' }}>{messagesBorne.nombre} nouveau{messagesBorne.nombre > 1 ? 'x' : ''} message{messagesBorne.nombre > 1 ? 's' : ''}</strong>
+              {messagesBorne.auteurs?.length ? ' de ' + (messagesBorne.auteurs.length > 1 ? messagesBorne.auteurs.slice(0, -1).join(', ') + ' et ' + messagesBorne.auteurs[messagesBorne.auteurs.length - 1] : messagesBorne.auteurs[0]) : ''}.
+              <span style={{ color: 'rgba(255,255,255,0.45)' }}> Lisez-les sur votre téléphone ou sur holiris.fr.</span>
+            </span>
+          </div>
+        )}
 
         {alertesBorne.length > 0 && (
           <div style={{ textAlign: 'left', background: 'rgba(230,185,138,0.08)', border: '1px solid rgba(230,185,138,0.3)', borderRadius: 8, padding: '14px 16px', marginBottom: 32 }}>
