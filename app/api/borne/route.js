@@ -11,6 +11,17 @@ export async function GET(request) {
     .select('id, code, senior_id, seniors(name)').eq('code', code).maybeSingle()
   if (!borne) return NextResponse.json({ error: 'Code borne invalide' }, { status: 404 })
 
+  // Alertes non lues, demandées quand une personne de la liste choisit son nom (jamais sur l'accueil)
+  if (new URL(request.url).searchParams.get('alertes')) {
+    const depuis = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+    const { data: alertes } = await supabaseAdmin.from('alertes')
+      .select('id, niveau, message, created_at')
+      .eq('senior_id', borne.senior_id).eq('lu', false).gte('created_at', depuis)
+      .order('created_at', { ascending: false }).limit(5)
+    // Les urgentes d'abord, comme sur le tableau de bord
+    return NextResponse.json({ alertes: (alertes || []).sort((a, b) => (b.niveau === 'danger') - (a.niveau === 'danger')) })
+  }
+
   const [{ data: intervenants }, { data: famille }] = await Promise.all([
     supabaseAdmin.from('intervenants').select('id, name, role').eq('senior_id', borne.senior_id).is('archived_at', null).order('name'),
     supabaseAdmin.from('famille').select('id, name, role').eq('senior_id', borne.senior_id).is('archived_at', null).order('name'),

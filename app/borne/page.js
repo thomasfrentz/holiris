@@ -19,6 +19,7 @@ export default function Borne() {
   const [noteProposee, setNoteProposee] = useState('')
   const [signalement, setSignalement] = useState(null) // { id, notePartielle }
   const [reponseMedicale, setReponseMedicale] = useState('')
+  const [alertesBorne, setAlertesBorne] = useState([])
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -64,7 +65,15 @@ export default function Borne() {
     setAudioBlob(null)
     setNoteProposee('')
     setDuration(0)
+    setAlertesBorne([])
     setStep('enregistrement')
+    // Alertes en cours : seulement pour les personnes de la liste, pas pour un visiteur
+    if (p.type !== 'invite' && borneInfo?.code) {
+      fetch('/api/borne?alertes=1&code=' + encodeURIComponent(borneInfo.code))
+        .then(res => res.ok ? res.json() : { alertes: [] })
+        .then(data => setAlertesBorne(data.alertes || []))
+        .catch(() => {})
+    }
   }
 
   function validerInvite() {
@@ -307,6 +316,22 @@ export default function Borne() {
           <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 32, fontWeight: 300, color: '#FAFCFA' }}>{selectedPersonne?.name}</h2>
           <p style={{ fontSize: 13, color: 'rgba(154,184,159,0.6)' }}>{selectedPersonne?.role}</p>
         </div>
+
+        {alertesBorne.length > 0 && (
+          <div style={{ textAlign: 'left', background: 'rgba(230,185,138,0.08)', border: '1px solid rgba(230,185,138,0.3)', borderRadius: 8, padding: '14px 16px', marginBottom: 32 }}>
+            <p style={{ fontSize: 11, color: '#E6B98A', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>Points d&apos;attention en cours</p>
+            {alertesBorne.map(a => (
+              <div key={a.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: a.niveau === 'danger' ? '#E0939A' : '#E6B98A', flexShrink: 0 }}>{a.niveau === 'danger' ? 'Urgent' : 'À surveiller'}</span>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+                  {a.message}
+                  <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}> · {new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                </span>
+              </div>
+            ))}
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Pensez à en parler dans votre note si vous avez remarqué quelque chose.</p>
+          </div>
+        )}
 
         {error && <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 4, padding: '10px 14px', fontSize: 13, color: '#e0939a', marginBottom: 24 }}>{error}</div>}
 
