@@ -48,6 +48,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
   const pathname = usePathname()
   const { structure, adminHoliris } = useRole()
   const nonLus = useNonLus()
+  // Seuls les messages du senior actif sont signalés
+  const nbMessages = nonLus.parSenior[selectedSeniorId]?.nombre || 0
 
   const navItemsAdmin = [
     { icon: 'flux', label: 'Flux en temps réel', href: '/app' },
@@ -170,10 +172,10 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
                     <span style={{ fontSize: 13, fontWeight: active ? 500 : 400, color: active ? '#4A8870' : '#6F7C75' }}>
                       {item.label}
                     </span>
-                    {nonLus.total > 0 && item.href === '/messages' && (
-                      <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#D98992', color: '#fff', fontSize: 10, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{nonLus.total > 99 ? '99+' : nonLus.total}</span>
+                    {nbMessages > 0 && item.href === '/messages' && (
+                      <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#D98992', color: '#fff', fontSize: 10, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{nbMessages > 99 ? '99+' : nbMessages}</span>
                     )}
-                    {active && !(nonLus.total > 0 && item.href === '/messages') && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#7FAF9B', marginLeft: 'auto' }} />}
+                    {active && !(nbMessages > 0 && item.href === '/messages') && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#7FAF9B', marginLeft: 'auto' }} />}
                   </div>
                 </Link>
               )
@@ -249,8 +251,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
                   transition: 'background 0.2s', position: 'relative',
                 }}>
                   <Icon type={item.icon} active={active} size={18} />
-                  {nonLus.total > 0 && item.href === '/messages' && (
-                    <span style={{ position: 'absolute', top: -2, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#D98992', color: '#fff', fontSize: 9, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{nonLus.total > 99 ? '99+' : nonLus.total}</span>
+                  {nbMessages > 0 && item.href === '/messages' && (
+                    <span style={{ position: 'absolute', top: -2, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#D98992', color: '#fff', fontSize: 9, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{nbMessages > 99 ? '99+' : nbMessages}</span>
                   )}
                 </div>
                 {item.label && (

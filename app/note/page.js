@@ -140,8 +140,8 @@ export default function NoteRapide() {
 
             <a href="/messages" style={{ display: 'block', textAlign: 'center', marginTop: 26, padding: '12px 16px', background: '#fff', border: '1px solid #C8DDD4', borderRadius: 12, color: '#4A8870', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>
               💬 Messages de l&apos;équipe
-              {nonLus.total > 0 && (
-                <span style={{ marginLeft: 8, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10, background: '#D98992', color: '#fff', fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', verticalAlign: 'middle' }}>{nonLus.total}</span>
+              {nonLus.parSenior[seniorId]?.nombre > 0 && (
+                <span style={{ marginLeft: 8, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10, background: '#D98992', color: '#fff', fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', verticalAlign: 'middle' }}>{nonLus.parSenior[seniorId].nombre}</span>
               )}
             </a>
 
