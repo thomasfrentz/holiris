@@ -14,10 +14,6 @@ export default function Intervenants() {
   const [showArchives, setShowArchives] = useState(false)
   const [saving, setSaving] = useState(false)
   const [emailSent, setEmailSent] = useState(null)
-  const [messageModal, setMessageModal] = useState(null)
-  const [messageTexte, setMessageTexte] = useState('')
-  const [messageSending, setMessageSending] = useState(false)
-  const [messageResult, setMessageResult] = useState(null)
   const [medecinModifie, setMedecinModifie] = useState({}) // seniorId -> intervenantId après désignation
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
 
@@ -115,27 +111,6 @@ export default function Intervenants() {
     } catch (e) { alert('Erreur réseau') }
   }
 
-  async function envoyerMessageLibre() {
-    if (!messageTexte.trim() || !messageModal) return
-    setMessageSending(true)
-    setMessageResult(null)
-    try {
-      const res = await fetch('/api/whatsapp-intervenant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsapp: messageModal.whatsapp, message: messageTexte })
-      })
-      const data = await res.json()
-      if (data.success) {
-        setMessageResult('success')
-        setTimeout(() => { setMessageModal(null); setMessageTexte(''); setMessageResult(null) }, 2000)
-      } else {
-        setMessageResult('error')
-      }
-    } catch (e) { setMessageResult('error') }
-    setMessageSending(false)
-  }
-
   const medecinTraitantId = selectedSeniorId in medecinModifie
     ? medecinModifie[selectedSeniorId]
     : selectedSenior?.medecin_traitant_id
@@ -181,36 +156,6 @@ export default function Intervenants() {
     <Layout senior={selectedSenior} seniors={seniors} selectedSeniorId={selectedSeniorId} switchSenior={switchSenior} isAdmin={isAdmin}>
 
 
-      {/* Modal message libre */}
-      {messageModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>Message WhatsApp</div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24', marginBottom: 4 }}>{messageModal.name}</div>
-            <div style={{ fontSize: 12, color: '#9BB5AA', marginBottom: 20 }}>{messageModal.whatsapp} · {messageModal.role}</div>
-            <div style={{ background: '#FDF3E7', border: '1px solid #F0D9B5', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#C4844A', marginBottom: 16 }}>
-              Ce message ne peut être envoyé que si l'intervenant a déjà écrit au numéro Holiris (+1 218-443-9755).
-            </div>
-            <textarea
-              placeholder={'Votre message à ' + messageModal.name.split(' ')[0] + '...'}
-              value={messageTexte} onChange={e => setMessageTexte(e.target.value)} rows={4}
-              style={{ width: '100%', padding: '12px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box', marginBottom: 12, background: '#FAFCFC' }}
-            />
-            {messageResult === 'success' && <div style={{ background: '#EAF4EF', color: '#4A8870', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12, fontWeight: 500 }}>Message envoyé ✓</div>}
-            {messageResult === 'error' && <div style={{ background: '#FBECED', color: '#C4606A', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>Erreur — l'intervenant doit d'abord écrire au numéro Holiris.</div>}
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={envoyerMessageLibre} disabled={messageSending || !messageTexte.trim()}
-                style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 24px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!messageTexte.trim() || messageSending) ? 0.5 : 1 }}>
-                {messageSending ? 'Envoi...' : 'Envoyer →'}
-              </button>
-              <button onClick={() => { setMessageModal(null); setMessageTexte(''); setMessageResult(null) }}
-                style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '11px 20px', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
         <div>
@@ -320,10 +265,10 @@ export default function Intervenants() {
                     Médecin traitant
                   </button>
                 ))}
-                <button onClick={() => { setMessageModal(i); setMessageTexte(''); setMessageResult(null) }}
-                  style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                <a href="/messages"
+                  style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit', textDecoration: 'none' }}>
                   Message
-                </button>
+                </a>
                 <button onClick={() => archiverIntervenant(i.id)}
                   style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
                   Archiver

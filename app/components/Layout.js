@@ -36,6 +36,7 @@ const Icon = ({ type, active, size = 18 }) => {
     intervenants: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>,
     assistant: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg>,
     profil: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+    messages: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>,
     structure: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/></svg>,
     espace: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   }
@@ -50,6 +51,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
     { icon: 'flux', label: 'Flux en temps réel', href: '/app' },
     { icon: 'agenda', label: 'Agenda', href: '/agenda' },
     { icon: 'carnet', label: 'Carnet de suivi', href: '/carnet' },
+    { icon: 'messages', label: 'Messages', href: '/messages' },
     { icon: 'ordonnances', label: 'Ordonnances', href: '/ordonnances' },
     { icon: 'famille', label: 'Famille', href: '/famille' },
     { icon: 'intervenants', label: 'Intervenants', href: '/intervenants' },
@@ -59,6 +61,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
 
   const navItemsIntervenant = [
     { icon: 'espace', label: 'Mon espace', href: '/espace-intervenant' },
+    { icon: 'messages', label: 'Messages', href: '/messages' },
     { icon: 'agenda', label: 'Agenda', href: '/agenda' },
   ]
 
@@ -68,6 +71,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
   const bottomNavItems = isIntervenant ? navItemsIntervenant : [
     { icon: 'flux', label: '', href: '/app' },
     { icon: 'agenda', label: 'Agenda', href: '/agenda' },
+    { icon: 'messages', label: 'Messages', href: '/messages' },
     { icon: 'famille', label: 'Famille', href: '/famille' },
     { icon: 'intervenants', label: 'Équipe', href: '/intervenants' },
     { icon: 'carnet', label: 'Carnet', href: '/carnet' },

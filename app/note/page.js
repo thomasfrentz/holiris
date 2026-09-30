@@ -136,7 +136,11 @@ export default function NoteRapide() {
 
             <NoteVocale key={seniorId} seniorId={seniorId} source={senior?.source || 'famille'} grand />
 
-            <div style={{ fontSize: 12, color: '#9BB5AA', textAlign: 'center', marginTop: 28, lineHeight: 1.6 }}>
+            <a href="/messages" style={{ display: 'block', textAlign: 'center', marginTop: 26, padding: '12px 16px', background: '#fff', border: '1px solid #C8DDD4', borderRadius: 12, color: '#4A8870', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>
+              💬 Messages de l&apos;équipe
+            </a>
+
+            <div style={{ fontSize: 12, color: '#9BB5AA', textAlign: 'center', marginTop: 20, lineHeight: 1.6 }}>
               Moral, repas, activités, ce que vous avez remarqué.<br />Les informations médicales ne sont pas enregistrées.
             </div>
           </>
