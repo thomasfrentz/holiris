@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
+import AucunDossier from '../components/AucunDossier'
 import { useIntervenant } from '../lib/useIntervenant'
 
 export default function Agenda() {
@@ -183,11 +184,7 @@ export default function Agenda() {
     </div>
   )
 
-  if (!selectedSenior) return (
-    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
-      <div style={{ color: '#888' }}>Aucun dossier accessible.</div>
-    </div>
-  )
+  if (!selectedSenior) return <AucunDossier isAdmin={isAdmin} />
 
   return (
     <Layout

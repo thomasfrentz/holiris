@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
+import AucunDossier from '../components/AucunDossier'
 
 export default function Intervenants() {
   const [intervenants, setIntervenants] = useState([])
@@ -17,7 +18,7 @@ export default function Intervenants() {
   const [messageTexte, setMessageTexte] = useState('')
   const [messageSending, setMessageSending] = useState(false)
   const [messageResult, setMessageResult] = useState(null)
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
 
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
@@ -149,6 +150,9 @@ export default function Intervenants() {
     await supabase.from('intervenants').delete().eq('id', id)
     loadData()
   }
+
+  // Aucun dossier (ex. structure sans client) : message au lieu d'un chargement sans fin
+  if (!seniorsLoading && !seniors.length) return <AucunDossier isAdmin={isAdmin} />
 
   if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", background: '#F7F9F8' }}>

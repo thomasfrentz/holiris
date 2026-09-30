@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
+import AucunDossier from '../components/AucunDossier'
 
 export default function Assistant() {
   const [notes, setNotes] = useState([])
@@ -15,7 +16,7 @@ export default function Assistant() {
   const [input, setInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const chatEndRef = useRef(null)
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -72,6 +73,9 @@ export default function Assistant() {
     }
     setAiLoading(false)
   }
+
+  // Aucun dossier (ex. structure sans client) : message au lieu d'un chargement sans fin
+  if (!seniorsLoading && !seniors.length) return <AucunDossier isAdmin={isAdmin} />
 
   if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>

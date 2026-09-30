@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import QuestionMedicale from '../components/QuestionMedicale'
 import NoteVocale from '../components/NoteVocale'
 import { useSenior } from '../lib/useSenior'
+import AucunDossier from '../components/AucunDossier'
 
 export default function Carnet() {
   const [notes, setNotes] = useState([])
@@ -15,7 +16,7 @@ export default function Carnet() {
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [questionMedicale, setQuestionMedicale] = useState(null)
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -85,6 +86,9 @@ export default function Carnet() {
     if (source === 'famille') return { icon: '👨‍👩‍👧', label: 'Note famille', color: '#3498db' }
     return { icon: '📝', label: 'Note', color: '#3498db' }
   }
+
+  // Aucun dossier (ex. structure sans client) : message au lieu d'un chargement sans fin
+  if (!seniorsLoading && !seniors.length) return <AucunDossier isAdmin={isAdmin} />
 
   if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>

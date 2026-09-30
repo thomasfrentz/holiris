@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
+import AucunDossier from '../components/AucunDossier'
 
 export default function Ordonnances() {
   const [ordonnances, setOrdonnances] = useState([])
@@ -15,7 +16,7 @@ export default function Ordonnances() {
   const [dateRenouvellement, setDateRenouvellement] = useState('')
   const [notes, setNotes] = useState('')
 
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -90,6 +91,9 @@ export default function Ordonnances() {
     if (jours <= 7) return { color: '#f39c12', bg: '#fef9ec' }
     return { color: '#2ecc71', bg: '#eafaf1' }
   }
+
+  // Aucun dossier (ex. structure sans client) : message au lieu d'un chargement sans fin
+  if (!seniorsLoading && !seniors.length) return <AucunDossier isAdmin={isAdmin} />
 
   if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>

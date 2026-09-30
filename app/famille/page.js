@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
+import AucunDossier from '../components/AucunDossier'
 
 export default function Famille() {
   const [membres, setMembres] = useState([])
@@ -20,7 +21,7 @@ export default function Famille() {
   const [email, setEmail] = useState('')
   const [pdcModifiee, setPdcModifiee] = useState({}) // seniorId -> familleId après désignation
 
-  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
+  const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
 
   const supabase = createBrowserClient(
@@ -167,6 +168,9 @@ export default function Famille() {
     await supabase.from('famille').delete().eq('id', id)
     setArchives(prev => prev.filter(m => m.id !== id))
   }
+
+  // Aucun dossier (ex. structure sans client) : message au lieu d'un chargement sans fin
+  if (!seniorsLoading && !seniors.length) return <AucunDossier isAdmin={isAdmin} />
 
   if (loading || !selectedSenior) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", background: '#F7F9F8' }}>
