@@ -18,6 +18,7 @@ export default function Intervenants() {
   const [messageTexte, setMessageTexte] = useState('')
   const [messageSending, setMessageSending] = useState(false)
   const [messageResult, setMessageResult] = useState(null)
+  const [medecinModifie, setMedecinModifie] = useState({}) // seniorId -> intervenantId après désignation
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
 
   const [prenom, setPrenom] = useState('')
@@ -133,6 +134,22 @@ export default function Intervenants() {
       }
     } catch (e) { setMessageResult('error') }
     setMessageSending(false)
+  }
+
+  const medecinTraitantId = selectedSeniorId in medecinModifie
+    ? medecinModifie[selectedSeniorId]
+    : selectedSenior?.medecin_traitant_id
+
+  // Le médecin traitant reçoit un compte rendu par email la veille de chaque RDV « Médical »
+  async function designerMedecin(intervenantId) {
+    const res = await fetch('/api/medecin-traitant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seniorId: selectedSeniorId, intervenantId })
+    })
+    const result = await res.json()
+    if (result.success) setMedecinModifie(prev => ({ ...prev, [selectedSeniorId]: intervenantId }))
+    else alert(result.error || 'Erreur')
   }
 
   async function archiverIntervenant(id) {
@@ -267,7 +284,12 @@ export default function Intervenants() {
                 {roleIcons[i.role] ?? '👤'}
               </div>
               <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{i.name}</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {i.name}
+                  {i.id === medecinTraitantId && (
+                    <span style={{ fontSize: 11, fontWeight: 500, color: '#4A8870', background: '#EAF4EF', padding: '2px 10px', borderRadius: 20 }}>Médecin traitant</span>
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{i.role}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {i.phone && <span>{i.phone}</span>}
@@ -287,6 +309,17 @@ export default function Intervenants() {
                     )}
                   </>
                 )}
+                {(i.id === medecinTraitantId || /m[ée]decin|docteur|g[ée]n[ée]raliste/i.test(i.role || '')) && (i.id === medecinTraitantId ? (
+                  <button onClick={() => designerMedecin(null)}
+                    style={{ background: '#F4F5F5', color: '#6F7C75', border: '1px solid #E8EFEB', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Retirer médecin traitant
+                  </button>
+                ) : (
+                  <button onClick={() => designerMedecin(i.id)} title="Reçoit un compte rendu par email la veille de chaque consultation"
+                    style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                    Médecin traitant
+                  </button>
+                ))}
                 <button onClick={() => { setMessageModal(i); setMessageTexte(''); setMessageResult(null) }}
                   style={{ background: '#F3EDF7', color: '#8B6FAA', border: '1px solid #E0D0EC', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
                   Message
