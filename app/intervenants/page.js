@@ -114,12 +114,15 @@ export default function Intervenants() {
     if (!edition.prenom.trim() || !edition.role || (nouvelEmail && !emailValide(nouvelEmail))) return
     setSaving(true)
     const nomComplet = (edition.prenom.trim() + ' ' + edition.nom.trim()).trim()
+    const emailChange = nouvelEmail !== (i.email || '')
     const { error } = await supabase.from('intervenants').update({
       name: nomComplet, role: edition.role,
       phone: edition.telephone || null, whatsapp: versWhatsapp(edition.telephone), email: nouvelEmail || null,
+      // Sans compte, un nouvel email invalide l'ancien lien d'invitation (envoyé à l'ancienne adresse)
+      ...(emailChange && !i.user_id ? { invite_token: null } : {}),
     }).eq('id', i.id)
     if (!error) {
-      if (!i.user_id && nouvelEmail && nouvelEmail !== (i.email || '')) await inviter(i.id, nomComplet)
+      if (!i.user_id && nouvelEmail && emailChange) await inviter(i.id, nomComplet)
       setEdition(null)
       setTimeout(() => setEmailSent(null), 6000)
       loadData()
