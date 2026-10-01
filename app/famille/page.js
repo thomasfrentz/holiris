@@ -67,6 +67,11 @@ export default function Famille() {
     setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail(''); setShowForm(false)
   }
 
+  // Message WhatsApp de bienvenue dès qu'un numéro est renseigné sur une fiche
+  const bienvenue = (type, id) => fetch('/api/whatsapp-bienvenue', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, id }),
+  }).catch(() => {})
+
   async function inviteMembre() {
     if (!prenom || !role || !email) return
     setSaving(true)
@@ -81,6 +86,7 @@ export default function Famille() {
     }).select()
 
     if (!error && data) {
+      if (telephone.trim()) bienvenue('famille', data[0].id)
 
       // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
       try {

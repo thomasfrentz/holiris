@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
 import { inviterMembre } from '@/lib/invitations'
+import { numeroWhatsapp, envoyerBienvenue } from '@/lib/whatsapp'
 
 const emailValide = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
@@ -40,6 +41,9 @@ export async function POST(request) {
       ...(emailChange && !membre.user_id ? { invite_token: null } : {}),
     }).eq('id', id)
     if (error) throw error
+
+    // Nouveau numéro : message WhatsApp de bienvenue
+    if (tel && numeroWhatsapp(tel) !== numeroWhatsapp(membre.whatsapp || membre.phone)) await envoyerBienvenue('famille', id)
 
     // Sans compte : invitation envoyée à la nouvelle adresse
     let invite = null

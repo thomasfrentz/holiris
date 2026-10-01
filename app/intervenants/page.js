@@ -80,6 +80,11 @@ export default function Intervenants() {
     } catch (e) { console.error('Erreur email:', e) }
   }
 
+  // Message WhatsApp de bienvenue dès qu'un numéro est renseigné sur une fiche
+  const bienvenue = (type, id) => fetch('/api/whatsapp-bienvenue', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, id }),
+  }).catch(() => {})
+
   // Téléphone et email facultatifs : sans eux, l'intervenant laisse ses notes sur la borne
   async function addIntervenant() {
     if (!prenom || !nom || !role || (email && !emailValide(email))) return
@@ -91,6 +96,7 @@ export default function Intervenants() {
     }).select()
 
     if (!error && data) {
+      if (telephone.trim()) bienvenue('intervenant', data[0].id)
       if (email) await inviter(data[0].id, prenom + ' ' + nom)
       else setEmailSent(prenom + ' ' + nom + ' est ajouté : il peut laisser ses notes sur la borne. Ajoutez son email plus tard pour lui envoyer un accès.')
 
@@ -122,6 +128,7 @@ export default function Intervenants() {
       ...(emailChange && !i.user_id ? { invite_token: null } : {}),
     }).eq('id', i.id)
     if (!error) {
+      if (edition.telephone.trim() && versWhatsapp(edition.telephone) !== (i.whatsapp || versWhatsapp(i.phone))) bienvenue('intervenant', i.id)
       if (!i.user_id && nouvelEmail && emailChange) await inviter(i.id, nomComplet)
       setEdition(null)
       setTimeout(() => setEmailSent(null), 6000)

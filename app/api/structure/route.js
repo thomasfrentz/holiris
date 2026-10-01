@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin, verifierGestionnaire } from '@/lib/serveur'
 import { inviterMembre, inviterGestionnaire } from '@/lib/invitations'
+import { envoyerBienvenue } from '@/lib/whatsapp'
 
 const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const champ = (v, max = 120) => String(v ?? '').trim().slice(0, max)
@@ -34,6 +35,7 @@ async function affecterSalarie(salarie, seniorId) {
     salarie_id: salarie.id,
   }).select('*, seniors!intervenants_senior_id_fkey(name)').single()
   if (error) throw error
+  if (telephone) await envoyerBienvenue('intervenants', ligne.id)
 
   // Une invitation est déjà en attente pour ce salarié : à la création de son compte,
   // tous ses dossiers sont rattachés d'un coup (même email). Pas de nouvel email.

@@ -90,9 +90,14 @@ export default function Profil() {
       await supabase.from('structure_membres').update({ nom: prenom + ' ' + nom }).eq('user_id', user.id)
     } else {
       const whatsappFormatted = whatsapp.replace(/\s/g, '').replace(/^0/, '+33')
+      const { data: avant } = await supabase.from('famille').select('id, whatsapp').eq('user_id', user.id).is('archived_at', null)
       await supabase.from('famille')
         .update({ name: prenom + ' ' + nom, role: lien, whatsapp: whatsappFormatted || null, adresse: adresse.trim() || null })
         .eq('user_id', user.id)
+      // Nouveau numéro : message WhatsApp de bienvenue (un par senior suivi)
+      if (whatsappFormatted) for (const f of avant || []) {
+        if (f.whatsapp !== whatsappFormatted) fetch('/api/whatsapp-bienvenue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'famille', id: f.id }) }).catch(() => {})
+      }
     }
 
     setSaved(true)
