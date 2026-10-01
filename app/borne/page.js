@@ -21,10 +21,13 @@ export default function Borne() {
   const [reponseMedicale, setReponseMedicale] = useState('')
   const [alertesBorne, setAlertesBorne] = useState([])
   const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs }
+  const [sosCompte, setSosCompte] = useState(0)
+  const [sosResultat, setSosResultat] = useState(null) // { success, emails, whatsapp, dejaPrevenus }
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
   const timerRef = useRef(null)
+  const sosEnvoiRef = useRef(false)
 
 
   useEffect(() => {
@@ -206,6 +209,50 @@ export default function Borne() {
     terminer()
   }
 
+  // SOS : confirmation avec compte à rebours ; sans réponse, l'alerte part automatiquement
+  const SOS_DELAI = 20
+
+  function ouvrirSos() {
+    sosEnvoiRef.current = false
+    setSosResultat(null)
+    setSosCompte(SOS_DELAI)
+    setStep('sos')
+  }
+
+  async function envoyerSos(auto) {
+    if (sosEnvoiRef.current) return
+    sosEnvoiRef.current = true
+    setStep('sos-envoi')
+    try {
+      const res = await fetch('/api/borne-sos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: borneInfo?.code, auto }),
+      })
+      setSosResultat(await res.json())
+    } catch {
+      setSosResultat({ success: false })
+    }
+    setStep('sos-envoye')
+  }
+
+  useEffect(() => {
+    if (step !== 'sos') return
+    const t = setTimeout(() => sosCompte <= 1 ? envoyerSos(true) : setSosCompte(c => c - 1), 1000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- envoyerSos est protégé contre le double envoi
+  }, [step, sosCompte])
+
+  // Prévenue : au moins un email ou WhatsApp parti (ou déjà prévenue il y a moins de 2 minutes)
+  const famillePrevenue = sosResultat?.success && (sosResultat.dejaPrevenus || sosResultat.emails + sosResultat.whatsapp > 0)
+
+  // Retour automatique à l'accueil 3 minutes après l'envoi
+  useEffect(() => {
+    if (step !== 'sos-envoye' || !famillePrevenue) return
+    const t = setTimeout(() => setStep('accueil'), 3 * 60 * 1000)
+    return () => clearTimeout(t)
+  }, [step, famillePrevenue])
+
   function formatDuration(s) {
     return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
   }
@@ -264,8 +311,15 @@ export default function Borne() {
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>Domicile de</p>
           <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 48, fontWeight: 300, color: '#FAFCFA', letterSpacing: '0.06em' }}>{borneInfo?.seniors?.name}</h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Qui êtes-vous ?</p>
         </div>
+
+        <button onClick={ouvrirSos}
+          style={{ width: '100%', background: '#C4434F', color: '#fff', border: '3px solid rgba(255,255,255,0.18)', borderRadius: 14, padding: '22px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 32, boxShadow: '0 0 0 6px rgba(196,67,79,0.18)' }}>
+          <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: '0.12em' }}>SOS</span>
+          <span style={{ fontSize: 18, fontWeight: 500, textAlign: 'left', lineHeight: 1.3 }}>J&apos;ai besoin d&apos;aide<br /><span style={{ fontSize: 13, opacity: 0.8, fontWeight: 400 }}>Prévenir ma famille</span></span>
+        </button>
+
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 14 }}>Qui êtes-vous ?</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {personnes.map(p => (
@@ -449,6 +503,73 @@ export default function Borne() {
             Non
           </button>
         </div>
+      </div>
+    </div>
+  )
+
+  if (step === 'sos' || step === 'sos-envoi') return (
+    <div style={{ ...bg, background: '#2A1416' }}>
+      <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
+        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '0.14em', color: '#F0A0A8', marginBottom: 16 }}>SOS</div>
+        <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 400, color: '#FAFCFA', lineHeight: 1.2, marginBottom: 14 }}>
+          Voulez-vous prévenir votre famille ?
+        </h2>
+        {step === 'sos' ? (
+          <>
+            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', marginBottom: 36 }}>
+              Sans réponse, l&apos;alerte sera envoyée dans <strong style={{ color: '#fff', fontSize: 22 }}>{sosCompte}</strong> seconde{sosCompte > 1 ? 's' : ''}.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <button onClick={() => envoyerSos(false)}
+                style={{ background: '#C4434F', color: '#fff', border: 'none', borderRadius: 14, padding: '26px 0', fontSize: 22, fontWeight: 600, cursor: 'pointer' }}>
+                Oui, prévenir ma famille
+              </button>
+              <button onClick={() => setStep('accueil')}
+                style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '2px solid rgba(255,255,255,0.25)', borderRadius: 14, padding: '22px 0', fontSize: 20, cursor: 'pointer' }}>
+                Non, annuler
+              </button>
+            </div>
+          </>
+        ) : (
+          <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.8)', marginTop: 24 }}>Envoi de l&apos;alerte…</p>
+        )}
+        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 36 }}>Urgence vitale : appelez le <strong style={{ color: '#fff' }}>15</strong> ou le <strong style={{ color: '#fff' }}>112</strong></p>
+      </div>
+    </div>
+  )
+
+  if (step === 'sos-envoye') return (
+    <div style={{ ...bg, background: famillePrevenue ? '#1E2820' : '#2A1416' }}>
+      <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
+        {famillePrevenue ? (
+          <>
+            <div style={{ fontSize: 64, marginBottom: 20 }}>✅</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 400, color: '#FAFCFA', marginBottom: 14 }}>{sosResultat.dejaPrevenus ? 'Votre famille vient d\'être prévenue' : 'Votre famille a été prévenue'}</h2>
+            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>Restez au calme, quelqu&apos;un va vous rappeler ou venir vous voir.</p>
+          </>
+        ) : sosResultat?.success ? (
+          <>
+            <div style={{ fontSize: 64, marginBottom: 20 }}>⚠️</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 400, color: '#FAFCFA', marginBottom: 14 }}>Aucun proche n&apos;a pu être prévenu</h2>
+            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>Aucun email ni numéro n&apos;est renseigné pour la famille. Appelez un proche directement.</p>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 64, marginBottom: 20 }}>⚠️</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 400, color: '#FAFCFA', marginBottom: 14 }}>L&apos;alerte n&apos;a pas pu être envoyée</h2>
+            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 24 }}>Vérifiez que la borne est connectée à Internet, ou appelez un proche.</p>
+            <button onClick={() => { sosEnvoiRef.current = false; envoyerSos(false) }}
+              style={{ background: '#C4434F', color: '#fff', border: 'none', borderRadius: 14, padding: '20px 40px', fontSize: 19, fontWeight: 600, cursor: 'pointer' }}>
+              Réessayer
+            </button>
+          </>
+        )}
+        <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: '18px 20px', marginTop: 32 }}>
+          <p style={{ fontSize: 16, color: '#fff', lineHeight: 1.6 }}>En cas d&apos;urgence vitale, appelez le <strong style={{ fontSize: 22 }}>15</strong> (SAMU) ou le <strong style={{ fontSize: 22 }}>112</strong>.</p>
+        </div>
+        <button onClick={() => setStep('accueil')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 15, cursor: 'pointer', marginTop: 32, textDecoration: 'underline' }}>
+          ← Retour à l&apos;accueil
+        </button>
       </div>
     </div>
   )
