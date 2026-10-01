@@ -82,6 +82,8 @@ export default function Borne() {
   const sonDistantRef = useRef(null)
   const finVisioRef = useRef(null)
   const derniereActionRef = useRef(0)
+  const versionRef = useRef(null)
+  const [miseAJour, setMiseAJour] = useState(false)
 
   useEffect(() => {
     loadBorne(localStorage.getItem('holiris_borne_code'))
@@ -153,6 +155,27 @@ export default function Borne() {
     const t2 = setInterval(personnesAJour, 10 * 60 * 1000)
     return () => { clearInterval(t1); clearInterval(t2) }
   }, [step, borneInfo])
+
+  // Mise à jour automatique : nouvelle version en ligne → rechargement, seulement sur l'accueil,
+  // sans visio en cours et après une minute sans que personne ne touche l'écran
+  useEffect(() => {
+    const verifier = () => fetch('/api/version', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+      if (!d?.version) return
+      if (!versionRef.current) versionRef.current = d.version
+      else if (d.version !== versionRef.current) setMiseAJour(true)
+    }).catch(() => {})
+    verifier()
+    const t = setInterval(verifier, 5 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    if (!miseAJour || step !== 'accueil' || visio) return
+    const t = setInterval(() => {
+      if (Date.now() - derniereActionRef.current > 60 * 1000) window.location.reload()
+    }, 15000)
+    return () => clearInterval(t)
+  }, [miseAJour, step, visio])
 
   function masquer(modif) {
     setMasques(prev => {
