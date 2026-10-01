@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/serveur'
 import { escapeHtml, emailSos, envoyerEnLots } from '@/lib/emails'
+import { creerLienVisio } from '@/lib/visio'
 
-// Bouton SOS de la borne : alerte rouge sur le tableau de bord, email et WhatsApp à toute la famille.
+// Bouton SOS de la borne : alerte rouge sur le tableau de bord, email et WhatsApp à toute la famille,
+// chacun avec un lien personnel (une seule utilisation) pour activer la caméra et le micro de la borne.
 // La borne n'a pas de compte connecté : son code sert de clé, comme pour les notes.
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -19,8 +21,10 @@ function numeroWhatsapp(numero) {
   return n
 }
 
-// Modèle « alerte_sos » à faire approuver dans Meta (catégorie Utilité, langue français)
-async function envoyerWhatsapp(numero, seniorName, heure) {
+// Modèle « alerte_sos » à faire approuver dans Meta (catégorie Utilité, langue français) :
+// texte avec {{1}} = nom du senior et {{2}} = heure, bouton URL « https://holiris.fr/visio?t={{1}} »
+async function envoyerWhatsapp(numero, seniorName, heure, lienVisio) {
+  const jeton = new URL(lienVisio).searchParams.get('t')
   try {
     const res = await fetch('https://graph.facebook.com/v18.0/' + process.env.META_PHONE_NUMBER_ID + '/messages', {
       method: 'POST',
@@ -32,7 +36,10 @@ async function envoyerWhatsapp(numero, seniorName, heure) {
         template: {
           name: 'alerte_sos',
           language: { code: 'fr' },
-          components: [{ type: 'body', parameters: [{ type: 'text', text: seniorName }, { type: 'text', text: heure }] }],
+          components: [
+            { type: 'body', parameters: [{ type: 'text', text: seniorName }, { type: 'text', text: heure }] },
+            { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: jeton }] },
+          ],
         },
       }),
     })
@@ -68,21 +75,24 @@ export async function POST(request) {
       .select('name, email, phone, whatsapp').eq('senior_id', borne.senior_id).is('archived_at', null)
 
     const emails = new Map()
-    const numeros = new Set()
+    const numeros = new Map()
     for (const f of famille || []) {
       if (f.email && !emails.has(f.email.toLowerCase())) emails.set(f.email.toLowerCase(), f)
       const numero = numeroWhatsapp(f.whatsapp || f.phone)
-      if (numero) numeros.add(numero)
+      if (numero && !numeros.has(numero)) numeros.set(numero, f)
     }
 
+    // Un lien de visio distinct par email et par WhatsApp : chacun ne sert qu'une fois
+    const prenom = f => f.name?.split(' ')[0]
+    const envoisEmail = await Promise.all([...emails].map(async ([email, f]) => ({
+      from: 'Holiris <contact@holiris.fr>',
+      to: email,
+      subject: `🆘 SOS — ${seniorName} a demandé de l'aide`,
+      html: emailSos({ prenom: escapeHtml(prenom(f)), seniorName: escapeHtml(seniorName), heure, auto: !!auto, lienVisio: await creerLienVisio(borne.senior_id, prenom(f)) }),
+    })))
     const [emailsEnvoyes, ...whatsapp] = await Promise.all([
-      envoyerEnLots(resend, [...emails].map(([email, f]) => ({
-        from: 'Holiris <contact@holiris.fr>',
-        to: email,
-        subject: `🆘 SOS — ${seniorName} a demandé de l'aide`,
-        html: emailSos({ prenom: escapeHtml(f.name?.split(' ')[0]), seniorName: escapeHtml(seniorName), heure, auto: !!auto }),
-      }))),
-      ...[...numeros].map(n => envoyerWhatsapp(n, seniorName, heure)),
+      envoyerEnLots(resend, envoisEmail),
+      ...[...numeros].map(async ([n, f]) => envoyerWhatsapp(n, seniorName, heure, await creerLienVisio(borne.senior_id, prenom(f)))),
     ])
 
     return NextResponse.json({ success: true, emails: emailsEnvoyes, whatsapp: whatsapp.filter(Boolean).length })

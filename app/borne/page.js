@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { demarrerVisio } from '../lib/visioRtc'
 
 export default function Borne() {
   const [step, setStep] = useState('loading')
@@ -23,11 +24,19 @@ export default function Borne() {
   const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs }
   const [sosCompte, setSosCompte] = useState(0)
   const [sosResultat, setSosResultat] = useState(null) // { success, emails, whatsapp, dejaPrevenus }
+  const [surveillanceVisio, setSurveillanceVisio] = useState(false) // SOS récent : un proche peut demander la visio
+  const [visio, setVisio] = useState(null) // { canal, prenom, etat }
+  const [cameraAutorisee, setCameraAutorisee] = useState(null) // null | true | false
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
   const timerRef = useRef(null)
   const sosEnvoiRef = useRef(false)
+  const visioRtcRef = useRef(null)
+  const fluxVisioRef = useRef(null)
+  const apercuRef = useRef(null)
+  const sonDistantRef = useRef(null)
+  const finVisioRef = useRef(null)
 
 
   useEffect(() => {
@@ -54,6 +63,9 @@ export default function Borne() {
     setBorneInfo(borne)
     setPersonnes(liste)
     setStep('accueil')
+    // Borne rechargée juste après un SOS : reprendre la surveillance des demandes de visio
+    fetch('/api/borne-visio?code=' + encodeURIComponent(borne.code))
+      .then(r => r.ok ? r.json() : null).then(d => { if (d?.sosRecent) setSurveillanceVisio(true) }).catch(() => {})
   }
 
   async function activerBorne() {
@@ -229,7 +241,9 @@ export default function Borne() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: borneInfo?.code, auto }),
       })
-      setSosResultat(await res.json())
+      const resultat = await res.json()
+      setSosResultat(resultat)
+      if (resultat.success) setSurveillanceVisio(true)
     } catch {
       setSosResultat({ success: false })
     }
@@ -253,6 +267,69 @@ export default function Borne() {
     return () => clearTimeout(t)
   }, [step, famillePrevenue])
 
+  // Visio demandée par un proche (lien reçu après le SOS) : vérification toutes les 3 secondes
+  useEffect(() => {
+    if (!surveillanceVisio || visio || !borneInfo?.code) return
+    const t = setInterval(async () => {
+      try {
+        const d = await (await fetch('/api/borne-visio?code=' + encodeURIComponent(borneInfo.code))).json()
+        if (d.visio) lancerVisio(d.visio)
+        else if (!d.sosRecent) setSurveillanceVisio(false)
+      } catch {}
+    }, 3000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- lancerVisio ne dépend que de refs
+  }, [surveillanceVisio, visio, borneInfo])
+
+  async function lancerVisio({ canal, prenom, iceServers }) {
+    if (visioRtcRef.current) return
+    let flux = null
+    try { flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true }) }
+    catch { try { flux = await navigator.mediaDevices.getUserMedia({ audio: true }) } catch { flux = null } }
+    if (!flux) {
+      // Caméra et micro refusés sur la tablette : la visio est annulée
+      fetch('/api/borne-visio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: borneInfo.code, canal }) }).catch(() => {})
+      return
+    }
+    fluxVisioRef.current = flux
+    setVisio({ canal, prenom, etat: 'connexion' })
+    window.scrollTo(0, 0) // le bandeau « Caméra et micro activés » doit être visible d'emblée
+    visioRtcRef.current = demarrerVisio({
+      role: 'borne', canal, iceServers, fluxLocal: flux,
+      surFluxDistant: f => { if (sonDistantRef.current) sonDistantRef.current.srcObject = f },
+      surEtat: etat => etat === 'termine' ? finVisio(false) : setVisio(v => v && { ...v, etat }),
+    })
+    finVisioRef.current = setTimeout(() => finVisio(true), 15 * 60 * 1000)
+  }
+
+  function finVisio(prevenir = true) {
+    clearTimeout(finVisioRef.current)
+    const rtc = visioRtcRef.current
+    visioRtcRef.current = null
+    rtc?.arreter(prevenir)
+    fluxVisioRef.current?.getTracks().forEach(t => t.stop())
+    setVisio(v => {
+      if (v) fetch('/api/borne-visio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: borneInfo?.code, canal: v.canal }) }).catch(() => {})
+      return null
+    })
+  }
+
+  // Aperçu de sa propre image pendant la visio
+  useEffect(() => {
+    if (visio && apercuRef.current && fluxVisioRef.current) apercuRef.current.srcObject = fluxVisioRef.current
+  }, [visio])
+
+  // À faire une fois à l'installation : la tablette mémorise l'autorisation caméra et micro
+  async function autoriserCamera() {
+    try {
+      const flux = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      flux.getTracks().forEach(t => t.stop())
+      setCameraAutorisee(true)
+    } catch {
+      setCameraAutorisee(false)
+    }
+  }
+
   function formatDuration(s) {
     return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
   }
@@ -266,6 +343,28 @@ export default function Borne() {
   }
 
   const bg = { minHeight: '100vh', background: '#1E2820', fontFamily: "'Inter', DM Sans, sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }
+
+  // La visio passe devant tous les autres écrans, avec un bandeau visible en permanence
+  if (visio) return (
+    <div style={{ ...bg, background: '#2A1416', justifyContent: 'flex-start', paddingTop: 24 }}>
+      <div style={{ width: '100%', maxWidth: 640, textAlign: 'center' }}>
+        <div style={{ background: '#C4434F', borderRadius: 12, padding: '16px 20px', color: '#fff', fontSize: 19, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 0 0 4px rgba(255,255,255,0.35)' }} />
+          Caméra et micro activés
+        </div>
+        <p style={{ fontSize: 22, color: '#FAFCFA', margin: '22px 0 6px' }}>
+          {visio.etat === 'en-direct' ? <><strong>{visio.prenom}</strong> vous voit et vous entend</> : <>Connexion avec <strong>{visio.prenom}</strong>…</>}
+        </p>
+        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', marginBottom: 20 }}>Vous pouvez lui parler normalement.</p>
+        <video ref={apercuRef} autoPlay playsInline muted style={{ width: 280, aspectRatio: '4 / 3', objectFit: 'cover', borderRadius: 12, background: '#000', transform: 'scaleX(-1)' }} />
+        <audio ref={sonDistantRef} autoPlay />
+        <button onClick={() => finVisio(true)}
+          style={{ display: 'block', width: '100%', marginTop: 24, background: 'rgba(255,255,255,0.12)', color: '#fff', border: '2px solid rgba(255,255,255,0.35)', borderRadius: 14, padding: '22px 0', fontSize: 21, fontWeight: 600, cursor: 'pointer' }}>
+          Arrêter la caméra
+        </button>
+      </div>
+    </div>
+  )
 
   if (step === 'loading') return (
     <div style={bg}><div style={{ color: '#9AB89F', fontSize: 14 }}>Chargement...</div></div>
@@ -362,7 +461,10 @@ export default function Borne() {
           )}
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: 40 }}>
+        <div style={{ textAlign: 'center', marginTop: 40, display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
+          <button onClick={autoriserCamera} style={{ background: 'none', border: 'none', color: cameraAutorisee === false ? '#e0939a' : 'rgba(255,255,255,0.25)', fontSize: 11, cursor: 'pointer', letterSpacing: '0.1em' }}>
+            {cameraAutorisee === true ? '✓ Caméra autorisée' : cameraAutorisee === false ? '📷 Caméra refusée : autorisez-la dans les réglages' : '📷 Autoriser la caméra (visio SOS)'}
+          </button>
           <button onClick={resetBorne} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 11, cursor: 'pointer', letterSpacing: '0.1em' }}>
             ⚙ Reconfigurer la borne
           </button>
