@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { escapeHtml, emailRelanceIntervenant, envoyerEnLots, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
+import { escapeHtml, emailRelanceIntervenant, emailRelanceFamille, envoyerEnLots, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -27,8 +27,11 @@ export async function GET(request) {
       .lte('scheduled_at', maintenant.toISOString())
       .not('intervenant_id', 'is', null)
 
+    // Proches sans nouvelles depuis 7 jours : envoyée chaque semaine, qu'il y ait eu des passages ou non
+    const famillesRelancees = await relancerFamilles(ilYa7j)
+
     if (!events?.length) {
-      return NextResponse.json({ success: true, message: 'Aucun intervenant actif cette semaine', relances: 0 })
+      return NextResponse.json({ success: true, message: 'Aucun intervenant actif cette semaine', relances: 0, familles_relancees: famillesRelancees })
     }
 
     const intervenantsVus = new Set()
@@ -94,7 +97,8 @@ export async function GET(request) {
       success: true,
       relances: relancesEnvoyees,
       intervenants_contactes: intervenantsVus.size,
-      emails_envoyes: emailsEnvoyes
+      emails_envoyes: emailsEnvoyes,
+      familles_relancees: famillesRelancees,
     })
 
   } catch (error) {
@@ -138,4 +142,40 @@ async function relancerParEmail(events, depuis) {
     html: emailRelanceIntervenant({ prenom: escapeHtml(e.prenom), seniorNames: [...e.seniors].map(escapeHtml), desinscription: lienDesinscription(email).page }),
   }))
   return envoyerEnLots(resend, messages)
+}
+
+// Email aux proches (compte créé) qui n'ont laissé ni note ni message depuis 7 jours pour un senior qu'ils suivent
+async function relancerFamilles(depuis) {
+  const [{ data: proches }, { data: notes }, { data: messages }] = await Promise.all([
+    supabase.from('famille').select('name, email, user_id, senior_id, seniors!famille_senior_id_fkey(name)')
+      .is('archived_at', null).not('user_id', 'is', null).not('email', 'is', null).not('is_admin', 'is', true),
+    supabase.from('notes').select('senior_id, intervenant_name').gte('created_at', depuis.toISOString()).not('intervenant_name', 'is', null),
+    supabase.from('messages').select('senior_id, auteur_user_id').gte('created_at', depuis.toISOString()),
+  ])
+
+  const aDonneDesNouvelles = p =>
+    (notes || []).some(n => n.senior_id === p.senior_id && n.intervenant_name.startsWith(p.name)) ||
+    (messages || []).some(m => m.senior_id === p.senior_id && m.auteur_user_id === p.user_id)
+
+  const desinscrits = await adressesDesinscrites(supabase)
+
+  // Un seul email par adresse, listant les seniors concernés
+  const parEmail = new Map()
+  for (const p of proches || []) {
+    if (!p.seniors?.name || aDonneDesNouvelles(p)) continue
+    const email = p.email.toLowerCase()
+    if (desinscrits.has(email)) continue
+    const entree = parEmail.get(email) || { prenom: p.name.split(' ')[0], seniors: new Set() }
+    entree.seniors.add(p.seniors.name)
+    parEmail.set(email, entree)
+  }
+
+  const envois = [...parEmail].map(([email, e]) => ({
+    from: 'Holiris <contact@holiris.fr>',
+    to: email,
+    subject: 'Des nouvelles de ' + [...e.seniors].join(', ') + ' à partager ?',
+    headers: entetesDesinscription(email),
+    html: emailRelanceFamille({ prenom: escapeHtml(e.prenom), seniorNames: [...e.seniors].map(escapeHtml), desinscription: lienDesinscription(email).page }),
+  }))
+  return envoyerEnLots(resend, envois)
 }
