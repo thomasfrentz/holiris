@@ -20,6 +20,9 @@ export default function Famille() {
   const [telephone, setTelephone] = useState('')
   const [email, setEmail] = useState('')
   const [pdcModifiee, setPdcModifiee] = useState({}) // seniorId -> familleId après désignation
+  const [userId, setUserId] = useState(null)
+  const [edition, setEdition] = useState(null) // fiche en cours de modification
+  const [enregistrement, setEnregistrement] = useState(false)
 
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
@@ -38,6 +41,7 @@ export default function Famille() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      setUserId(user.id)
       if (!selectedSeniorId) return
 
       const { data: actifs } = await supabase
@@ -146,6 +150,34 @@ export default function Famille() {
     } catch (e) { alert('Erreur réseau') }
   }
 
+  // Modifier une fiche : admin, gestionnaire de la structure ou personne de confiance (vérifié par le serveur)
+  const maFicheId = membres.find(m => m.user_id === userId)?.id
+  const peutModifier = isAdmin || (!!personneConfianceId && maFicheId === personneConfianceId)
+
+  function ouvrirEdition(m) {
+    const [p, ...n] = (m.name || '').split(' ')
+    setEdition({ id: m.id, prenom: p, nom: n.join(' '), role: m.role || '', telephone: m.phone || '', email: m.email || '', adresse: m.adresse || '' })
+  }
+
+  async function enregistrerEdition(m) {
+    setEnregistrement(true)
+    try {
+      const res = await fetch('/api/famille', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(edition) })
+      const result = await res.json()
+      if (!result.success) { alert(result.error || 'Erreur'); setEnregistrement(false); return }
+      const nomComplet = (edition.prenom.trim() + ' ' + edition.nom.trim()).trim()
+      if (result.invite?.success) {
+        setInviteSent(nomComplet + (result.invite.linked ? ' (compte existant, espace ajouté à son compte)' : ''))
+        setTimeout(() => setInviteSent(null), 5000)
+      }
+      const { data: updated } = await supabase.from('famille').select('*')
+        .eq('senior_id', selectedSeniorId).is('archived_at', null).order('created_at', { ascending: false })
+      setMembres(updated || [])
+      setEdition(null)
+    } catch { alert('Erreur réseau') }
+    setEnregistrement(false)
+  }
+
   async function archiverMembre(id) {
     if (!isAdmin) return
     await supabase.from('famille').update({ archived_at: new Date().toISOString() }).eq('id', id)
@@ -200,9 +232,15 @@ export default function Famille() {
             {archivé && m.archived_at && <span style={{ color: '#C4844A' }}>· Archivé le {new Date(m.archived_at).toLocaleDateString('fr-FR')}</span>}
           </div>
         </div>
-        {isAdmin && (
+        {(isAdmin || peutModifier) && (
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {archivé ? (
+            {peutModifier && !archivé && edition?.id !== m.id && (
+              <button onClick={() => ouvrirEdition(m)}
+                style={{ background: '#F4F5F5', color: '#6F7C75', border: '1px solid #E8EFEB', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                Modifier
+              </button>
+            )}
+            {!isAdmin ? null : archivé ? (
               <>
                 <button onClick={() => restaurerMembre(m.id)}
                   style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
@@ -245,6 +283,36 @@ export default function Famille() {
           </div>
         )}
       </div>
+      {!archivé && edition?.id === m.id && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #F0F4F2' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+            <input placeholder="Prénom *" value={edition.prenom} onChange={e => setEdition({ ...edition, prenom: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+            <input placeholder="Nom" value={edition.nom} onChange={e => setEdition({ ...edition, nom: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+            <select value={edition.role} onChange={e => setEdition({ ...edition, role: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }}>
+              <option value="">Lien avec le senior *</option>
+              {[...new Set([...roles, ...(edition.role ? [edition.role] : [])])].map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <input placeholder="Téléphone / WhatsApp" value={edition.telephone} onChange={e => setEdition({ ...edition, telephone: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+            <input type="email" placeholder="Email *" value={edition.email} onChange={e => setEdition({ ...edition, email: e.target.value })} style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1' }} />
+            <input placeholder="Adresse" value={edition.adresse} onChange={e => setEdition({ ...edition, adresse: e.target.value })} style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1' }} />
+          </div>
+          <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 10 }}>
+            {m.user_id
+              ? 'Email de contact, utilisé pour les notifications. L\'identifiant de connexion de son compte ne change pas.'
+              : 'Si vous changez l\'email, une nouvelle invitation est envoyée à la nouvelle adresse.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => enregistrerEdition(m)} disabled={enregistrement || !edition.prenom.trim() || !edition.role || !edition.email.trim()}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!edition.prenom.trim() || !edition.role || !edition.email.trim()) ? 0.5 : 1 }}>
+              {enregistrement ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
+            <button onClick={() => setEdition(null)}
+              style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -320,7 +388,7 @@ export default function Famille() {
             <div style={{ fontSize: 14, color: '#9BB5AA', marginBottom: 4 }}>Aucun membre actif</div>
             <div style={{ fontSize: 13, color: '#C8DDD4' }}>Invitez les proches de {selectedSenior?.name}</div>
           </div>
-        ) : membres.map(m => <MembreCard key={m.id} m={m} />)}
+        ) : membres.map(m => <div key={m.id}>{MembreCard({ m })}</div>)}
       </div>
 
       {(archives.length > 0 || isAdmin) && (
@@ -338,7 +406,7 @@ export default function Famille() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {archives.length === 0 ? (
                 <div style={{ fontSize: 13, color: '#C8DDD4', padding: '12px 0' }}>Aucun membre archivé.</div>
-              ) : archives.map(m => <MembreCard key={m.id} m={m} archivé={true} />)}
+              ) : archives.map(m => <div key={m.id}>{MembreCard({ m, archivé: true })}</div>)}
             </div>
           )}
         </div>
