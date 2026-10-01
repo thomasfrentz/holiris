@@ -108,7 +108,7 @@ export default function Intervenants() {
   }
 
   // Modification d'une fiche. Sans compte, l'invitation part dès qu'un nouvel email est renseigné ;
-  // avec un compte, l'email (identifiant de connexion) ne se modifie pas ici.
+  // avec un compte, l'email de la fiche sert aux notifications (l'identifiant de connexion ne change pas).
   async function enregistrerEdition(i) {
     const nouvelEmail = edition.email.trim().toLowerCase()
     if (!edition.prenom.trim() || !edition.role || (nouvelEmail && !emailValide(nouvelEmail))) return
@@ -116,8 +116,7 @@ export default function Intervenants() {
     const nomComplet = (edition.prenom.trim() + ' ' + edition.nom.trim()).trim()
     const { error } = await supabase.from('intervenants').update({
       name: nomComplet, role: edition.role,
-      phone: edition.telephone || null, whatsapp: versWhatsapp(edition.telephone),
-      ...(i.user_id ? {} : { email: nouvelEmail || null }),
+      phone: edition.telephone || null, whatsapp: versWhatsapp(edition.telephone), email: nouvelEmail || null,
     }).eq('id', i.id)
     if (!error) {
       if (!i.user_id && nouvelEmail && nouvelEmail !== (i.email || '')) await inviter(i.id, nomComplet)
@@ -323,12 +322,12 @@ export default function Intervenants() {
                     {[...new Set([...ROLES, ...(edition.role ? [edition.role] : [])])].map(r => <option key={r}>{r}</option>)}
                   </select>
                   <input placeholder="Téléphone (facultatif)" value={edition.telephone} onChange={e => setEdition({ ...edition, telephone: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
-                  <input type="email" placeholder="Email (facultatif)" value={edition.email} disabled={!!i.user_id} onChange={e => setEdition({ ...edition, email: e.target.value })}
-                    style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1', opacity: i.user_id ? 0.6 : 1 }} />
+                  <input type="email" placeholder="Email (facultatif)" value={edition.email} onChange={e => setEdition({ ...edition, email: e.target.value })}
+                    style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1' }} />
                 </div>
                 <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 10 }}>
                   {i.user_id
-                    ? 'L\'email sert d\'identifiant à son compte : il ne se modifie pas ici.'
+                    ? 'Email de contact, utilisé pour les notifications. L\'identifiant de connexion de son compte ne change pas.'
                     : 'En enregistrant un nouvel email, ' + (edition.prenom || 'l\'intervenant') + ' reçoit le lien pour créer son compte.'}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
