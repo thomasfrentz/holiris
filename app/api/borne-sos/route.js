@@ -24,7 +24,8 @@ function numeroWhatsapp(numero) {
 // Modèle « alerte_sos » à faire approuver dans Meta (catégorie Utilité, langue français) :
 // texte avec {{1}} = nom du senior et {{2}} = heure, bouton URL « https://holiris.fr/visio?t={{1}} »
 async function envoyerWhatsapp(numero, seniorName, heure, lienVisio) {
-  const jeton = new URL(lienVisio).searchParams.get('t')
+  // Sans lien (création impossible), le bouton mène à une page « lien invalide » : l'alerte part quand même
+  const jeton = lienVisio ? new URL(lienVisio).searchParams.get('t') : 'indisponible'
   try {
     const res = await fetch('https://graph.facebook.com/v18.0/' + process.env.META_PHONE_NUMBER_ID + '/messages', {
       method: 'POST',
@@ -82,17 +83,22 @@ export async function POST(request) {
       if (numero && !numeros.has(numero)) numeros.set(numero, f)
     }
 
-    // Un lien de visio distinct par email et par WhatsApp : chacun ne sert qu'une fois
+    // Un lien de visio distinct par email et par WhatsApp : chacun ne sert qu'une fois.
+    // La visio est un plus : si le lien ne peut pas être créé, l'alerte part sans lui.
     const prenom = f => f.name?.split(' ')[0]
+    const lien = async f => {
+      try { return await creerLienVisio(borne.senior_id, prenom(f)) }
+      catch (error) { console.error('Lien visio SOS impossible:', error.message); return null }
+    }
     const envoisEmail = await Promise.all([...emails].map(async ([email, f]) => ({
       from: 'Holiris <contact@holiris.fr>',
       to: email,
       subject: `🆘 SOS — ${seniorName} a demandé de l'aide`,
-      html: emailSos({ prenom: escapeHtml(prenom(f)), seniorName: escapeHtml(seniorName), heure, auto: !!auto, lienVisio: await creerLienVisio(borne.senior_id, prenom(f)) }),
+      html: emailSos({ prenom: escapeHtml(prenom(f)), seniorName: escapeHtml(seniorName), heure, auto: !!auto, lienVisio: await lien(f) }),
     })))
     const [emailsEnvoyes, ...whatsapp] = await Promise.all([
       envoyerEnLots(resend, envoisEmail),
-      ...[...numeros].map(async ([n, f]) => envoyerWhatsapp(n, seniorName, heure, await creerLienVisio(borne.senior_id, prenom(f)))),
+      ...[...numeros].map(async ([n, f]) => envoyerWhatsapp(n, seniorName, heure, await lien(f))),
     ])
 
     return NextResponse.json({ success: true, emails: emailsEnvoyes, whatsapp: whatsapp.filter(Boolean).length })
