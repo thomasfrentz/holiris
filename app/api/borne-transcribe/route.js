@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
+import { transcriptionVide, RIEN_ENTENDU } from '@/lib/transcription'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -16,9 +17,14 @@ export async function POST(request) {
     const transcription = await groq.audio.transcriptions.create({
       file: audioFile,
       model: 'whisper-large-v3-turbo',
-      language: 'fr'
+      language: 'fr',
+      response_format: 'verbose_json',
     })
     const rawText = transcription.text
+    // Silence ou bruit : pas de note inventée
+    if (transcriptionVide(rawText, transcription.segments)) {
+      return NextResponse.json({ success: false, rienEntendu: true, error: RIEN_ENTENDU })
+    }
 
     const completion = await groq.chat.completions.create({
       model: 'openai/gpt-oss-120b',

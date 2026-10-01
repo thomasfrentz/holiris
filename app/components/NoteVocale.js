@@ -56,11 +56,11 @@ export default function NoteVocale({ seniorId, source, onNoteAjoutee, grand = fa
       formData.append('audio', blob, 'note.' + extension)
       const res = await fetch('/api/borne-transcribe', { method: 'POST', body: formData })
       const result = await res.json()
-      if (!result.success || !result.note) throw new Error()
+      if (!result.success || !result.note) throw new Error(result.rienEntendu ? result.error : '')
       setNote(result.note)
       setEtape('revision')
-    } catch {
-      setErreur('La transcription a échoué. Réessayez.')
+    } catch (e) {
+      setErreur(e.message || 'La transcription a échoué. Réessayez.')
       setEtape('pret')
     }
   }

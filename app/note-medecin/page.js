@@ -43,7 +43,7 @@ function NoteMedecinContenu() {
           const fd = new FormData(); fd.append('audio', blob, 'note.' + (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'))
           const r = await (await fetch('/api/borne-transcribe', { method: 'POST', body: fd })).json()
           if (r.success && r.note) setTexte(prev => (prev ? prev + '\n' : '') + r.note)
-          else setErreur('La dictée n\'a pas pu être retranscrite. Vous pouvez écrire votre note.')
+          else setErreur(r.rienEntendu ? r.error : 'La dictée n\'a pas pu être retranscrite. Vous pouvez écrire votre note.')
         } catch { setErreur('La dictée n\'a pas pu être retranscrite. Vous pouvez écrire votre note.') }
         setTranscription(false)
       }

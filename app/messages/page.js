@@ -100,7 +100,7 @@ export default function Messages() {
           const fd = new FormData(); fd.append('audio', blob, 'message.' + (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'))
           const r = await (await fetch('/api/borne-transcribe', { method: 'POST', body: fd })).json()
           if (r.success && r.rawText) setTexte(prev => (prev ? prev + ' ' : '') + r.rawText.trim())
-          else setErreur('La dictée n\'a pas pu être retranscrite.')
+          else setErreur(r.rienEntendu ? r.error : 'La dictée n\'a pas pu être retranscrite.')
         } catch { setErreur('La dictée n\'a pas pu être retranscrite.') }
         setDictee('')
       }

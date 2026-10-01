@@ -248,7 +248,11 @@ export default function Borne() {
         setStep('revision')
         return
       }
-      setError('La transcription n\'a pas fonctionné. Vous pouvez réessayer ou réenregistrer.')
+      if (result.rienEntendu) {
+        // Rien à réessayer avec ce son : on repart sur un nouvel enregistrement
+        setAudioBlob(null)
+        setError(result.error)
+      } else setError('La transcription n\'a pas fonctionné. Vous pouvez réessayer ou réenregistrer.')
     } catch {
       setError('Pas de connexion Internet. Vous pouvez réessayer ou réenregistrer.')
     }
