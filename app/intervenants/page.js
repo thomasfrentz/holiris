@@ -22,6 +22,7 @@ export default function Intervenants() {
   const [role, setRole] = useState('')
   const [telephone, setTelephone] = useState('')
   const [email, setEmail] = useState('')
+  const [edition, setEdition] = useState(null) // { id, telephone, email } : coordonnées ajoutées après coup
 
   const router = useRouter()
   const supabase = createBrowserClient(
@@ -60,37 +61,59 @@ export default function Intervenants() {
 
   useEffect(() => { loadData() }, [selectedSeniorId])
 
+  const emailValide = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim())
+  const versWhatsapp = t => t ? t.replace(/\s/g, '').replace(/^0/, '+33') : null
+
+  // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
+  async function inviter(id, nomComplet) {
+    try {
+      const res = await fetch('/api/invitation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'intervenant', id })
+      })
+      const result = await res.json()
+      if (result.success) setEmailSent('Email d\'invitation envoyé à ' + nomComplet
+        + (result.linked ? ' (compte existant, espace ajouté à son compte)' : ''))
+    } catch (e) { console.error('Erreur email:', e) }
+  }
+
+  // Téléphone et email facultatifs : sans eux, l'intervenant laisse ses notes sur la borne
   async function addIntervenant() {
-    if (!prenom || !nom || !role || !telephone || !email) return
+    if (!prenom || !nom || !role || (email && !emailValide(email))) return
     setSaving(true)
-    const whatsapp = telephone.replace(/\s/g, '').replace(/^0/, '+33')
 
     const { data, error } = await supabase.from('intervenants').insert({
-      name: prenom + ' ' + nom, role, phone: telephone, whatsapp,
-      email: email.trim().toLowerCase(), senior_id: selectedSeniorId
+      name: prenom + ' ' + nom, role, phone: telephone || null, whatsapp: versWhatsapp(telephone),
+      email: email ? email.trim().toLowerCase() : null, senior_id: selectedSeniorId
     }).select()
 
     if (!error && data) {
-
-      // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
-      try {
-        const res = await fetch('/api/invitation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'intervenant', id: data[0].id })
-        })
-        const result = await res.json()
-        if (result.success) setEmailSent(result.linked
-          ? prenom + ' ' + nom + ' (compte existant, espace ajouté à son compte)'
-          : prenom + ' ' + nom)
-      } catch (e) { console.error('Erreur email:', e) }
-
+      if (email) await inviter(data[0].id, prenom + ' ' + nom)
+      else setEmailSent(prenom + ' ' + nom + ' est ajouté : il peut laisser ses notes sur la borne. Ajoutez son email plus tard pour lui envoyer un accès.')
 
       setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
       setShowForm(false)
-      setTimeout(() => setEmailSent(null), 5000)
+      setTimeout(() => setEmailSent(null), 6000)
       loadData()
     }
+    setSaving(false)
+  }
+
+  // Coordonnées ajoutées plus tard : l'invitation part dès qu'un email est renseigné
+  async function enregistrerCoordonnees(i) {
+    const nouvelEmail = edition.email.trim().toLowerCase()
+    if (nouvelEmail && !emailValide(nouvelEmail)) return
+    setSaving(true)
+    const { error } = await supabase.from('intervenants').update({
+      phone: edition.telephone || null, whatsapp: versWhatsapp(edition.telephone), email: nouvelEmail || null,
+    }).eq('id', i.id)
+    if (!error) {
+      if (nouvelEmail && nouvelEmail !== (i.email || '')) await inviter(i.id, i.name)
+      setEdition(null)
+      setTimeout(() => setEmailSent(null), 6000)
+      loadData()
+    } else alert('Erreur : ' + error.message)
     setSaving(false)
   }
 
@@ -171,7 +194,7 @@ export default function Intervenants() {
 
       {emailSent && (
         <div style={{ background: '#EAF4EF', border: '1px solid #C8DDD4', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#4A8870', fontWeight: 500 }}>
-          Email d'invitation envoyé à {emailSent}
+          {emailSent}
         </div>
       )}
 
@@ -193,19 +216,19 @@ export default function Intervenants() {
               <option>Médecin</option><option>Cardiologue</option>
               <option>Pharmacien</option><option>Autre</option>
             </select>
-            <input placeholder="Téléphone (ex: 06 12 34 56 78)" value={telephone} onChange={e => setTelephone(e.target.value)}
+            <input placeholder="Téléphone (facultatif)" value={telephone} onChange={e => setTelephone(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <input type="email" placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)}
+            <input type="email" placeholder="Email (facultatif)" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Lien d'accès envoyé par email · Le numéro WhatsApp permet à l'intervenant d'envoyer ses notes
+              Sans email ni téléphone, l&apos;intervenant laisse ses notes sur la borne. Avec un email, il reçoit un lien pour créer son compte ; avec un numéro WhatsApp, il peut aussi envoyer ses notes par WhatsApp.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || !telephone || !email}
-              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !nom || !role || !telephone || !email) ? 0.5 : 1 }}>
+            <button onClick={addIntervenant} disabled={saving || !prenom || !nom || !role || (email && !emailValide(email))}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !nom || !role || (email && !emailValide(email))) ? 0.5 : 1 }}>
               {saving ? 'Ajout...' : 'Ajouter'}
             </button>
             <button onClick={() => setShowForm(false)}
@@ -238,14 +261,21 @@ export default function Intervenants() {
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>{i.role}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {i.phone && <span>{i.phone}</span>}
-                  {i.email && <span>· {i.email}</span>}
+                  {i.email && <span>{i.phone ? '· ' : ''}{i.email}</span>}
                   {i.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
-                  {!i.user_id && <span style={{ color: '#C4844A' }}>· En attente</span>}
+                  {!i.user_id && i.email && <span style={{ color: '#C4844A' }}>· Invitation envoyée</span>}
+                  {!i.user_id && !i.email && <span style={{ color: '#8B6FAA' }}>{i.phone ? '· ' : ''}Notes sur la borne · sans compte</span>}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 {!i.user_id && (
                   <>
+                    {edition?.id !== i.id && (
+                      <button onClick={() => setEdition({ id: i.id, telephone: i.phone || '', email: i.email || '' })}
+                        style={{ background: i.email ? '#F4F5F5' : '#7FAF9B', color: i.email ? '#6F7C75' : '#fff', border: i.email ? '1px solid #E8EFEB' : 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                        {i.email ? 'Modifier' : 'Ajouter email / tél.'}
+                      </button>
+                    )}
                     {i.email && (
                       <button onClick={() => renvoyerEmail(i)}
                         style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
@@ -275,6 +305,29 @@ export default function Intervenants() {
                 </button>
               </div>
             </div>
+            {edition?.id === i.id && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #F0F4F2' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+                  <input placeholder="Téléphone (facultatif)" value={edition.telephone} onChange={e => setEdition({ ...edition, telephone: e.target.value })}
+                    style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+                  <input type="email" placeholder="Email" value={edition.email} onChange={e => setEdition({ ...edition, email: e.target.value })}
+                    style={{ padding: '9px 12px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+                </div>
+                <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 10 }}>
+                  En enregistrant un email, {i.name.split(' ')[0]} reçoit le lien pour créer son compte.
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => enregistrerCoordonnees(i)} disabled={saving || (edition.email.trim() && !emailValide(edition.email))}
+                    style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (edition.email.trim() && !emailValide(edition.email)) ? 0.5 : 1 }}>
+                    {saving ? 'Enregistrement...' : edition.email.trim() && edition.email.trim().toLowerCase() !== (i.email || '') ? 'Enregistrer et inviter' : 'Enregistrer'}
+                  </button>
+                  <button onClick={() => setEdition(null)}
+                    style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
