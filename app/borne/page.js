@@ -59,6 +59,11 @@ export default function Borne() {
   const [reponseMedicale, setReponseMedicale] = useState('')
   const [alertesAccueil, setAlertesAccueil] = useState([])
   const [messagesAccueil, setMessagesAccueil] = useState([]) // [{ prenom, nombre }]
+  // Notifications retirées de l'accueil, sur cette tablette seulement (le tableau de bord n'est pas touché)
+  const [masques, setMasques] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('holiris_borne_masques')) || { alertes: [], messages: '' } }
+    catch { return { alertes: [], messages: '' } }
+  })
   const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs } de la personne qui enregistre
   const [maintenant, setMaintenant] = useState(() => new Date())
   const [sosCompte, setSosCompte] = useState(0)
@@ -148,6 +153,17 @@ export default function Borne() {
     const t2 = setInterval(personnesAJour, 10 * 60 * 1000)
     return () => { clearInterval(t1); clearInterval(t2) }
   }, [step, borneInfo])
+
+  function masquer(modif) {
+    setMasques(prev => {
+      const suivant = { ...prev, ...modif(prev) }
+      try { localStorage.setItem('holiris_borne_masques', JSON.stringify(suivant)) } catch {}
+      return suivant
+    })
+  }
+  const masquerAlerte = id => masquer(prev => ({ alertes: [...prev.alertes, id].slice(-100) }))
+  // L'annonce revient dès que les messages non lus changent (nouveau message)
+  const masquerMessages = () => masquer(() => ({ messages: JSON.stringify(messagesAccueil) }))
 
   function retourAccueil() {
     if (recording) stopRecording(false)
@@ -515,9 +531,11 @@ export default function Borne() {
   )
 
   if (step === 'accueil') {
-    const urgentes = alertesAccueil.filter(a => a.niveau === 'danger')
-    const autres = alertesAccueil.filter(a => a.niveau !== 'danger')
+    const nonMasquees = alertesAccueil.filter(a => !masques.alertes.includes(a.id))
+    const urgentes = nonMasquees.filter(a => a.niveau === 'danger')
+    const autres = nonMasquees.filter(a => a.niveau !== 'danger')
     const alertesVisibles = [...urgentes, ...autres].slice(0, 3)
+    const messagesVisibles = messagesAccueil.length > 0 && JSON.stringify(messagesAccueil) !== masques.messages
     return page(
       <div style={{ width: '100%', maxWidth: 820, display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
         <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: C.gris, fontSize: 16 }}>
@@ -529,12 +547,12 @@ export default function Borne() {
         </div>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
-          <Logo taille={alertesVisibles.length || messagesAccueil.length ? 96 : 140} />
+          <Logo taille={alertesVisibles.length || messagesVisibles ? 96 : 140} />
           <h1 style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
           <p style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
         </div>
 
-        {(alertesVisibles.length > 0 || messagesAccueil.length > 0) && (
+        {(alertesVisibles.length > 0 || messagesVisibles) && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
             {alertesVisibles.map(a => (
               <div key={a.id} style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
@@ -543,15 +561,17 @@ export default function Borne() {
                 </span>
                 <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>{a.message}</span>
                 <span style={{ fontSize: 13, color: C.gris, flexShrink: 0 }}>{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                <button onClick={() => masquerAlerte(a.id)} aria-label="Retirer cette alerte" className="borne-bouton" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.7)', color: C.gris, fontSize: 22, lineHeight: 1, cursor: 'pointer', fontFamily: TEXTE }}>×</button>
               </div>
             ))}
-            {messagesAccueil.length > 0 && (
+            {messagesVisibles && (
               <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: C.lilasClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
                 <span style={{ fontSize: 24 }}>💬</span>
-                <span style={{ fontSize: 17, lineHeight: 1.45 }}>
+                <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>
                   Nouveaux messages pour {listePrenoms(messagesAccueil.map(m => `${m.prenom} (${m.nombre})`))}
                   <span style={{ color: C.gris }}> — à lire sur le téléphone ou sur holiris.fr</span>
                 </span>
+                <button onClick={masquerMessages} aria-label="Retirer l'annonce des messages" className="borne-bouton" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.7)', color: C.gris, fontSize: 22, lineHeight: 1, cursor: 'pointer', fontFamily: TEXTE }}>×</button>
               </div>
             )}
           </div>
