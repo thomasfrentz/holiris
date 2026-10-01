@@ -12,8 +12,24 @@ export async function GET(request) {
     .select('id, code, senior_id, seniors(name)').eq('code', code).maybeSingle()
   if (!borne) return NextResponse.json({ error: 'Code borne invalide' }, { status: 404 })
 
-  // Messages non lus de la personne qui a touché son nom : nombre et prénoms seulement, jamais le contenu
+  // Messages non lus : nombre et prénoms seulement, jamais le contenu
   const personneId = new URL(request.url).searchParams.get('nonlus')
+
+  // Accueil de la borne : une ligne par personne du dossier qui a des messages non lus
+  if (personneId === 'tous') {
+    const [{ data: interv }, { data: fam }] = await Promise.all([
+      supabaseAdmin.from('intervenants').select('name, user_id').eq('senior_id', borne.senior_id).is('archived_at', null).not('user_id', 'is', null),
+      supabaseAdmin.from('famille').select('name, user_id').eq('senior_id', borne.senior_id).is('archived_at', null).not('user_id', 'is', null),
+    ])
+    const vus = new Set()
+    const personnes = [...(interv || []), ...(fam || [])].filter(p => !vus.has(p.user_id) && vus.add(p.user_id))
+    const lignes = await Promise.all(personnes.map(async p => {
+      const { parSenior } = await nonLusPour(p.user_id, [borne.senior_id])
+      return { prenom: p.name.split(' ')[0], nombre: parSenior[borne.senior_id]?.nombre || 0 }
+    }))
+    return NextResponse.json({ messages: lignes.filter(l => l.nombre > 0) })
+  }
+
   if (personneId) {
     const table = new URL(request.url).searchParams.get('type') === 'famille' ? 'famille' : 'intervenants'
     const { data: p } = await supabaseAdmin.from(table).select('user_id, senior_id').eq('id', personneId).maybeSingle()
@@ -22,7 +38,7 @@ export async function GET(request) {
     return NextResponse.json(parSenior[borne.senior_id] || { nombre: 0, auteurs: [] })
   }
 
-  // Alertes non lues, demandées quand une personne de la liste choisit son nom (jamais sur l'accueil)
+  // Alertes non lues, affichées sur l'accueil de la borne
   if (new URL(request.url).searchParams.get('alertes')) {
     const depuis = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: alertes } = await supabaseAdmin.from('alertes')

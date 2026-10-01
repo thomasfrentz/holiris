@@ -2,6 +2,44 @@
 import { useState, useEffect, useRef } from 'react'
 import { demarrerVisio } from '../lib/visioRtc'
 
+// Charte Holiris, version douce et chaleureuse pour la tablette du domicile
+const C = {
+  fond: 'linear-gradient(160deg, #FDFBF7 0%, #F7F2EA 55%, #F4EEF6 100%)',
+  carte: '#FFFFFF',
+  bord: '#E6EDE9',
+  encre: '#1F2A24',
+  gris: '#6F7C75',
+  grisClair: '#9BB5AA',
+  sauge: '#7FAF9B',
+  saugeFonce: '#4A8870',
+  saugeClair: '#EAF4EF',
+  lilas: '#BC84C6',
+  lilasFonce: '#8B6FAA',
+  lilasClair: '#F3EDF7',
+  ambre: '#C4844A',
+  ambreClair: '#FDF3E7',
+  rouge: '#C4434F',
+  roseClair: '#FBEDEE',
+}
+const TITRE = 'var(--font-display), "Cormorant Garamond", Georgia, serif'
+const TEXTE = 'var(--font-body), "DM Sans", system-ui, sans-serif'
+const OMBRE = '0 10px 30px rgba(74, 60, 40, 0.08)'
+const INACTIVITE = 4 * 60 * 1000
+
+function Logo({ taille = 120 }) {
+  return (
+    <svg width={taille} height={taille} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke={C.sauge} strokeWidth="1.6" />
+      <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke={C.lilas} strokeWidth="1.6" />
+      <circle cx="32" cy="32" r="5" fill={C.sauge} />
+      <circle cx="32" cy="32" r="2.2" fill="#fff" />
+    </svg>
+  )
+}
+
+const initiales = nom => nom.split(' ').filter(Boolean).slice(0, 2).map(m => m[0]).join('').toUpperCase()
+const listePrenoms = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1] : l[0] || ''
+
 export default function Borne() {
   const [step, setStep] = useState('loading')
   const [codeInput, setCodeInput] = useState('')
@@ -11,7 +49,6 @@ export default function Borne() {
   const [recording, setRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState(null)
   const [sending, setSending] = useState(false)
-  const [transcribing, setTranscribing] = useState(false)
   const [error, setError] = useState('')
   const [duration, setDuration] = useState(0)
   const [showInvite, setShowInvite] = useState(false)
@@ -20,8 +57,10 @@ export default function Borne() {
   const [noteProposee, setNoteProposee] = useState('')
   const [signalement, setSignalement] = useState(null) // { id, notePartielle }
   const [reponseMedicale, setReponseMedicale] = useState('')
-  const [alertesBorne, setAlertesBorne] = useState([])
-  const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs }
+  const [alertesAccueil, setAlertesAccueil] = useState([])
+  const [messagesAccueil, setMessagesAccueil] = useState([]) // [{ prenom, nombre }]
+  const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs } de la personne qui enregistre
+  const [maintenant, setMaintenant] = useState(() => new Date())
   const [sosCompte, setSosCompte] = useState(0)
   const [sosResultat, setSosResultat] = useState(null) // { success, emails, whatsapp, dejaPrevenus }
   const [surveillanceVisio, setSurveillanceVisio] = useState(false) // SOS récent : un proche peut demander la visio
@@ -37,7 +76,7 @@ export default function Borne() {
   const apercuRef = useRef(null)
   const sonDistantRef = useRef(null)
   const finVisioRef = useRef(null)
-
+  const derniereActionRef = useRef(0)
 
   useEffect(() => {
     loadBorne(localStorage.getItem('holiris_borne_code'))
@@ -76,12 +115,72 @@ export default function Borne() {
     await loadBorne(code)
   }
 
+  // ── Page d'accueil permanente : écran toujours allumé, horloge, alertes et messages ──
+
+  useEffect(() => {
+    let verrou = null
+    const demander = () => navigator.wakeLock?.request('screen').then(v => { verrou = v }).catch(() => {})
+    const auRetour = () => { if (document.visibilityState === 'visible') demander() }
+    demander()
+    document.addEventListener('visibilitychange', auRetour)
+    return () => { document.removeEventListener('visibilitychange', auRetour); verrou?.release().catch(() => {}) }
+  }, [])
+
+  useEffect(() => {
+    const t = setInterval(() => setMaintenant(new Date()), 30000)
+    return () => clearInterval(t)
+  }, [])
+
+  // Alertes en cours et messages non lus, actualisés toutes les 2 minutes ; liste des personnes toutes les 10 minutes
+  useEffect(() => {
+    if (step !== 'accueil' || !borneInfo?.code) return
+    const code = encodeURIComponent(borneInfo.code)
+    const actualiser = () => {
+      fetch('/api/borne?alertes=1&code=' + code).then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setAlertesAccueil(d.alertes || []) }).catch(() => {})
+      fetch('/api/borne?nonlus=tous&code=' + code).then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setMessagesAccueil(d.messages || []) }).catch(() => {})
+    }
+    const personnesAJour = () => fetch('/api/borne?code=' + code).then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.personnes) setPersonnes(d.personnes) }).catch(() => {})
+    actualiser()
+    const t1 = setInterval(actualiser, 2 * 60 * 1000)
+    const t2 = setInterval(personnesAJour, 10 * 60 * 1000)
+    return () => { clearInterval(t1); clearInterval(t2) }
+  }, [step, borneInfo])
+
+  function retourAccueil() {
+    if (recording) stopRecording(false)
+    setSelectedPersonne(null)
+    setAudioBlob(null)
+    setNoteProposee('')
+    setDuration(0)
+    setSignalement(null)
+    setReponseMedicale('')
+    setShowInvite(false)
+    setError('')
+    setStep('accueil')
+  }
+
+  // Sans action pendant 4 minutes (hors enregistrement), retour à l'accueil
+  useEffect(() => {
+    if (!['choix', 'enregistrement', 'revision'].includes(step) || recording) return
+    derniereActionRef.current = Date.now()
+    const t = setInterval(() => {
+      if (Date.now() - derniereActionRef.current > INACTIVITE) retourAccueil()
+    }, 20000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- retourAccueil ne lit que l'état courant
+  }, [step, recording])
+
+  // ── Note vocale : choix de la personne, enregistrement, transcription automatique, relecture ──
+
   function choisirPersonne(p) {
     setSelectedPersonne(p)
     setAudioBlob(null)
     setNoteProposee('')
     setDuration(0)
-    setAlertesBorne([])
+    setError('')
     setMessagesBorne(null)
     // Messages non lus de cette personne : annonce seulement (nombre et prénoms, jamais le contenu)
     if (p.type !== 'invite' && p.id && borneInfo?.code) {
@@ -91,13 +190,6 @@ export default function Borne() {
         .catch(() => {})
     }
     setStep('enregistrement')
-    // Alertes en cours : seulement pour les personnes de la liste, pas pour un visiteur
-    if (p.type !== 'invite' && borneInfo?.code) {
-      fetch('/api/borne?alertes=1&code=' + encodeURIComponent(borneInfo.code))
-        .then(res => res.ok ? res.json() : { alertes: [] })
-        .then(data => setAlertesBorne(data.alertes || []))
-        .catch(() => {})
-    }
   }
 
   function validerInvite() {
@@ -109,6 +201,7 @@ export default function Borne() {
   }
 
   async function startRecording() {
+    setError('')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       chunksRef.current = []
@@ -116,8 +209,11 @@ export default function Borne() {
       mediaRecorderRef.current = mr
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       mr.onstop = () => {
-        setAudioBlob(new Blob(chunksRef.current, { type: 'audio/webm' }))
         stream.getTracks().forEach(t => t.stop())
+        if (!mr.aTranscrire) return
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
+        setAudioBlob(blob)
+        transcrire(blob)
       }
       mr.start()
       setRecording(true)
@@ -128,33 +224,43 @@ export default function Borne() {
     }
   }
 
-  function stopRecording() {
+  // L'arrêt lance directement la transcription (sauf en quittant la page)
+  function stopRecording(aTranscrire = true) {
     if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.aTranscrire = aTranscrire
       mediaRecorderRef.current.stop()
       setRecording(false)
       clearInterval(timerRef.current)
     }
   }
 
-  async function transcrire() {
-    if (!audioBlob) return
-    setTranscribing(true)
+  async function transcrire(blob) {
+    if (!blob) return
+    setStep('transcription')
     setError('')
     try {
       const formData = new FormData()
-      formData.append('audio', audioBlob, 'note.webm')
+      formData.append('audio', blob, blob.type.includes('mp4') ? 'note.m4a' : 'note.webm')
       const res = await fetch('/api/borne-transcribe', { method: 'POST', body: formData })
       const result = await res.json()
       if (result.success) {
         setNoteProposee(result.note)
         setStep('revision')
-      } else {
-        setError("Erreur lors de la transcription : " + (result.error || 'inconnue'))
+        return
       }
+      setError('La transcription n\'a pas fonctionné. Vous pouvez réessayer ou réenregistrer.')
     } catch {
-      setError('Erreur réseau.')
+      setError('Pas de connexion Internet. Vous pouvez réessayer ou réenregistrer.')
     }
-    setTranscribing(false)
+    setStep('enregistrement')
+  }
+
+  function reenregistrer() {
+    setAudioBlob(null)
+    setNoteProposee('')
+    setDuration(0)
+    setError('')
+    setStep('enregistrement')
   }
 
   async function envoyerNote() {
@@ -181,25 +287,17 @@ export default function Borne() {
       } else if (result.success) {
         terminer()
       } else {
-        setError("Erreur lors de l'envoi.")
+        setError("L'envoi n'a pas fonctionné. Réessayez dans un instant.")
       }
     } catch {
-      setError('Erreur réseau.')
+      setError('Pas de connexion Internet. Réessayez dans un instant.')
     }
     setSending(false)
   }
 
   function terminer() {
     setStep('confirmation')
-    setTimeout(() => {
-      setSelectedPersonne(null)
-      setAudioBlob(null)
-      setNoteProposee('')
-      setDuration(0)
-      setSignalement(null)
-      setReponseMedicale('')
-      setStep('accueil')
-    }, 3000)
+    setTimeout(retourAccueil, 4000)
   }
 
   async function repondreMedical(essentiel) {
@@ -221,7 +319,7 @@ export default function Borne() {
     terminer()
   }
 
-  // SOS : confirmation avec compte à rebours ; sans réponse, l'alerte part automatiquement
+  // ── SOS : confirmation avec compte à rebours ; sans réponse, l'alerte part automatiquement ──
   const SOS_DELAI = 20
 
   function ouvrirSos() {
@@ -267,7 +365,7 @@ export default function Borne() {
     return () => clearTimeout(t)
   }, [step, famillePrevenue])
 
-  // Visio demandée par un proche (lien reçu après le SOS) : vérification toutes les 3 secondes
+  // ── Visio demandée par un proche (lien reçu après le SOS) : vérification toutes les 3 secondes ──
   useEffect(() => {
     if (!surveillanceVisio || visio || !borneInfo?.code) return
     const t = setInterval(async () => {
@@ -342,350 +440,368 @@ export default function Borne() {
     setStep('setup')
   }
 
-  const bg = { minHeight: '100vh', background: '#1E2820', fontFamily: "'Inter', DM Sans, sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }
+  // ── Mise en forme ──
+
+  const page = (contenu, { fond = C.fond, haut = false } = {}) => (
+    <div onPointerDown={() => { derniereActionRef.current = Date.now() }}
+      style={{ minHeight: '100dvh', background: fond, fontFamily: TEXTE, color: C.encre, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: haut ? 'flex-start' : 'center', padding: '28px 24px', boxSizing: 'border-box' }}>
+      <style>{`
+        @keyframes holiris-pulse { 0% { box-shadow: 0 0 0 0 rgba(196,67,79,0.35) } 70% { box-shadow: 0 0 0 26px rgba(196,67,79,0) } 100% { box-shadow: 0 0 0 0 rgba(196,67,79,0) } }
+        @keyframes holiris-tourne { to { transform: rotate(360deg) } }
+        .borne-bouton { transition: transform 0.15s ease, box-shadow 0.15s ease; -webkit-tap-highlight-color: transparent; }
+        .borne-bouton:active { transform: scale(0.98); }
+      `}</style>
+      {contenu}
+    </div>
+  )
+  const bouton = (fond, couleur, extra = {}) => ({ background: fond, color: couleur, border: 'none', borderRadius: 20, padding: '20px 28px', fontSize: 19, fontWeight: 500, cursor: 'pointer', fontFamily: TEXTE, ...extra })
+  const retour = (libelle, action) => (
+    <button onClick={action} className="borne-bouton"
+      style={{ alignSelf: 'flex-start', background: C.carte, border: `1px solid ${C.bord}`, borderRadius: 999, padding: '10px 18px', fontSize: 15, color: C.gris, cursor: 'pointer', fontFamily: TEXTE, marginBottom: 20 }}>
+      ← {libelle}
+    </button>
+  )
+  const erreurBloc = error && (
+    <div style={{ background: C.roseClair, border: '1px solid #F0CDD1', borderRadius: 14, padding: '12px 16px', fontSize: 15, color: '#8E2F38', marginBottom: 20, textAlign: 'left' }}>{error}</div>
+  )
+  const urgence = (
+    <p style={{ fontSize: 15, color: C.gris, marginTop: 28, textAlign: 'center' }}>
+      Urgence vitale : appelez le <strong style={{ color: C.encre }}>15</strong> ou le <strong style={{ color: C.encre }}>112</strong>
+    </p>
+  )
 
   // La visio passe devant tous les autres écrans, avec un bandeau visible en permanence
-  if (visio) return (
-    <div style={{ ...bg, background: '#2A1416', justifyContent: 'flex-start', paddingTop: 24 }}>
-      <div style={{ width: '100%', maxWidth: 640, textAlign: 'center' }}>
-        <div style={{ background: '#C4434F', borderRadius: 12, padding: '16px 20px', color: '#fff', fontSize: 19, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 0 0 4px rgba(255,255,255,0.35)' }} />
-          Caméra et micro activés
-        </div>
-        <p style={{ fontSize: 22, color: '#FAFCFA', margin: '22px 0 6px' }}>
-          {visio.etat === 'en-direct' ? <><strong>{visio.prenom}</strong> vous voit et vous entend</> : <>Connexion avec <strong>{visio.prenom}</strong>…</>}
-        </p>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', marginBottom: 20 }}>Vous pouvez lui parler normalement.</p>
-        <video ref={apercuRef} autoPlay playsInline muted style={{ width: 280, aspectRatio: '4 / 3', objectFit: 'cover', borderRadius: 12, background: '#000', transform: 'scaleX(-1)' }} />
-        <audio ref={sonDistantRef} autoPlay />
-        <button onClick={() => finVisio(true)}
-          style={{ display: 'block', width: '100%', marginTop: 24, background: 'rgba(255,255,255,0.12)', color: '#fff', border: '2px solid rgba(255,255,255,0.35)', borderRadius: 14, padding: '22px 0', fontSize: 21, fontWeight: 600, cursor: 'pointer' }}>
-          Arrêter la caméra
-        </button>
+  if (visio) return page(
+    <div style={{ width: '100%', maxWidth: 640, textAlign: 'center' }}>
+      <div style={{ background: C.rouge, borderRadius: 18, padding: '16px 20px', color: '#fff', fontSize: 20, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', animation: 'holiris-pulse 1.8s infinite' }} />
+        Caméra et micro activés
       </div>
+      <p style={{ fontFamily: TITRE, fontSize: 32, margin: '24px 0 6px' }}>
+        {visio.etat === 'en-direct' ? <><strong style={{ fontWeight: 600 }}>{visio.prenom}</strong> vous voit et vous entend</> : <>Connexion avec <strong style={{ fontWeight: 600 }}>{visio.prenom}</strong>…</>}
+      </p>
+      <p style={{ fontSize: 17, color: C.gris, marginBottom: 22 }}>Vous pouvez lui parler normalement.</p>
+      <video ref={apercuRef} autoPlay playsInline muted style={{ width: 300, aspectRatio: '4 / 3', objectFit: 'cover', borderRadius: 18, background: '#000', transform: 'scaleX(-1)', boxShadow: OMBRE }} />
+      <audio ref={sonDistantRef} autoPlay />
+      <button onClick={() => finVisio(true)} className="borne-bouton"
+        style={bouton(C.carte, C.rouge, { display: 'block', width: '100%', marginTop: 26, border: `2px solid ${C.rouge}`, fontSize: 21, fontWeight: 600 })}>
+        Arrêter la caméra
+      </button>
+    </div>,
+    { haut: true }
+  )
+
+  if (step === 'loading') return page(<p style={{ color: C.grisClair, fontSize: 16 }}>Chargement…</p>)
+
+  if (step === 'setup') return page(
+    <div style={{ background: C.carte, borderRadius: 28, padding: '44px 40px', width: '100%', maxWidth: 480, boxShadow: OMBRE, textAlign: 'center' }}>
+      <Logo taille={64} />
+      <h1 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, letterSpacing: '0.04em', margin: '10px 0 4px' }}>Holiris</h1>
+      <p style={{ fontSize: 12, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 30 }}>Configuration de la borne</p>
+      {erreurBloc}
+      <input type="text" placeholder="BORNE-XXXXX" value={codeInput}
+        onChange={e => setCodeInput(e.target.value.toUpperCase())}
+        onKeyDown={e => e.key === 'Enter' && activerBorne()}
+        style={{ width: '100%', padding: '16px', background: '#FAFCFB', border: `1px solid ${C.bord}`, borderRadius: 14, color: C.encre, fontSize: 20, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.12em', textAlign: 'center', marginBottom: 14 }} />
+      <button onClick={activerBorne} disabled={!codeInput.trim()} className="borne-bouton"
+        style={bouton(C.sauge, '#fff', { width: '100%', opacity: codeInput.trim() ? 1 : 0.5 })}>
+        Activer la borne
+      </button>
     </div>
   )
 
-  if (step === 'loading') return (
-    <div style={bg}><div style={{ color: '#9AB89F', fontSize: 14 }}>Chargement...</div></div>
-  )
-
-  if (step === 'setup') return (
-    <div style={bg}>
-      <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.25)', borderRadius: 8, padding: '48px 40px', width: '100%', maxWidth: 480 }}>
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <svg width="48" height="48" viewBox="0 0 64 64" fill="none" style={{ marginBottom: 16 }}>
-            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
-            <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
-            <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
-            <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
-          </svg>
-          <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 300, color: '#FAFCFA', letterSpacing: '0.12em', marginBottom: 8 }}>
-            Hol<span style={{ color: '#9AB89F', fontStyle: 'italic' }}>iris</span>
-          </h1>
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.15em' }}>CONFIGURATION DE LA BORNE</p>
+  if (step === 'accueil') {
+    const urgentes = alertesAccueil.filter(a => a.niveau === 'danger')
+    const autres = alertesAccueil.filter(a => a.niveau !== 'danger')
+    const alertesVisibles = [...urgentes, ...autres].slice(0, 3)
+    return page(
+      <div style={{ width: '100%', maxWidth: 820, display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: C.gris, fontSize: 16 }}>
+          <span>Chez <strong style={{ color: C.encre, fontWeight: 500 }}>{borneInfo?.seniors?.name}</strong></span>
+          <span style={{ textAlign: 'right' }}>
+            <strong style={{ fontFamily: TITRE, fontSize: 30, fontWeight: 500, color: C.encre }}>{maintenant.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</strong>
+            <span style={{ display: 'block', fontSize: 14 }}>{maintenant.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, l => l.toUpperCase())}</span>
+          </span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {error && <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 4, padding: '10px 14px', fontSize: 13, color: '#e0939a' }}>{error}</div>}
-          <div>
-            <label style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9AB89F', display: 'block', marginBottom: 6 }}>Code borne</label>
-            <input type="text" placeholder="BORNE-XXXXX" value={codeInput}
-              onChange={e => setCodeInput(e.target.value.toUpperCase())}
-              onKeyDown={e => e.key === 'Enter' && activerBorne()}
-              style={{ width: '100%', padding: '14px 16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 4, color: '#FAFCFA', fontSize: 18, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.1em', textAlign: 'center' }}
-            />
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
+          <Logo taille={alertesVisibles.length || messagesAccueil.length ? 96 : 140} />
+          <h1 style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
+          <p style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
+        </div>
+
+        {(alertesVisibles.length > 0 || messagesAccueil.length > 0) && (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+            {alertesVisibles.map(a => (
+              <div key={a.id} style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: a.niveau === 'danger' ? C.rouge : C.ambre, flexShrink: 0 }}>
+                  {a.niveau === 'danger' ? 'Urgent' : 'À surveiller'}
+                </span>
+                <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>{a.message}</span>
+                <span style={{ fontSize: 13, color: C.gris, flexShrink: 0 }}>{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+              </div>
+            ))}
+            {messagesAccueil.length > 0 && (
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: C.lilasClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
+                <span style={{ fontSize: 24 }}>💬</span>
+                <span style={{ fontSize: 17, lineHeight: 1.45 }}>
+                  Nouveaux messages pour {listePrenoms(messagesAccueil.map(m => `${m.prenom} (${m.nombre})`))}
+                  <span style={{ color: C.gris }}> — à lire sur le téléphone ou sur holiris.fr</span>
+                </span>
+              </div>
+            )}
           </div>
-          <button onClick={activerBorne} disabled={!codeInput.trim()}
-            style={{ background: '#6B8F71', color: '#FAFCFA', border: 'none', borderRadius: 4, padding: '16px 0', fontSize: 15, fontWeight: 500, cursor: 'pointer', opacity: !codeInput.trim() ? 0.5 : 1 }}>
-            Activer la borne
+        )}
+
+        <div style={{ width: '100%', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <button onClick={() => { setShowInvite(false); setStep('choix') }} className="borne-bouton"
+            style={bouton(C.sauge, '#fff', { flex: '2 1 320px', padding: '30px 28px', fontSize: 24, borderRadius: 24, boxShadow: '0 12px 28px rgba(74,136,112,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 })}>
+            <span style={{ fontSize: 30 }}>🎙</span> Enregistrer une note
+          </button>
+          <button onClick={ouvrirSos} className="borne-bouton"
+            style={bouton(C.rouge, '#fff', { flex: '1 1 220px', padding: '22px 24px', borderRadius: 24, boxShadow: '0 12px 28px rgba(196,67,79,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 })}>
+            <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: '0.1em' }}>SOS</span>
+            <span style={{ fontSize: 16, textAlign: 'left', lineHeight: 1.3 }}>J&apos;ai besoin<br />d&apos;aide</span>
           </button>
         </div>
-      </div>
-    </div>
-  )
 
-  if (step === 'accueil') return (
-    <div style={{ ...bg, justifyContent: 'flex-start', paddingTop: 48 }}>
-      <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>Domicile de</p>
-          <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 48, fontWeight: 300, color: '#FAFCFA', letterSpacing: '0.06em' }}>{borneInfo?.seniors?.name}</h1>
-        </div>
-
-        <button onClick={ouvrirSos}
-          style={{ width: '100%', background: '#C4434F', color: '#fff', border: '3px solid rgba(255,255,255,0.18)', borderRadius: 14, padding: '22px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 32, boxShadow: '0 0 0 6px rgba(196,67,79,0.18)' }}>
-          <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: '0.12em' }}>SOS</span>
-          <span style={{ fontSize: 18, fontWeight: 500, textAlign: 'left', lineHeight: 1.3 }}>J&apos;ai besoin d&apos;aide<br /><span style={{ fontSize: 13, opacity: 0.8, fontWeight: 400 }}>Prévenir ma famille</span></span>
-        </button>
-
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 14 }}>Qui êtes-vous ?</p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {personnes.map(p => (
-            <button key={p.id} onClick={() => choisirPersonne(p)}
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.25)', borderRadius: 8, padding: '18px 24px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: p.type === 'famille' ? 'rgba(168,159,204,0.2)' : 'rgba(107,143,113,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
-                {p.type === 'famille' ? '👨‍👩‍👧' : '👤'}
-              </div>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 500, color: '#FAFCFA' }}>{p.name}</div>
-                <div style={{ fontSize: 12, color: 'rgba(154,184,159,0.7)', marginTop: 2 }}>{p.role}</div>
-              </div>
-            </button>
-          ))}
-
-          {!showInvite ? (
-            <button onClick={() => setShowInvite(true)}
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 8, padding: '16px 24px', cursor: 'pointer', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 4 }}>
-              + Je ne suis pas dans la liste
-            </button>
-          ) : (
-            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.25)', borderRadius: 8, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Qui êtes-vous ?</p>
-              <input placeholder="Votre prénom et nom" value={inviteNom} onChange={e => setInviteNom(e.target.value)}
-                style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 4, color: '#FAFCFA', fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
-              <input placeholder="Votre rôle (ex: Médecin, Ami, Voisin...)" value={inviteRole} onChange={e => setInviteRole(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && validerInvite()}
-                style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 4, color: '#FAFCFA', fontSize: 15, outline: 'none', fontFamily: 'inherit' }} />
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={validerInvite} disabled={!inviteNom.trim()}
-                  style={{ flex: 1, background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '12px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: !inviteNom.trim() ? 0.5 : 1 }}>
-                  Continuer →
-                </button>
-                <button onClick={() => { setShowInvite(false); setInviteNom(''); setInviteRole('') }}
-                  style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: 4, padding: '12px 16px', fontSize: 14, cursor: 'pointer' }}>
-                  Annuler
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 40, display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
-          <button onClick={autoriserCamera} style={{ background: 'none', border: 'none', color: cameraAutorisee === false ? '#e0939a' : 'rgba(255,255,255,0.25)', fontSize: 11, cursor: 'pointer', letterSpacing: '0.1em' }}>
+        <div style={{ marginTop: 22, display: 'flex', justifyContent: 'center', gap: 22, flexWrap: 'wrap' }}>
+          <button onClick={autoriserCamera} style={{ background: 'none', border: 'none', color: cameraAutorisee === false ? C.rouge : '#B9C4BE', fontSize: 12, cursor: 'pointer', fontFamily: TEXTE }}>
             {cameraAutorisee === true ? '✓ Caméra autorisée' : cameraAutorisee === false ? '📷 Caméra refusée : autorisez-la dans les réglages' : '📷 Autoriser la caméra (visio SOS)'}
           </button>
-          <button onClick={resetBorne} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 11, cursor: 'pointer', letterSpacing: '0.1em' }}>
+          <button onClick={resetBorne} style={{ background: 'none', border: 'none', color: '#B9C4BE', fontSize: 12, cursor: 'pointer', fontFamily: TEXTE }}>
             ⚙ Reconfigurer la borne
           </button>
         </div>
-      </div>
-    </div>
-  )
+      </div>,
+      { haut: true }
+    )
+  }
 
-  if (step === 'enregistrement') return (
-    <div style={bg}>
-      <div style={{ width: '100%', maxWidth: 480, textAlign: 'center' }}>
-        <div style={{ marginBottom: 40 }}>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>Note vocale pour {borneInfo?.seniors?.name}</p>
-          <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 32, fontWeight: 300, color: '#FAFCFA' }}>{selectedPersonne?.name}</h2>
-          <p style={{ fontSize: 13, color: 'rgba(154,184,159,0.6)' }}>{selectedPersonne?.role}</p>
+  if (step === 'choix') {
+    const groupes = [
+      { titre: 'Intervenants', liste: personnes.filter(p => p.type === 'intervenant'), couleur: C.sauge, clair: C.saugeClair },
+      { titre: 'Famille', liste: personnes.filter(p => p.type === 'famille'), couleur: C.lilas, clair: C.lilasClair },
+    ]
+    return page(
+      <div style={{ width: '100%', maxWidth: 900, display: 'flex', flexDirection: 'column' }}>
+        {retour('Accueil', retourAccueil)}
+        <h2 style={{ fontFamily: TITRE, fontSize: 42, fontWeight: 500, textAlign: 'center', marginBottom: 6 }}>Qui enregistre la note ?</h2>
+        <p style={{ fontSize: 17, color: C.gris, textAlign: 'center', marginBottom: 28 }}>Touchez votre nom</p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 22 }}>
+          {groupes.map(g => (
+            <div key={g.titre}>
+              <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: g.couleur, marginBottom: 12, paddingLeft: 4 }}>{g.titre}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {g.liste.length === 0 && <div style={{ fontSize: 15, color: C.grisClair, padding: '14px 4px' }}>Personne pour le moment</div>}
+                {g.liste.map(p => (
+                  <button key={p.type + p.id} onClick={() => choisirPersonne(p)} className="borne-bouton"
+                    style={{ background: C.carte, border: `1px solid ${C.bord}`, borderRadius: 20, padding: '16px 18px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 4px 14px rgba(74,60,40,0.05)', fontFamily: TEXTE }}>
+                    <span style={{ width: 52, height: 52, borderRadius: '50%', background: g.clair, color: g.couleur, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: TITRE, fontSize: 22, fontWeight: 600, flexShrink: 0 }}>{initiales(p.name)}</span>
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontSize: 19, fontWeight: 500, color: C.encre }}>{p.name}</span>
+                      {p.role && <span style={{ display: 'block', fontSize: 14, color: C.gris, marginTop: 2 }}>{p.role}</span>}
+                    </span>
+                    <span style={{ color: C.grisClair, fontSize: 22 }}>›</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {messagesBorne && (
-          <div style={{ textAlign: 'left', background: 'rgba(127,175,155,0.1)', border: '1px solid rgba(127,175,155,0.35)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 22 }}>💬</span>
-            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
-              Vous avez <strong style={{ color: '#9AB89F' }}>{messagesBorne.nombre} nouveau{messagesBorne.nombre > 1 ? 'x' : ''} message{messagesBorne.nombre > 1 ? 's' : ''}</strong>
-              {messagesBorne.auteurs?.length ? ' de ' + (messagesBorne.auteurs.length > 1 ? messagesBorne.auteurs.slice(0, -1).join(', ') + ' et ' + messagesBorne.auteurs[messagesBorne.auteurs.length - 1] : messagesBorne.auteurs[0]) : ''}.
-              <span style={{ color: 'rgba(255,255,255,0.45)' }}> Lisez-les sur votre téléphone ou sur holiris.fr.</span>
-            </span>
-          </div>
-        )}
-
-        {alertesBorne.length > 0 && (
-          <div style={{ textAlign: 'left', background: 'rgba(230,185,138,0.08)', border: '1px solid rgba(230,185,138,0.3)', borderRadius: 8, padding: '14px 16px', marginBottom: 32 }}>
-            <p style={{ fontSize: 11, color: '#E6B98A', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>Points d&apos;attention en cours</p>
-            {alertesBorne.map(a => (
-              <div key={a.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginBottom: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: a.niveau === 'danger' ? '#E0939A' : '#E6B98A', flexShrink: 0 }}>{a.niveau === 'danger' ? 'Urgent' : 'À surveiller'}</span>
-                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
-                  {a.message}
-                  <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}> · {new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
-                </span>
-              </div>
-            ))}
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>Pensez à en parler dans votre note si vous avez remarqué quelque chose.</p>
-          </div>
-        )}
-
-        {error && <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 4, padding: '10px 14px', fontSize: 13, color: '#e0939a', marginBottom: 24 }}>{error}</div>}
-
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
-          {!audioBlob ? (
-            <>
-              <button onClick={recording ? stopRecording : startRecording}
-                style={{ width: 140, height: 140, borderRadius: '50%', background: recording ? 'rgba(196,96,106,0.9)' : '#6B8F71', border: recording ? '4px solid rgba(196,96,106,0.4)' : '4px solid rgba(107,143,113,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, boxShadow: recording ? '0 0 0 12px rgba(196,96,106,0.2), 0 0 0 24px rgba(196,96,106,0.1)' : '0 0 0 8px rgba(107,143,113,0.15)', transition: 'all 0.3s ease' }}>
-                <span style={{ fontSize: 40 }}>{recording ? '⏹' : '🎙'}</span>
-                <span style={{ fontSize: 11, color: '#fff', letterSpacing: '0.1em' }}>{recording ? formatDuration(duration) : 'PARLER'}</span>
-              </button>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>{recording ? 'Appuyez à nouveau pour arrêter' : 'Appuyez pour commencer'}</p>
-            </>
+        <div style={{ marginTop: 24 }}>
+          {!showInvite ? (
+            <button onClick={() => setShowInvite(true)} className="borne-bouton"
+              style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.grisClair}`, borderRadius: 20, padding: '18px', cursor: 'pointer', color: C.gris, fontSize: 17, fontFamily: TEXTE }}>
+              + Je ne suis pas dans la liste
+            </button>
           ) : (
-            <>
-              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(107,143,113,0.2)', border: '2px solid rgba(107,143,113,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>🎙</div>
-              <div>
-                <p style={{ color: '#9AB89F', fontSize: 15, marginBottom: 4 }}>Enregistrement prêt · {formatDuration(duration)}</p>
-                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>L’IA va analyser votre message</p>
+            <div style={{ background: C.carte, borderRadius: 20, padding: 22, boxShadow: OMBRE, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input placeholder="Votre prénom et nom" value={inviteNom} onChange={e => setInviteNom(e.target.value)}
+                style={{ padding: '14px 16px', background: '#FAFCFB', border: `1px solid ${C.bord}`, borderRadius: 14, fontSize: 17, outline: 'none', fontFamily: TEXTE, color: C.encre }} />
+              <input placeholder="Votre rôle (ex : voisin, ami, kiné…)" value={inviteRole} onChange={e => setInviteRole(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && validerInvite()}
+                style={{ padding: '14px 16px', background: '#FAFCFB', border: `1px solid ${C.bord}`, borderRadius: 14, fontSize: 17, outline: 'none', fontFamily: TEXTE, color: C.encre }} />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={validerInvite} disabled={!inviteNom.trim()} className="borne-bouton"
+                  style={bouton(C.sauge, '#fff', { flex: 1, padding: '16px', fontSize: 17, opacity: inviteNom.trim() ? 1 : 0.5 })}>Continuer</button>
+                <button onClick={() => { setShowInvite(false); setInviteNom(''); setInviteRole('') }} className="borne-bouton"
+                  style={bouton('#F2F4F3', C.gris, { padding: '16px 22px', fontSize: 17 })}>Annuler</button>
               </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button onClick={transcrire} disabled={transcribing}
-                  style={{ background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '14px 32px', fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>
-                  {transcribing ? '✨ Analyse en cours...' : '✨ Analyser et prévisualiser'}
-                </button>
-                <button onClick={() => { setAudioBlob(null); setDuration(0) }}
-                  style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '14px 20px', fontSize: 15, cursor: 'pointer' }}>
-                  Recommencer
-                </button>
-              </div>
-            </>
+            </div>
           )}
         </div>
+      </div>,
+      { haut: true }
+    )
+  }
 
-        <button onClick={() => setStep('accueil')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 13, cursor: 'pointer', marginTop: 40, textDecoration: 'underline' }}>
-          ← Retour
-        </button>
-      </div>
-    </div>
-  )
+  if (step === 'enregistrement' || step === 'transcription') return page(
+    <div style={{ width: '100%', maxWidth: 620, display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+      {retour('Changer de personne', () => { stopRecording(false); setError(''); setStep('choix') })}
+      <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase' }}>Note pour {borneInfo?.seniors?.name}</p>
+      <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, margin: '6px 0 2px' }}>{selectedPersonne?.name}</h2>
+      <p style={{ fontSize: 16, color: C.gris, marginBottom: 22 }}>{selectedPersonne?.role}</p>
 
-  if (step === 'revision') return (
-    <div style={bg}>
-      <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>Note proposée par l’IA</p>
-          <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 28, fontWeight: 300, color: '#FAFCFA' }}>{selectedPersonne?.name}</h2>
+      {messagesBorne && (
+        <div style={{ width: '100%', display: 'flex', gap: 12, alignItems: 'center', background: C.lilasClair, borderRadius: 16, padding: '12px 16px', marginBottom: 20, boxSizing: 'border-box' }}>
+          <span style={{ fontSize: 22 }}>💬</span>
+          <span style={{ fontSize: 16, lineHeight: 1.5 }}>
+            Vous avez <strong>{messagesBorne.nombre} nouveau{messagesBorne.nombre > 1 ? 'x' : ''} message{messagesBorne.nombre > 1 ? 's' : ''}</strong>
+            {messagesBorne.auteurs?.length ? ' de ' + listePrenoms(messagesBorne.auteurs) : ''}.
+            <span style={{ color: C.gris }}> Lisez-les sur votre téléphone ou sur holiris.fr.</span>
+          </span>
         </div>
+      )}
 
-        {error && <div style={{ background: 'rgba(196,122,130,0.15)', border: '1px solid rgba(196,122,130,0.3)', borderRadius: 4, padding: '10px 14px', fontSize: 13, color: '#e0939a', marginBottom: 16 }}>{error}</div>}
+      <div style={{ width: '100%' }}>{erreurBloc}</div>
 
-        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: 8, padding: 24, marginBottom: 20 }}>
-          <p style={{ fontSize: 11, color: '#9AB89F', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12 }}>✨ Suggestion de l’assistant</p>
-          <textarea
-            value={noteProposee}
-            onChange={e => setNoteProposee(e.target.value)}
-            rows={4}
-            style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(107,143,113,0.2)', borderRadius: 4, padding: '12px 14px', color: '#FAFCFA', fontSize: 15, lineHeight: 1.6, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
-          />
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8 }}>Vous pouvez modifier ce texte avant de l’envoyer.</p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={envoyerNote} disabled={sending || !noteProposee.trim()}
-            style={{ flex: 1, background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '16px 0', fontSize: 15, fontWeight: 500, cursor: 'pointer', opacity: !noteProposee.trim() ? 0.5 : 1 }}>
-            {sending ? 'Envoi...' : '✅ Envoyer la note'}
-          </button>
-          <button onClick={() => { setStep('enregistrement'); setAudioBlob(null); setDuration(0) }}
-            style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '16px 20px', fontSize: 15, cursor: 'pointer' }}>
-            🎙 Ré-enregistrer
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
-  if (step === 'medical') return (
-    <div style={bg}>
-      <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
-        <p style={{ fontSize: 11, color: '#E6B98A', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Information médicale</p>
-        <p style={{ color: '#FAFCFA', fontSize: 17, lineHeight: 1.6, marginBottom: 12 }}>
-          Votre note contient une information médicale. Pour protéger la personne suivie,
-          {signalement?.notePartielle ? ' cette partie n’a pas été enregistrée (le reste de la note a bien été publié).' : ' elle n’a pas été enregistrée.'}
-        </p>
-        <p style={{ color: '#9AB89F', fontSize: 15, lineHeight: 1.6, marginBottom: 32 }}>
-          Cette information est-elle essentielle ? Si oui, la personne de confiance vous contactera.
-        </p>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={() => repondreMedical(true)} disabled={sending}
-            style={{ flex: 1, background: '#6B8F71', color: '#fff', border: 'none', borderRadius: 4, padding: '18px 0', fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>
-            Oui, essentielle
-          </button>
-          <button onClick={() => repondreMedical(false)} disabled={sending}
-            style={{ flex: 1, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4, padding: '18px 0', fontSize: 16, cursor: 'pointer' }}>
-            Non
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
-  if (step === 'sos' || step === 'sos-envoi') return (
-    <div style={{ ...bg, background: '#2A1416' }}>
-      <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
-        <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '0.14em', color: '#F0A0A8', marginBottom: 16 }}>SOS</div>
-        <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 400, color: '#FAFCFA', lineHeight: 1.2, marginBottom: 14 }}>
-          Voulez-vous prévenir votre famille ?
-        </h2>
-        {step === 'sos' ? (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 22, paddingBottom: 30 }}>
+        {step === 'transcription' ? (
           <>
-            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', marginBottom: 36 }}>
-              Sans réponse, l&apos;alerte sera envoyée dans <strong style={{ color: '#fff', fontSize: 22 }}>{sosCompte}</strong> seconde{sosCompte > 1 ? 's' : ''}.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <button onClick={() => envoyerSos(false)}
-                style={{ background: '#C4434F', color: '#fff', border: 'none', borderRadius: 14, padding: '26px 0', fontSize: 22, fontWeight: 600, cursor: 'pointer' }}>
-                Oui, prévenir ma famille
-              </button>
-              <button onClick={() => setStep('accueil')}
-                style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '2px solid rgba(255,255,255,0.25)', borderRadius: 14, padding: '22px 0', fontSize: 20, cursor: 'pointer' }}>
-                Non, annuler
-              </button>
-            </div>
+            <div style={{ width: 84, height: 84, borderRadius: '50%', border: `5px solid ${C.saugeClair}`, borderTopColor: C.sauge, animation: 'holiris-tourne 1s linear infinite' }} />
+            <p style={{ fontFamily: TITRE, fontSize: 28 }}>Transcription en cours…</p>
+            <p style={{ fontSize: 16, color: C.gris }}>Votre note s&apos;affiche dans quelques secondes.</p>
           </>
-        ) : (
-          <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.8)', marginTop: 24 }}>Envoi de l&apos;alerte…</p>
-        )}
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 36 }}>Urgence vitale : appelez le <strong style={{ color: '#fff' }}>15</strong> ou le <strong style={{ color: '#fff' }}>112</strong></p>
-      </div>
-    </div>
-  )
-
-  if (step === 'sos-envoye') return (
-    <div style={{ ...bg, background: famillePrevenue ? '#1E2820' : '#2A1416' }}>
-      <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
-        {famillePrevenue ? (
-          <>
-            <div style={{ fontSize: 64, marginBottom: 20 }}>✅</div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 38, fontWeight: 400, color: '#FAFCFA', marginBottom: 14 }}>{sosResultat.dejaPrevenus ? 'Votre famille vient d\'être prévenue' : 'Votre famille a été prévenue'}</h2>
-            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>Restez au calme, quelqu&apos;un va vous rappeler ou venir vous voir.</p>
-          </>
-        ) : sosResultat?.success ? (
-          <>
-            <div style={{ fontSize: 64, marginBottom: 20 }}>⚠️</div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 400, color: '#FAFCFA', marginBottom: 14 }}>Aucun proche n&apos;a pu être prévenu</h2>
-            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>Aucun email ni numéro n&apos;est renseigné pour la famille. Appelez un proche directement.</p>
-          </>
+        ) : audioBlob && error ? (
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button onClick={() => transcrire(audioBlob)} className="borne-bouton" style={bouton(C.sauge, '#fff')}>Réessayer</button>
+            <button onClick={reenregistrer} className="borne-bouton" style={bouton(C.carte, C.saugeFonce, { border: `1.5px solid ${C.sauge}` })}>Réenregistrer</button>
+          </div>
         ) : (
           <>
-            <div style={{ fontSize: 64, marginBottom: 20 }}>⚠️</div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 400, color: '#FAFCFA', marginBottom: 14 }}>L&apos;alerte n&apos;a pas pu être envoyée</h2>
-            <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 24 }}>Vérifiez que la borne est connectée à Internet, ou appelez un proche.</p>
-            <button onClick={() => { sosEnvoiRef.current = false; envoyerSos(false) }}
-              style={{ background: '#C4434F', color: '#fff', border: 'none', borderRadius: 14, padding: '20px 40px', fontSize: 19, fontWeight: 600, cursor: 'pointer' }}>
-              Réessayer
+            <button onClick={recording ? () => stopRecording(true) : startRecording} className="borne-bouton"
+              style={{ width: 176, height: 176, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff',
+                background: recording ? C.rouge : `linear-gradient(145deg, ${C.sauge}, ${C.saugeFonce})`,
+                boxShadow: recording ? undefined : '0 16px 36px rgba(74,136,112,0.35)',
+                animation: recording ? 'holiris-pulse 1.6s infinite' : 'none' }}>
+              <span style={{ fontSize: 50 }}>{recording ? '■' : '🎙'}</span>
+              <span style={{ fontSize: 15, letterSpacing: '0.12em', fontWeight: 600 }}>{recording ? formatDuration(duration) : 'PARLER'}</span>
             </button>
+            <p style={{ fontSize: 18, color: C.gris, textAlign: 'center' }}>
+              {recording ? 'Je vous écoute… touchez à nouveau quand vous avez fini' : 'Touchez le micro et racontez comment ça s\'est passé'}
+            </p>
           </>
         )}
-        <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: '18px 20px', marginTop: 32 }}>
-          <p style={{ fontSize: 16, color: '#fff', lineHeight: 1.6 }}>En cas d&apos;urgence vitale, appelez le <strong style={{ fontSize: 22 }}>15</strong> (SAMU) ou le <strong style={{ fontSize: 22 }}>112</strong>.</p>
-        </div>
-        <button onClick={() => setStep('accueil')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 15, cursor: 'pointer', marginTop: 32, textDecoration: 'underline' }}>
-          ← Retour à l&apos;accueil
+      </div>
+    </div>,
+    { haut: true }
+  )
+
+  if (step === 'revision') return page(
+    <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column' }}>
+      {retour('Accueil', retourAccueil)}
+      <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'center' }}>Note de {selectedPersonne?.name}</p>
+      <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, textAlign: 'center', margin: '6px 0 20px' }}>Votre note est prête</h2>
+      {erreurBloc}
+      <div style={{ background: C.carte, borderRadius: 24, padding: 22, boxShadow: OMBRE, marginBottom: 18 }}>
+        <textarea value={noteProposee} onChange={e => setNoteProposee(e.target.value)} rows={5}
+          style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', fontFamily: TEXTE, fontSize: 20, lineHeight: 1.6, color: C.encre, background: 'transparent', boxSizing: 'border-box' }} />
+        <p style={{ fontSize: 14, color: C.grisClair, marginTop: 6 }}>✏️ Touchez le texte pour le corriger si besoin.</p>
+      </div>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <button onClick={envoyerNote} disabled={sending || !noteProposee.trim()} className="borne-bouton"
+          style={bouton(C.sauge, '#fff', { flex: '2 1 260px', fontSize: 21, padding: '22px', boxShadow: '0 12px 28px rgba(74,136,112,0.28)', opacity: noteProposee.trim() ? 1 : 0.5 })}>
+          {sending ? 'Envoi…' : 'Envoyer la note'}
         </button>
+        <button onClick={reenregistrer} disabled={sending} className="borne-bouton"
+          style={bouton(C.carte, C.saugeFonce, { flex: '1 1 200px', border: `1.5px solid ${C.sauge}` })}>
+          🎙 Réenregistrer
+        </button>
+      </div>
+    </div>,
+    { haut: true }
+  )
+
+  if (step === 'medical') return page(
+    <div style={{ width: '100%', maxWidth: 600, background: C.carte, borderRadius: 28, padding: '36px 32px', boxShadow: OMBRE, textAlign: 'center' }}>
+      <p style={{ fontSize: 13, color: C.ambre, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 14 }}>Information médicale</p>
+      <p style={{ fontSize: 19, lineHeight: 1.6, marginBottom: 12 }}>
+        Votre note contient une information médicale. Pour protéger la personne suivie,
+        {signalement?.notePartielle ? ' cette partie n’a pas été enregistrée (le reste de la note a bien été publié).' : ' elle n’a pas été enregistrée.'}
+      </p>
+      <p style={{ fontSize: 17, color: C.saugeFonce, lineHeight: 1.6, marginBottom: 28 }}>
+        Cette information est-elle essentielle ? Si oui, la personne de confiance vous contactera.
+      </p>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <button onClick={() => repondreMedical(true)} disabled={sending} className="borne-bouton" style={bouton(C.sauge, '#fff', { flex: 1 })}>Oui, essentielle</button>
+        <button onClick={() => repondreMedical(false)} disabled={sending} className="borne-bouton" style={bouton('#F2F4F3', C.gris, { flex: 1 })}>Non</button>
       </div>
     </div>
   )
 
-  if (step === 'confirmation') return (
-    <div style={bg}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 72, marginBottom: 24 }}>✅</div>
-        <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 36, fontWeight: 300, color: '#FAFCFA', marginBottom: 12 }}>Note enregistrée</h2>
-        <p style={{ color: '#9AB89F', fontSize: 15 }}>Merci {selectedPersonne?.name}</p>
-        {reponseMedicale && <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 12, maxWidth: 420 }}>{reponseMedicale}</p>}
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 8 }}>Retour à l’accueil dans quelques secondes...</p>
-      </div>
+  if (step === 'confirmation') return page(
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ width: 110, height: 110, borderRadius: '50%', background: C.saugeClair, color: C.saugeFonce, fontSize: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>✓</div>
+      <h2 style={{ fontFamily: TITRE, fontSize: 44, fontWeight: 500, marginBottom: 10 }}>Merci {selectedPersonne?.name?.split(' ')[0]} !</h2>
+      <p style={{ fontSize: 19, color: C.saugeFonce }}>Votre note a bien été envoyée à la famille.</p>
+      {reponseMedicale && <p style={{ fontSize: 16, color: C.gris, marginTop: 14, maxWidth: 460 }}>{reponseMedicale}</p>}
     </div>
+  )
+
+  if (step === 'sos' || step === 'sos-envoi') return page(
+    <div style={{ width: '100%', maxWidth: 580, textAlign: 'center' }}>
+      <div style={{ display: 'inline-block', background: C.rouge, color: '#fff', borderRadius: 999, padding: '8px 22px', fontSize: 22, fontWeight: 700, letterSpacing: '0.14em', marginBottom: 20 }}>SOS</div>
+      <h2 style={{ fontFamily: TITRE, fontSize: 44, fontWeight: 500, lineHeight: 1.15, marginBottom: 14 }}>Voulez-vous prévenir votre famille ?</h2>
+      {step === 'sos' ? (
+        <>
+          <p style={{ fontSize: 19, color: C.gris, marginBottom: 32 }}>
+            Sans réponse, l&apos;alerte partira dans <strong style={{ color: C.rouge, fontSize: 26 }}>{sosCompte}</strong> seconde{sosCompte > 1 ? 's' : ''}.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <button onClick={() => envoyerSos(false)} className="borne-bouton"
+              style={bouton(C.rouge, '#fff', { padding: '26px', fontSize: 23, fontWeight: 600, borderRadius: 24, boxShadow: '0 12px 28px rgba(196,67,79,0.3)' })}>
+              Oui, prévenir ma famille
+            </button>
+            <button onClick={() => setStep('accueil')} className="borne-bouton"
+              style={bouton(C.carte, C.encre, { padding: '22px', fontSize: 21, borderRadius: 24, border: `1.5px solid ${C.bord}` })}>
+              Non, annuler
+            </button>
+          </div>
+        </>
+      ) : (
+        <p style={{ fontSize: 20, color: C.gris, marginTop: 24 }}>Envoi de l&apos;alerte…</p>
+      )}
+      {urgence}
+    </div>,
+    { fond: 'linear-gradient(160deg, #FFF8F7 0%, #FBEDEE 100%)' }
+  )
+
+  if (step === 'sos-envoye') return page(
+    <div style={{ width: '100%', maxWidth: 580, textAlign: 'center' }}>
+      {famillePrevenue ? (
+        <>
+          <div style={{ width: 110, height: 110, borderRadius: '50%', background: C.saugeClair, color: C.saugeFonce, fontSize: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>✓</div>
+          <h2 style={{ fontFamily: TITRE, fontSize: 44, fontWeight: 500, marginBottom: 12 }}>{sosResultat.dejaPrevenus ? 'Votre famille vient d\'être prévenue' : 'Votre famille a été prévenue'}</h2>
+          <p style={{ fontSize: 19, color: C.gris, lineHeight: 1.6 }}>Restez au calme, quelqu&apos;un va vous rappeler ou venir vous voir.</p>
+        </>
+      ) : sosResultat?.success ? (
+        <>
+          <div style={{ fontSize: 60, marginBottom: 18 }}>⚠️</div>
+          <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, marginBottom: 12 }}>Aucun proche n&apos;a pu être prévenu</h2>
+          <p style={{ fontSize: 19, color: C.gris, lineHeight: 1.6 }}>Aucun email ni numéro n&apos;est renseigné pour la famille. Appelez un proche directement.</p>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: 60, marginBottom: 18 }}>⚠️</div>
+          <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, marginBottom: 12 }}>L&apos;alerte n&apos;a pas pu être envoyée</h2>
+          <p style={{ fontSize: 19, color: C.gris, lineHeight: 1.6, marginBottom: 24 }}>Vérifiez que la borne est connectée à Internet, ou appelez un proche.</p>
+          <button onClick={() => { sosEnvoiRef.current = false; envoyerSos(false) }} className="borne-bouton"
+            style={bouton(C.rouge, '#fff', { padding: '20px 40px', fontWeight: 600 })}>
+            Réessayer
+          </button>
+        </>
+      )}
+      <div style={{ background: C.carte, borderRadius: 20, padding: '18px 20px', marginTop: 30, boxShadow: OMBRE }}>
+        <p style={{ fontSize: 18, lineHeight: 1.6 }}>En cas d&apos;urgence vitale, appelez le <strong style={{ fontSize: 24, color: C.rouge }}>15</strong> (SAMU) ou le <strong style={{ fontSize: 24, color: C.rouge }}>112</strong>.</p>
+      </div>
+      <button onClick={() => setStep('accueil')} style={{ background: 'none', border: 'none', color: C.gris, fontSize: 17, cursor: 'pointer', marginTop: 28, textDecoration: 'underline', fontFamily: TEXTE }}>
+        ← Retour à l&apos;accueil
+      </button>
+    </div>,
+    { fond: famillePrevenue ? C.fond : 'linear-gradient(160deg, #FFF8F7 0%, #FBEDEE 100%)' }
   )
 
   return null
