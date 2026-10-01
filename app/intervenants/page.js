@@ -22,13 +22,15 @@ export default function Intervenants() {
   const [role, setRole] = useState('')
   const [telephone, setTelephone] = useState('')
   const [email, setEmail] = useState('')
-  const [edition, setEdition] = useState(null) // { id, telephone, email } : coordonnées ajoutées après coup
+  const [edition, setEdition] = useState(null) // fiche en cours de modification : { id, prenom, nom, role, telephone, email }
 
   const router = useRouter()
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
+
+  const ROLES = ['Infirmière', 'Infirmier', 'Kinésithérapeute', 'Aide à domicile', 'Médecin', 'Cardiologue', 'Pharmacien', 'Autre']
 
   const roleIcons = {
     'Infirmière': '💉', 'Infirmier': '💉',
@@ -100,16 +102,25 @@ export default function Intervenants() {
     setSaving(false)
   }
 
-  // Coordonnées ajoutées plus tard : l'invitation part dès qu'un email est renseigné
-  async function enregistrerCoordonnees(i) {
+  function ouvrirEdition(i) {
+    const [p, ...n] = (i.name || '').split(' ')
+    setEdition({ id: i.id, prenom: p, nom: n.join(' '), role: i.role || '', telephone: i.phone || '', email: i.email || '' })
+  }
+
+  // Modification d'une fiche. Sans compte, l'invitation part dès qu'un nouvel email est renseigné ;
+  // avec un compte, l'email (identifiant de connexion) ne se modifie pas ici.
+  async function enregistrerEdition(i) {
     const nouvelEmail = edition.email.trim().toLowerCase()
-    if (nouvelEmail && !emailValide(nouvelEmail)) return
+    if (!edition.prenom.trim() || !edition.role || (nouvelEmail && !emailValide(nouvelEmail))) return
     setSaving(true)
+    const nomComplet = (edition.prenom.trim() + ' ' + edition.nom.trim()).trim()
     const { error } = await supabase.from('intervenants').update({
-      phone: edition.telephone || null, whatsapp: versWhatsapp(edition.telephone), email: nouvelEmail || null,
+      name: nomComplet, role: edition.role,
+      phone: edition.telephone || null, whatsapp: versWhatsapp(edition.telephone),
+      ...(i.user_id ? {} : { email: nouvelEmail || null }),
     }).eq('id', i.id)
     if (!error) {
-      if (nouvelEmail && nouvelEmail !== (i.email || '')) await inviter(i.id, i.name)
+      if (!i.user_id && nouvelEmail && nouvelEmail !== (i.email || '')) await inviter(i.id, nomComplet)
       setEdition(null)
       setTimeout(() => setEmailSent(null), 6000)
       loadData()
@@ -211,10 +222,7 @@ export default function Intervenants() {
             <select value={role} onChange={e => setRole(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }}>
               <option value="">Rôle / Fonction</option>
-              <option>Infirmière</option><option>Infirmier</option>
-              <option>Kinésithérapeute</option><option>Aide à domicile</option>
-              <option>Médecin</option><option>Cardiologue</option>
-              <option>Pharmacien</option><option>Autre</option>
+              {ROLES.map(r => <option key={r}>{r}</option>)}
             </select>
             <input placeholder="Téléphone (facultatif)" value={telephone} onChange={e => setTelephone(e.target.value)}
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
@@ -268,14 +276,14 @@ export default function Intervenants() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {edition?.id !== i.id && (
+                  <button onClick={() => ouvrirEdition(i)}
+                    style={{ background: '#F4F5F5', color: '#6F7C75', border: '1px solid #E8EFEB', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                    Modifier
+                  </button>
+                )}
                 {!i.user_id && (
                   <>
-                    {edition?.id !== i.id && (
-                      <button onClick={() => setEdition({ id: i.id, telephone: i.phone || '', email: i.email || '' })}
-                        style={{ background: i.email ? '#F4F5F5' : '#7FAF9B', color: i.email ? '#6F7C75' : '#fff', border: i.email ? '1px solid #E8EFEB' : 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                        {i.email ? 'Modifier' : 'Ajouter email / tél.'}
-                      </button>
-                    )}
                     {i.email && (
                       <button onClick={() => renvoyerEmail(i)}
                         style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
@@ -307,19 +315,26 @@ export default function Intervenants() {
             </div>
             {edition?.id === i.id && (
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #F0F4F2' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-                  <input placeholder="Téléphone (facultatif)" value={edition.telephone} onChange={e => setEdition({ ...edition, telephone: e.target.value })}
-                    style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
-                  <input type="email" placeholder="Email" value={edition.email} onChange={e => setEdition({ ...edition, email: e.target.value })}
-                    style={{ padding: '9px 12px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <input placeholder="Prénom" value={edition.prenom} onChange={e => setEdition({ ...edition, prenom: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+                  <input placeholder="Nom" value={edition.nom} onChange={e => setEdition({ ...edition, nom: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+                  <select value={edition.role} onChange={e => setEdition({ ...edition, role: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }}>
+                    <option value="">Rôle / Fonction</option>
+                    {[...new Set([...ROLES, ...(edition.role ? [edition.role] : [])])].map(r => <option key={r}>{r}</option>)}
+                  </select>
+                  <input placeholder="Téléphone (facultatif)" value={edition.telephone} onChange={e => setEdition({ ...edition, telephone: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
+                  <input type="email" placeholder="Email (facultatif)" value={edition.email} disabled={!!i.user_id} onChange={e => setEdition({ ...edition, email: e.target.value })}
+                    style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1', opacity: i.user_id ? 0.6 : 1 }} />
                 </div>
                 <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 10 }}>
-                  En enregistrant un email, {i.name.split(' ')[0]} reçoit le lien pour créer son compte.
+                  {i.user_id
+                    ? 'L\'email sert d\'identifiant à son compte : il ne se modifie pas ici.'
+                    : 'En enregistrant un nouvel email, ' + (edition.prenom || 'l\'intervenant') + ' reçoit le lien pour créer son compte.'}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => enregistrerCoordonnees(i)} disabled={saving || (edition.email.trim() && !emailValide(edition.email))}
-                    style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (edition.email.trim() && !emailValide(edition.email)) ? 0.5 : 1 }}>
-                    {saving ? 'Enregistrement...' : edition.email.trim() && edition.email.trim().toLowerCase() !== (i.email || '') ? 'Enregistrer et inviter' : 'Enregistrer'}
+                  <button onClick={() => enregistrerEdition(i)} disabled={saving || !edition.prenom.trim() || !edition.role || (edition.email.trim() && !emailValide(edition.email))}
+                    style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!edition.prenom.trim() || !edition.role || (edition.email.trim() && !emailValide(edition.email))) ? 0.5 : 1 }}>
+                    {saving ? 'Enregistrement...' : !i.user_id && edition.email.trim() && edition.email.trim().toLowerCase() !== (i.email || '') ? 'Enregistrer et inviter' : 'Enregistrer'}
                   </button>
                   <button onClick={() => setEdition(null)}
                     style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
