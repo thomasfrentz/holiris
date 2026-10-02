@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
-import { transcriptionVide, RIEN_ENTENDU } from '@/lib/transcription'
+import { transcriptionVide, RIEN_ENTENDU, mettreAuPropre } from '@/lib/transcription'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -26,17 +26,8 @@ export async function POST(request) {
       return NextResponse.json({ success: false, rienEntendu: true, error: RIEN_ENTENDU })
     }
 
-    const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-120b',
-      reasoning_effort: 'low',
-      messages: [
-        { role: 'system', content: 'Tu es l\'assistant de Holiris. Transforme ce message vocal en note courte et naturelle en 1-2 phrases : moral, état général, activités. Sois factuel. Commence directement par la note, sans formule de politesse.' },
-        { role: 'user', content: rawText }
-      ],
-      max_completion_tokens: 400
-    })
-
-    const note = completion.choices[0]?.message?.content || rawText
+    // Texte fidèle à ce qui a été dit (mis au propre, sans résumé ni interprétation)
+    const note = await mettreAuPropre(rawText)
     return NextResponse.json({ success: true, note, rawText })
   } catch (err) {
     console.error('borne-transcribe error:', err)

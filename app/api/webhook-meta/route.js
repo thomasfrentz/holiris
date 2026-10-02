@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { supabaseAdmin as supabase } from '@/lib/serveur'
 import { analyserNote, enregistrerNote, repondreSignalement } from '@/lib/notesMedicales'
+import { mettreAuPropre } from '@/lib/transcription'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -174,25 +175,8 @@ async function transcribeMetaAudio(audioId) {
   return transcription.text
 }
 
-async function synthesizeNote(text) {
-  try {
-    const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-20b',
-      reasoning_effort: 'low',
-      messages: [
-        {
-          role: 'system',
-          content: 'Tu es l\'assistant de Holiris. Transforme ce message en note courte et naturelle en 1-2 phrases maximum. Sois direct et factuel. Commence directement par l\'information, sans formule de politesse, sans objet, sans signature.'
-        },
-        { role: 'user', content: text }
-      ],
-      max_completion_tokens: 450
-    })
-    return completion.choices[0]?.message?.content || text
-  } catch {
-    return text
-  }
-}
+// Texte fidèle à ce qui a été dit ou écrit (mis au propre, sans résumé ni interprétation)
+const synthesizeNote = mettreAuPropre
 
 // Cherche le senior cité dans le message, parmi ceux suivis par cet intervenant uniquement
 async function findSeniorByName(text, fallbackSeniorId, seniorIds) {
