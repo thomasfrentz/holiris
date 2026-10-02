@@ -30,11 +30,11 @@ export default function Intervenants() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )
 
-  const ROLES = ['Infirmière', 'Infirmier', 'Kinésithérapeute', 'Aide à domicile', 'Médecin', 'Cardiologue', 'Pharmacien', 'Autre']
+  const ROLES = ['Infirmier·ère', 'Aide-soignant·e', 'Auxiliaire de vie', 'Aide à domicile', 'Kinésithérapeute', 'Médecin', 'Cardiologue', 'Pharmacien·ne', 'Autre']
 
   const roleIcons = {
-    'Infirmière': '💉', 'Infirmier': '💉',
-    'Kinésithérapeute': '🦵', 'Aide à domicile': '🤝',
+    'Infirmier·ère': '💉', 'Infirmière': '💉', 'Infirmier': '💉', 'Aide-soignant·e': '🩺', 'Auxiliaire de vie': '🤝',
+    'Kinésithérapeute': '🦵', 'Aide à domicile': '🤝', 'Pharmacien·ne': '💊',
     'Médecin': '🏥', 'Cardiologue': '❤️',
     'Pharmacien': '💊', 'Autre': '👤',
   }

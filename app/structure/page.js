@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 
-const ROLES = ['Aide à domicile', 'Auxiliaire de vie', 'Aide-soignant(e)', 'Infirmier(e)', 'Kinésithérapeute', 'Coordinateur(trice)', 'Autre']
+const ROLES = ['Aide à domicile', 'Auxiliaire de vie', 'Aide-soignant·e', 'Infirmier·ère', 'Kinésithérapeute', 'Coordinateur·rice', 'Autre']
 
 export default function MaStructure() {
   const [donnees, setDonnees] = useState(null)
