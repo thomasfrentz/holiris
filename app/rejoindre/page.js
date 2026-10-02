@@ -71,8 +71,9 @@ function RejoindreContent() {
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 50%, #F5F0FA 100%)', fontFamily: "'Inter', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Inter:wght@300;400;500&display=swap');`}</style>
       <div style={{ textAlign: 'center', padding: 32 }}>
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, color: '#1F2A24', marginBottom: 12 }}>Lien invalide</div>
-        <div style={{ fontSize: 14, color: '#9BB5AA' }}>Ce lien d'invitation n'existe pas ou a déjà été utilisé.</div>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 28, color: '#1F2A24', marginBottom: 12 }}>Lien déjà utilisé</div>
+        <div style={{ fontSize: 14, color: '#9BB5AA', marginBottom: 24, maxWidth: 360 }}>Votre accès est sans doute déjà activé : connectez-vous avec votre email et votre mot de passe.</div>
+        <a href="/login" style={{ display: 'inline-block', background: '#7FAF9B', color: '#fff', borderRadius: 8, padding: '12px 28px', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Se connecter</a>
       </div>
     </div>
   )

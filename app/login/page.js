@@ -35,10 +35,16 @@ function LoginContent() {
     return searchParams.get('redirect') || null
   }
 
-  async function redirectAfterAuth(user) {
+  // apresInscription : l'accès est déjà activé, inutile de repasser par la page d'invitation
+  async function redirectAfterAuth(user, apresInscription = false) {
     const redirect = getRedirect()
-    if (redirect) {
+    if (redirect && !(apresInscription && redirect.startsWith('/rejoindre'))) {
       router.push(redirect)
+      return
+    }
+    // Inscription par invitation : l'espace correspondant à l'invitation acceptée
+    if (apresInscription && (typeInscription === 'famille' || typeInscription === 'intervenant')) {
+      router.push(typeInscription === 'famille' ? '/app' : '/espace-intervenant')
       return
     }
 
@@ -103,14 +109,23 @@ function LoginContent() {
 
       const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
       if (signInData?.user) {
-        await redirectAfterAuth(signInData.user)
+        await redirectAfterAuth(signInData.user, true)
       }
       setLoading(false)
       return
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError('Email ou mot de passe incorrect.'); setLoading(false); return }
+    if (error) {
+      // Invité(e) qui n'a pas encore créé son compte : le dire clairement
+      const enAttente = await fetch('/api/invitation-en-attente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
+        .then(r => r.ok ? r.json() : null).catch(() => null)
+      setError(enAttente?.enAttente
+        ? 'Vous n\'avez pas encore créé votre compte. Ouvrez l\'email d\'invitation Holiris et cliquez sur « Créer mon compte » pour choisir votre mot de passe.'
+        : 'Email ou mot de passe incorrect.')
+      setLoading(false)
+      return
+    }
 
     await redirectAfterAuth(data.user)
   }

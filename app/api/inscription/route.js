@@ -53,6 +53,15 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
+    // Invitation proche ou intervenant : accès activé tout de suite, pour toutes les invitations
+    // en attente à cette adresse (le jeton a prouvé l'accès à la boîte mail)
+    if (type === 'famille' || type === 'intervenant') {
+      for (const table of ['famille', 'intervenants']) {
+        await supabaseAdmin.from(table).update({ user_id: created.user.id, invite_token: null })
+          .ilike('email', adresse).is('user_id', null).is('archived_at', null)
+      }
+    }
+
     // Gestionnaire de structure : rattaché directement (le jeton a prouvé l'accès à la boîte mail)
     if (gestionnaireId) {
       await supabaseAdmin.from('structure_membres')
