@@ -3,6 +3,7 @@ import Groq from 'groq-sdk'
 import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/serveur'
 import { escapeHtml, emailCompteRendu, lienNoteMedecin, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
+import { SURNOMS, auteurAvecLien } from '@/lib/contexteIA'
 
 // Chaque matin : compte rendu au médecin traitant la veille de chaque consultation
 // (rendez-vous « Médical » de l'agenda), couvrant la période depuis la consultation précédente.
@@ -25,8 +26,8 @@ async function resumer(seniorName, notes, alertes) {
       reasoning_effort: 'low',
       max_completion_tokens: 1200,
       messages: [
-        { role: 'system', content: 'Tu rédiges une synthèse factuelle pour le médecin traitant d\'une personne âgée suivie à domicile. Les notes sont écrites par ses aides à domicile et ses proches : l\'auteur est indiqué avant les deux-points, mais chaque note décrit la personne suivie. Ne confonds jamais un auteur avec la personne suivie. N\'évoque que ce qui figure dans les notes : n\'invente ni ne déduis rien, et ne mentionne pas un sujet absent des notes (sommeil, chutes…). Sois précis, neutre et concis. Ne pose aucun diagnostic et ne propose aucun traitement. Réponds en français.' },
-        { role: 'user', content: `Personne suivie : ${seniorName}.\n\nNotes (auteur : contenu) :\n${notes.map(n => `[${dateCourte(n.created_at)}] ${n.intervenant_name || 'Proche'} : ${n.content}`).join('\n')}\n\nAlertes :\n${alertes.map(a => '- ' + a.message).join('\n') || 'Aucune.'}\n\nRédige un paragraphe de 3 à 6 phrases sur ${seniorName}, sans liste, en t\'appuyant uniquement sur ces notes : état général et moral, alimentation, mobilité, faits marquants et évolution sur la période.` },
+        { role: 'system', content: 'Tu rédiges une synthèse factuelle pour le médecin traitant d\'une personne âgée suivie à domicile. Les notes sont écrites par ses aides à domicile et ses proches : l\'auteur est indiqué avant les deux-points, mais chaque note décrit la personne suivie. Ne confonds jamais un auteur avec la personne suivie. N\'évoque que ce qui figure dans les notes : n\'invente ni ne déduis rien, et ne mentionne pas un sujet absent des notes (sommeil, chutes…). Sois précis, neutre et concis. Ne pose aucun diagnostic et ne propose aucun traitement. Réponds en français.\n\n' + SURNOMS },
+        { role: 'user', content: `Personne suivie : ${seniorName}.\n\nNotes (auteur : contenu) :\n${notes.map(n => `[${dateCourte(n.created_at)}] ${auteurAvecLien(n.intervenant_name || 'Proche')} : ${n.content}`).join('\n')}\n\nAlertes :\n${alertes.map(a => '- ' + a.message).join('\n') || 'Aucune.'}\n\nRédige un paragraphe de 3 à 6 phrases sur ${seniorName}, sans liste, en t\'appuyant uniquement sur ces notes : état général et moral, alimentation, mobilité, faits marquants et évolution sur la période.` },
       ],
     })
     return (completion.choices[0]?.message?.content || '').replace(/\s+/g, ' ').trim() || 'Synthèse indisponible.'

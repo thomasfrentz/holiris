@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
+import { SURNOMS } from '@/lib/contexteIA'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -11,7 +12,7 @@ export async function POST(request) {
       model: 'openai/gpt-oss-20b',
       reasoning_effort: 'low',
       messages: [
-        { role: 'system', content: context },
+        { role: 'system', content: context + '\n\n' + SURNOMS },
         ...messages
       ],
       max_completion_tokens: 800,

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
+import { SURNOMS, auteurAvecLien } from '@/lib/contexteIA'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { escapeHtml, emailResumeFamille, emailNouveauCompte, envoyerEnLots, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
@@ -19,18 +20,18 @@ const JOUR = 24 * 60 * 60 * 1000
 
 async function genererResume(seniorName, notes, alertes) {
   const notesText = notes.map(n =>
-    `[${new Date(n.created_at).toLocaleDateString('fr-FR')}] ${n.intervenant_name || 'Proche'} : ${n.content}`
+    `[${new Date(n.created_at).toLocaleDateString('fr-FR')}] ${auteurAvecLien(n.intervenant_name || 'Proche')} : ${n.content}`
   ).join('\n')
   const alertesText = alertes.length ? alertes.map(a => `- ${a.message}`).join('\n') : 'Aucune alerte.'
 
   const completion = await groq.chat.completions.create({
-    model: 'openai/gpt-oss-20b',
+    model: 'openai/gpt-oss-120b',
     reasoning_effort: 'low',
     max_completion_tokens: 800,
     messages: [
       {
         role: 'system',
-        content: 'Tu écris aux proches d\'une personne âgée. Ton chaleureux, simple et rassurant sans minimiser. Ne mentionne jamais de diagnostic ni de traitement.'
+        content: 'Tu écris aux proches d\'une personne âgée. Ton chaleureux, simple et rassurant sans minimiser. Ne mentionne jamais de diagnostic ni de traitement.\n\n' + SURNOMS
       },
       {
         role: 'user',

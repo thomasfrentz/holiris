@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
+import { SURNOMS, auteurAvecLien } from '@/lib/contexteIA'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -8,7 +9,7 @@ export async function POST(request) {
     const { notes, alertes, senior } = await request.json()
 
     const notesText = notes.map(n =>
-      `[${new Date(n.created_at).toLocaleDateString('fr-FR')}] ${n.intervenant_name || n.source || 'Inconnu'} : ${n.content}`
+      `[${new Date(n.created_at).toLocaleDateString('fr-FR')}] ${auteurAvecLien(n.intervenant_name || n.source || 'Inconnu')} : ${n.content}`
     ).join('\n')
 
     const alertesText = alertes.length > 0
@@ -16,13 +17,13 @@ export async function POST(request) {
       : 'Aucune alerte active.'
 
     const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-20b',
+      model: 'openai/gpt-oss-120b',
       reasoning_effort: 'low',
       max_completion_tokens: 1300,
       messages: [
         {
           role: 'system',
-          content: 'Tu es un assistant médico-social. Sois factuel, bienveillant et professionnel. Ne mentionne jamais de diagnostics médicaux.'
+          content: 'Tu es un assistant médico-social. Sois factuel, bienveillant et professionnel. Ne mentionne jamais de diagnostics médicaux.\n\n' + SURNOMS
         },
         {
           role: 'user',

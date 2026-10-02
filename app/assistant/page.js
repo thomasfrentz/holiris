@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { auteurAvecLien } from '@/lib/contexteIA'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
@@ -58,7 +59,7 @@ export default function Assistant() {
     setMessages(prev => [...prev, { role: 'user', text: userMsg }])
     setAiLoading(true)
 
-    const context = 'Tu es l\'assistant IA de Holiris, plateforme de suivi des personnes âgées dans les Pyrénées-Orientales.\n\nPersonne suivie : ' + (selectedSenior?.name || '') + ', ' + (selectedSenior?.age || '') + ' ans, ' + (selectedSenior?.city || '') + '\n\nDernières notes :\n' + notes.slice(0, 5).map(n => '- ' + new Date(n.created_at).toLocaleDateString('fr-FR') + ' : ' + n.content).join('\n') + '\n\nProchains événements :\n' + events.slice(0, 5).map(e => '- ' + new Date(e.scheduled_at).toLocaleDateString('fr-FR') + ' : ' + e.label).join('\n') + '\n\nRéponds de façon bienveillante et concise (3-5 phrases max).'
+    const context = 'Tu es l\'assistant IA de Holiris, plateforme de suivi des personnes âgées dans les Pyrénées-Orientales.\n\nPersonne suivie : ' + (selectedSenior?.name || '') + ', ' + (selectedSenior?.age || '') + ' ans, ' + (selectedSenior?.city || '') + '\n\nDernières notes :\n' + notes.slice(0, 5).map(n => '- ' + new Date(n.created_at).toLocaleDateString('fr-FR') + ' · ' + auteurAvecLien(n.intervenant_name || 'Proche') + ' : ' + n.content).join('\n') + '\n\nProchains événements :\n' + events.slice(0, 5).map(e => '- ' + new Date(e.scheduled_at).toLocaleDateString('fr-FR') + ' : ' + e.label).join('\n') + '\n\nRéponds de façon bienveillante et concise (3-5 phrases max).'
 
     try {
       const res = await fetch('/api/chat', {
