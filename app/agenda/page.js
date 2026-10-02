@@ -21,6 +21,7 @@ export default function Agenda() {
   const [heure, setHeure] = useState('')
   const [recurrence, setRecurrence] = useState('none')
   const [recurrenceDays, setRecurrenceDays] = useState([])
+  const [voirPasses, setVoirPasses] = useState(false)
 
   const { seniors, selectedSenior: adminSenior, selectedSeniorId: adminSeniorId, switchSenior: adminSwitch, isAdmin, loading: seniorLoading } = useSenior()
   const { selectedSenior: intervenantSenior, selectedSeniorId: intervenantSeniorId, switchSenior: intervenantSwitch, seniorsList, isIntervenant, loading: intervenantLoading } = useIntervenant()
@@ -171,12 +172,16 @@ export default function Agenda() {
     weekly: 'Toutes les semaines', biweekly: 'Toutes les 2 semaines', monthly: 'Tous les mois',
   }
 
-  const groupedEvents = events.reduce((acc, e) => {
-    const d = new Date(e.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  // À venir (à partir d'aujourd'hui) en premier, du plus proche au plus lointain ; le passé replié, du plus récent au plus ancien
+  const debutDuJour = new Date(); debutDuJour.setHours(0, 0, 0, 0)
+  const grouper = liste => liste.reduce((acc, e) => {
+    const d = new Date(e.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: new Date(e.scheduled_at).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
     if (!acc[d]) acc[d] = []
     acc[d].push(e)
     return acc
   }, {})
+  const groupedEvents = grouper(events.filter(e => new Date(e.scheduled_at) >= debutDuJour))
+  const groupedPasses = grouper(events.filter(e => new Date(e.scheduled_at) < debutDuJour).reverse())
 
   if (seniorLoading || intervenantLoading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Georgia, serif', background: '#f4f1ec' }}>
@@ -289,13 +294,16 @@ export default function Agenda() {
       )}
 
       {Object.keys(groupedEvents).length === 0 && !loading && (
-        <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
+        <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12, marginBottom: 24 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
-          <div>Aucun événement pour le moment</div>
+          <div>Aucun événement à venir</div>
         </div>
       )}
 
-      {Object.entries(groupedEvents).map(([d, dayEvents]) => (
+      {[...Object.entries(groupedEvents), ...(voirPasses ? Object.entries(groupedPasses) : [])].map(([d, dayEvents], index) => (<div key={d}>
+        {voirPasses && index === Object.keys(groupedEvents).length && (
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#C4844A', letterSpacing: '0.2em', textTransform: 'uppercase', margin: '8px 0 16px' }}>Événements passés</div>
+        )}
         <div key={d} style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{d}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -329,7 +337,14 @@ export default function Agenda() {
             })}
           </div>
         </div>
-      ))}
+      </div>))}
+
+      {Object.keys(groupedPasses).length > 0 && (
+        <button onClick={() => setVoirPasses(!voirPasses)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C4844A', fontSize: 13, fontWeight: 500, padding: '4px 0', fontFamily: 'inherit' }}>
+          {voirPasses ? '▲ Masquer les événements passés' : `▼ Voir les événements passés (${Object.values(groupedPasses).flat().length})`}
+        </button>
+      )}
     </Layout>
   )
 }
