@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
-import { envoyerBienvenue, derniereErreurWhatsapp } from '@/lib/whatsapp'
+import { envoyerBienvenue, derniereErreurWhatsapp, derniereEnvoiLien } from '@/lib/whatsapp'
 
 // Message WhatsApp de bienvenue, demandé par le site quand un numéro est renseigné sur une fiche
 export async function POST(request) {
@@ -24,7 +24,7 @@ export async function POST(request) {
 
     const envoye = await envoyerBienvenue(table, id)
     // Raison du refus de Meta (modèle en cours d'examen, numéro invalide…) pour le diagnostic
-    return NextResponse.json({ success: envoye, ...(envoye ? {} : { erreur: derniereErreurWhatsapp || 'Aucun numéro sur cette fiche' }) })
+    return NextResponse.json({ success: envoye, lien: derniereEnvoiLien, ...(envoye ? {} : { erreur: derniereErreurWhatsapp || 'Aucun numéro sur cette fiche' }) })
   } catch (error) {
     console.error('Erreur bienvenue WhatsApp:', error.message)
     return NextResponse.json({ success: false }, { status: 500 })
