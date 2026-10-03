@@ -96,8 +96,8 @@ export default function Intervenants() {
     }).select()
 
     if (!error && data) {
-      if (telephone.trim()) bienvenue('intervenant', data[0].id)
       if (email) await inviter(data[0].id, prenom + ' ' + nom)
+      if (telephone.trim()) bienvenue('intervenant', data[0].id)
       else setEmailSent(prenom + ' ' + nom + ' est ajouté : il peut laisser ses notes sur la borne. Ajoutez son email plus tard pour lui envoyer un accès.')
 
       setPrenom(''); setNom(''); setRole(''); setTelephone(''); setEmail('')
@@ -128,8 +128,8 @@ export default function Intervenants() {
       ...(emailChange && !i.user_id ? { invite_token: null } : {}),
     }).eq('id', i.id)
     if (!error) {
-      if (edition.telephone.trim() && versWhatsapp(edition.telephone) !== (i.whatsapp || versWhatsapp(i.phone))) bienvenue('intervenant', i.id)
       if (!i.user_id && nouvelEmail && emailChange) await inviter(i.id, nomComplet)
+      if (edition.telephone.trim() && versWhatsapp(edition.telephone) !== (i.whatsapp || versWhatsapp(i.phone))) bienvenue('intervenant', i.id)
       setEdition(null)
       setTimeout(() => setEmailSent(null), 6000)
       loadData()

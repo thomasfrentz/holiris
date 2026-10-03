@@ -35,15 +35,13 @@ async function affecterSalarie(salarie, seniorId) {
     salarie_id: salarie.id,
   }).select('*, seniors!intervenants_senior_id_fkey(name)').single()
   if (error) throw error
-  if (telephone) await envoyerBienvenue('intervenants', ligne.id)
 
   // Une invitation est déjà en attente pour ce salarié : à la création de son compte,
   // tous ses dossiers sont rattachés d'un coup (même email). Pas de nouvel email.
   const { data: enAttente } = await supabaseAdmin.from('intervenants')
     .select('id').eq('salarie_id', salarie.id).is('user_id', null).not('invite_token', 'is', null).neq('id', ligne.id).limit(1)
-  if (enAttente?.length) return
-
-  await inviterMembre({ table: 'intervenants', type: 'intervenant', membre: ligne })
+  if (!enAttente?.length) await inviterMembre({ table: 'intervenants', type: 'intervenant', membre: ligne })
+  if (telephone) await envoyerBienvenue('intervenants', ligne.id)
 }
 
 // Données de l'espace « Ma structure »

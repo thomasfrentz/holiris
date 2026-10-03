@@ -86,7 +86,6 @@ export default function Famille() {
     }).select()
 
     if (!error && data) {
-      if (telephone.trim()) bienvenue('famille', data[0].id)
 
       // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
       try {
@@ -100,6 +99,7 @@ export default function Famille() {
           ? nomComplet + ' (compte existant, espace ajouté à son compte)'
           : nomComplet)
       } catch (e) { console.error('Erreur email famille:', e) }
+      if (telephone.trim()) bienvenue('famille', data[0].id)
 
 
       const { data: updated } = await supabase

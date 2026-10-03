@@ -42,15 +42,14 @@ export async function POST(request) {
     }).eq('id', id)
     if (error) throw error
 
-    // Nouveau numéro : message WhatsApp de bienvenue
-    if (tel && numeroWhatsapp(tel) !== numeroWhatsapp(membre.whatsapp || membre.phone)) await envoyerBienvenue('famille', id)
-
     // Sans compte : invitation envoyée à la nouvelle adresse
     let invite = null
     if (emailChange && !membre.user_id) {
       const { data: aJour } = await supabaseAdmin.from('famille').select('*, seniors!famille_senior_id_fkey(name)').eq('id', id).single()
       invite = await inviterMembre({ table: 'famille', type: 'famille', membre: aJour })
     }
+    // Nouveau numéro : messages WhatsApp (après l'invitation, pour que le lien soit le bon)
+    if (tel && numeroWhatsapp(tel) !== numeroWhatsapp(membre.whatsapp || membre.phone)) await envoyerBienvenue('famille', id)
     return NextResponse.json({ success: true, invite: invite ? { success: invite.success, linked: invite.linked } : null })
   } catch (error) {
     console.error('Erreur modification famille:', error.message)
