@@ -37,6 +37,14 @@ function Logo({ taille = 120 }) {
   )
 }
 
+// Mémoire de la tablette : certains navigateurs « kiosque » bloquent le stockage local, ce qui ne doit
+// jamais bloquer la borne. Le code peut aussi être donné dans l'adresse : holiris.fr/borne?code=BORNE-XXXXX
+const memoire = {
+  lire: cle => { try { return window.localStorage.getItem(cle) } catch { return null } },
+  ecrire: (cle, valeur) => { try { window.localStorage.setItem(cle, valeur) } catch {} },
+  effacer: cle => { try { window.localStorage.removeItem(cle) } catch {} },
+}
+
 const initiales = nom => nom.split(' ').filter(Boolean).slice(0, 2).map(m => m[0]).join('').toUpperCase()
 const listePrenoms = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1] : l[0] || ''
 
@@ -61,7 +69,7 @@ export default function Borne() {
   const [messagesAccueil, setMessagesAccueil] = useState([]) // [{ prenom, nombre }]
   // Notifications retirées de l'accueil, sur cette tablette seulement (le tableau de bord n'est pas touché)
   const [masques, setMasques] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('holiris_borne_masques')) || { alertes: [], messages: '' } }
+    try { return JSON.parse(memoire.lire('holiris_borne_masques')) || { alertes: [], messages: '' } }
     catch { return { alertes: [], messages: '' } }
   })
   const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs } de la personne qui enregistre
@@ -87,7 +95,10 @@ export default function Borne() {
   const [miseAJour, setMiseAJour] = useState(false)
 
   useEffect(() => {
-    loadBorne(localStorage.getItem('holiris_borne_code'))
+    window.__holirisBorne = true // la page a bien démarré (voir le diagnostic de layout.js)
+    const codeAdresse = new URLSearchParams(window.location.search).get('code')
+    if (codeAdresse) memoire.ecrire('holiris_borne_code', codeAdresse.trim().toUpperCase())
+    loadBorne(codeAdresse || memoire.lire('holiris_borne_code'))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chargement unique au montage
   }, [])
 
@@ -97,11 +108,21 @@ export default function Borne() {
       return
     }
     setStep('loading')
-    const res = await fetch('/api/borne?code=' + encodeURIComponent(code.toUpperCase()))
-    const { borne, personnes: liste } = res.ok ? await res.json() : {}
+    let reponse = null
+    try {
+      const res = await fetch('/api/borne?code=' + encodeURIComponent(code.toUpperCase()))
+      reponse = { ok: res.ok, data: res.ok ? await res.json() : {} }
+    } catch {
+      // Pas de connexion : on réessaie dans 15 secondes plutôt que de rester bloqué
+      setError('Connexion à Internet impossible. Nouvel essai dans quelques secondes…')
+      setStep('setup')
+      setTimeout(() => { setError(''); loadBorne(code) }, 15000)
+      return
+    }
+    const { borne, personnes: liste } = reponse.data
 
     if (!borne) {
-      localStorage.removeItem('holiris_borne_code')
+      memoire.effacer('holiris_borne_code')
       setStep('setup')
       setError('Code borne invalide.')
       return
@@ -122,7 +143,7 @@ export default function Borne() {
     if (!codeInput.trim()) return
     setError('')
     const code = codeInput.trim().toUpperCase()
-    localStorage.setItem('holiris_borne_code', code)
+    memoire.ecrire('holiris_borne_code', code)
     await loadBorne(code)
     // Configuration : proposer les documents encore à signer
     const d = await chargerDocuments(code)
@@ -203,7 +224,7 @@ export default function Borne() {
   function masquer(modif) {
     setMasques(prev => {
       const suivant = { ...prev, ...modif(prev) }
-      try { localStorage.setItem('holiris_borne_masques', JSON.stringify(suivant)) } catch {}
+      memoire.ecrire('holiris_borne_masques', JSON.stringify(suivant))
       return suivant
     })
   }
@@ -499,7 +520,7 @@ export default function Borne() {
   }
 
   function resetBorne() {
-    localStorage.removeItem('holiris_borne_code')
+    memoire.effacer('holiris_borne_code')
     setBorneInfo(null)
     setPersonnes([])
     setSelectedPersonne(null)
@@ -557,7 +578,7 @@ export default function Borne() {
     { haut: true }
   )
 
-  if (step === 'loading') return page(<p style={{ color: C.grisClair, fontSize: 16 }}>Chargement…</p>)
+  if (step === 'loading') return page(<p id="borne-chargement" style={{ color: C.grisClair, fontSize: 16 }}>Chargement…</p>)
 
   if (step === 'setup') return page(
     <div style={{ background: C.carte, borderRadius: 28, padding: '44px 40px', width: '100%', maxWidth: 480, boxShadow: OMBRE, textAlign: 'center' }}>
