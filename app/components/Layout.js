@@ -182,7 +182,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
             })}
           </nav>
 
-          <Link href="/note" className="hl-install" style={{ textDecoration: 'none', marginTop: 16, display: 'block', padding: '10px 12px', background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 8 }}>
+          <Link href="/installer" className="hl-install" style={{ textDecoration: 'none', marginTop: 16, display: 'block', padding: '10px 12px', background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 8 }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: '#8B6FAA' }}>📲 Installer l&apos;application</div>
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 2 }}>Dictez vos notes depuis le téléphone</div>
           </Link>
@@ -221,7 +221,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
               <span style={{ color: '#C4606A' }}>→</span>
             </Link>
           )}
-          <Link href="/note" className="hl-install-mobile" style={{ textDecoration: 'none', alignItems: 'center', gap: 10, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 10, padding: '10px 14px', marginBottom: 18 }}>
+          <Link href="/installer" className="hl-install-mobile" style={{ textDecoration: 'none', alignItems: 'center', gap: 10, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 10, padding: '10px 14px', marginBottom: 18 }}>
             <span style={{ fontSize: 18 }}>📲</span>
             <span style={{ flex: 1, fontSize: 13, color: '#6F7C75' }}><strong style={{ color: '#8B6FAA' }}>Installer l&apos;application</strong> pour dicter vos notes</span>
             <span style={{ color: '#8B6FAA' }}>→</span>

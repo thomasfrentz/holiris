@@ -157,9 +157,9 @@ export default function NoteRapide() {
           <div style={{ fontSize: 22 }}>📲</div>
           <div style={{ flex: 1, fontSize: 13, color: '#6F7C75', lineHeight: 1.5 }}>
             <strong style={{ color: '#1F2A24' }}>Installez Holiris sur votre téléphone.</strong><br />
-            {installation === 'ios'
-              ? <>Touchez <strong>Partager</strong> <span aria-hidden>⎋</span> puis <strong>« Sur l&apos;écran d&apos;accueil »</strong>.</>
-              : promptAndroid ? 'Un raccourci pour enregistrer vos notes en un geste.' : <>Menu <strong>⋮</strong> du navigateur, puis <strong>« Installer l&apos;application »</strong>.</>}
+            {installation === 'android' && promptAndroid
+              ? 'Un raccourci pour enregistrer vos notes en un geste.'
+              : <>Une icône sur l&apos;écran d&apos;accueil pour dicter vos notes en un geste. <a href="/installer" style={{ color: '#8B6FAA', fontWeight: 600 }}>Voir comment faire →</a></>}
           </div>
           {installation === 'android' && promptAndroid && (
             <button onClick={installerAndroid} style={{ background: '#8B6FAA', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Installer</button>

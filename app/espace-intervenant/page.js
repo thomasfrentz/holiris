@@ -182,7 +182,7 @@ export default function IntervenantDashboard() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span className="hl-nom-interv" style={{ fontSize: 13, color: '#6F7C75' }}>{intervenantName}</span>
-          <Link href="/note" className="hl-install" style={{ textDecoration: 'none', fontSize: 13, color: '#8B6FAA', fontWeight: 500, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 6, padding: '5px 10px' }}>📲 Installer l&apos;app</Link>
+          <Link href="/installer" className="hl-install" style={{ textDecoration: 'none', fontSize: 13, color: '#8B6FAA', fontWeight: 500, background: '#F3EDF7', border: '1px solid #E0D0EC', borderRadius: 6, padding: '5px 10px' }}>📲 Installer l&apos;app</Link>
           <Link href="/messages" style={{ textDecoration: 'none', fontSize: 13, color: '#4A8870', fontWeight: 500 }}>Messages</Link>
           <Link href="/agenda" style={{ textDecoration: 'none', fontSize: 13, color: '#4A8870', fontWeight: 500 }}>Agenda</Link>
           <button onClick={logout} style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
