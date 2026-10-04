@@ -59,6 +59,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
     { icon: 'ordonnances', label: 'Ordonnances', href: '/ordonnances' },
     { icon: 'famille', label: 'Famille', href: '/famille' },
     { icon: 'intervenants', label: 'Intervenants', href: '/intervenants' },
+    { icon: 'ordonnances', label: 'Documents', href: '/documents' },
     { icon: 'assistant', label: 'Assistant IA', href: '/assistant' },
     { icon: 'profil', label: 'Profil', href: '/profil' },
   ]

@@ -71,6 +71,7 @@ export default function Borne() {
   const [surveillanceVisio, setSurveillanceVisio] = useState(false) // SOS récent : un proche peut demander la visio
   const [visio, setVisio] = useState(null) // { canal, prenom, etat }
   const [cameraAutorisee, setCameraAutorisee] = useState(null) // null | true | false
+  const [documents, setDocuments] = useState([]) // documents à signer par le senior
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -109,6 +110,9 @@ export default function Borne() {
     setBorneInfo(borne)
     setPersonnes(liste)
     setStep('accueil')
+    chargerDocuments(borne.code)
+    // Retour de la page de signature : afficher la liste des documents
+    if (new URLSearchParams(window.location.search).get('documents')) { setStep('documents'); window.history.replaceState(null, '', '/borne') }
     // Borne rechargée juste après un SOS : reprendre la surveillance des demandes de visio
     fetch('/api/borne-visio?code=' + encodeURIComponent(borne.code))
       .then(r => r.ok ? r.json() : null).then(d => { if (d?.sosRecent) setSurveillanceVisio(true) }).catch(() => {})
@@ -120,6 +124,25 @@ export default function Borne() {
     const code = codeInput.trim().toUpperCase()
     localStorage.setItem('holiris_borne_code', code)
     await loadBorne(code)
+    // Configuration : proposer les documents encore à signer
+    const d = await chargerDocuments(code)
+    if (d?.aSigner) setStep('documents')
+  }
+
+  async function chargerDocuments(code) {
+    try {
+      const r = await fetch('/api/borne-documents?code=' + encodeURIComponent(code))
+      const d = r.ok ? await r.json() : null
+      if (d) setDocuments(d.documents)
+      return d
+    } catch { return null }
+  }
+
+  async function signerDocument(type) {
+    setError('')
+    const r = await (await fetch('/api/borne-documents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: borneInfo.code, type }) })).json().catch(() => ({}))
+    if (r.success) window.location.href = r.lien
+    else setError(r.error || 'Le document n\'a pas pu être préparé.')
   }
 
   // ── Page d'accueil permanente : écran toujours allumé, horloge, alertes et messages ──
@@ -616,6 +639,11 @@ export default function Borne() {
           <button onClick={autoriserCamera} style={{ background: 'none', border: 'none', color: cameraAutorisee === false ? C.rouge : '#B9C4BE', fontSize: 12, cursor: 'pointer', fontFamily: TEXTE }}>
             {cameraAutorisee === true ? '✓ Caméra autorisée' : cameraAutorisee === false ? '📷 Caméra refusée : autorisez-la dans les réglages' : '📷 Autoriser la caméra (visio SOS)'}
           </button>
+          {documents.some(d => !d.signe && !d.indisponible) && (
+            <button onClick={() => setStep('documents')} style={{ background: 'none', border: 'none', color: C.ambre, fontSize: 12, cursor: 'pointer', fontFamily: TEXTE }}>
+              📄 Documents à signer ({documents.filter(d => !d.signe && !d.indisponible).length})
+            </button>
+          )}
           <button onClick={resetBorne} style={{ background: 'none', border: 'none', color: '#B9C4BE', fontSize: 12, cursor: 'pointer', fontFamily: TEXTE }}>
             ⚙ Reconfigurer la borne
           </button>
@@ -624,6 +652,37 @@ export default function Borne() {
       { haut: true }
     )
   }
+
+  if (step === 'documents') return page(
+    <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column' }}>
+      <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'center' }}>Avant de commencer</p>
+      <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, textAlign: 'center', margin: '6px 0 8px' }}>Documents à signer</h2>
+      <p style={{ fontSize: 17, color: C.gris, textAlign: 'center', marginBottom: 26, lineHeight: 1.5 }}>
+        À lire et signer par {borneInfo?.seniors?.name} ou son représentant légal, directement sur la borne.
+      </p>
+      {erreurBloc}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {documents.map(d => (
+          <div key={d.type} style={{ background: C.carte, borderRadius: 20, padding: '18px 20px', boxShadow: '0 4px 14px rgba(74,60,40,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 26 }}>{d.signe ? '✅' : '📄'}</span>
+            <span style={{ flex: 1 }}>
+              <span style={{ display: 'block', fontSize: 18, fontWeight: 500 }}>{d.titre}</span>
+              <span style={{ display: 'block', fontSize: 14, color: d.signe ? C.saugeFonce : C.gris, marginTop: 2 }}>
+                {d.signe ? 'Signé' : d.indisponible ? 'La famille doit d’abord choisir la personne de confiance' : 'À signer'}
+              </span>
+            </span>
+            {!d.signe && !d.indisponible && (
+              <button onClick={() => signerDocument(d.type)} className="borne-bouton" style={bouton(C.sauge, '#fff', { padding: '14px 22px', fontSize: 17 })}>Lire et signer</button>
+            )}
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setStep('accueil')} className="borne-bouton"
+        style={bouton(C.carte, C.saugeFonce, { marginTop: 24, border: `1.5px solid ${C.sauge}` })}>
+        {documents.some(d => !d.signe && !d.indisponible) ? 'Signer plus tard' : 'Terminer'}
+      </button>
+    </div>
+  )
 
   if (step === 'choix') {
     const groupes = [

@@ -3,6 +3,7 @@ import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/serveur'
 import { escapeHtml, emailSos, envoyerEnLots } from '@/lib/emails'
 import { creerLienVisio } from '@/lib/visio'
+import { autorisationsSignees } from '@/lib/documents'
 
 // Bouton SOS de la borne : alerte rouge sur le tableau de bord, email et WhatsApp à toute la famille,
 // chacun avec un lien personnel (une seule utilisation) pour activer la caméra et le micro de la borne.
@@ -86,7 +87,10 @@ export async function POST(request) {
     // Un lien de visio distinct par email et par WhatsApp : chacun ne sert qu'une fois.
     // La visio est un plus : si le lien ne peut pas être créé, l'alerte part sans lui.
     const prenom = f => f.name?.split(' ')[0]
+    // Visio refusée dans les autorisations signées : l'alerte part sans lien
+    const visioAutorisee = (await autorisationsSignees(borne.senior_id))?.visio !== false
     const lien = async f => {
+      if (!visioAutorisee) return null
       try { return await creerLienVisio(borne.senior_id, prenom(f)) }
       catch (error) { console.error('Lien visio SOS impossible:', error.message); return null }
     }
