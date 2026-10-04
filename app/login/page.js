@@ -133,11 +133,11 @@ function LoginContent() {
   async function handleReset() {
     if (!resetEmail) return
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: 'https://holiris.fr/login'
-    })
-    if (error) {
-      setError('Erreur lors de l\'envoi. Vérifiez l\'email.')
+    // Lien envoyé par Holiris, qui mène à la page de choix du nouveau mot de passe
+    const res = await fetch('/api/mot-de-passe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: resetEmail }) })
+    const result = await res.json().catch(() => ({}))
+    if (!result.success) {
+      setError(result.error || 'Erreur lors de l\'envoi. Vérifiez l\'email.')
     } else {
       setResetSent(true)
     }
@@ -169,7 +169,7 @@ function LoginContent() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {resetSent ? (
               <div style={{ background: 'rgba(107,143,113,0.2)', border: '1px solid rgba(107,143,113,0.4)', borderRadius: 2, padding: '12px 14px', fontSize: 13, color: '#9AB89F', textAlign: 'center' }}>
-                ✅ Un email de réinitialisation a été envoyé à {resetEmail}
+                ✅ Si un compte existe pour {resetEmail}, un email vient de lui être envoyé. Pensez à regarder dans les courriers indésirables.
               </div>
             ) : (
               <>
