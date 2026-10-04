@@ -41,12 +41,26 @@ const ETAPES = {
 export default function Installer() {
   const [systeme, setSysteme] = useState('ios')
   const [copie, setCopie] = useState(false)
+  const [promptAndroid, setPromptAndroid] = useState(null) // installation en un clic proposée par Chrome (Android)
+  const [installee, setInstallee] = useState(false)
 
   useEffect(() => {
     // Onglet du téléphone utilisé, détecté au chargement (modifiable)
     // eslint-disable-next-line react-hooks/set-state-in-effect -- dépend du navigateur, inconnu au rendu serveur
     if (/android/i.test(navigator.userAgent)) setSysteme('android')
+    const surPrompt = e => { e.preventDefault(); setPromptAndroid(e) }
+    const surInstallation = () => { setInstallee(true); setPromptAndroid(null) }
+    window.addEventListener('beforeinstallprompt', surPrompt)
+    window.addEventListener('appinstalled', surInstallation)
+    return () => { window.removeEventListener('beforeinstallprompt', surPrompt); window.removeEventListener('appinstalled', surInstallation) }
   }, [])
+
+  async function installerDirectement() {
+    promptAndroid.prompt()
+    const { outcome } = await promptAndroid.userChoice
+    if (outcome === 'accepted') setInstallee(true)
+    setPromptAndroid(null)
+  }
 
   async function copierLien() {
     try {
@@ -66,6 +80,20 @@ export default function Installer() {
           <h1 style={{ fontFamily: 'var(--font-display), "Cormorant Garamond", serif', fontSize: 34, fontWeight: 500, margin: '6px 0 8px' }}>Installer Holiris sur votre téléphone</h1>
           <p style={{ fontSize: 15, color: C.gris, lineHeight: 1.6 }}>Une icône sur votre écran d&apos;accueil pour dicter une note en un geste. Rien à télécharger sur l&apos;App Store ou le Play Store.</p>
         </div>
+
+        {installee && (
+          <div style={{ background: C.saugeClair, borderRadius: 18, padding: '18px', textAlign: 'center', marginBottom: 18, fontSize: 16, color: C.saugeFonce, fontWeight: 500 }}>
+            ✓ Holiris est installé : retrouvez l&apos;icône sur votre écran d&apos;accueil.
+          </div>
+        )}
+        {promptAndroid && !installee && (
+          <div style={{ background: '#fff', borderRadius: 18, padding: '18px', textAlign: 'center', marginBottom: 18, boxShadow: '0 4px 14px rgba(74,60,40,0.05)' }}>
+            <button onClick={installerDirectement} style={{ width: '100%', background: C.sauge, color: '#fff', border: 'none', borderRadius: 14, padding: '18px', fontSize: 18, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 10px 24px rgba(74,136,112,0.28)' }}>
+              📲 Installer Holiris
+            </button>
+            <p style={{ fontSize: 13, color: C.grisClair, marginTop: 10 }}>Un seul clic, puis « Installer » pour confirmer.</p>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 6, background: '#EFEAE2', borderRadius: 14, padding: 5, marginBottom: 18 }}>
           <button onClick={() => setSysteme('ios')} style={onglet(systeme === 'ios')}>iPhone / iPad</button>
