@@ -26,6 +26,38 @@ async function auteurPour(user, seniorId) {
   return { type: 'famille', id: a?.id, nom: a?.name || user.email.split('@')[0], role: 'Holiris', email: user.email }
 }
 
+// Destinataire choisi : une fiche famille ou intervenant de ce senior (null = tout le monde)
+async function destinataireValide(dest, seniorId) {
+  if (!dest?.id || !['famille', 'intervenant'].includes(dest.type)) return null
+  const table = dest.type === 'famille' ? 'famille' : 'intervenants'
+  const { data } = await supabaseAdmin.from(table).select('id, name, email, user_id')
+    .eq('id', dest.id).eq('senior_id', seniorId).is('archived_at', null).maybeSingle()
+  return data ? { ...data, type: dest.type } : null
+}
+
+// Message adressé à une personne : elle seule est notifiée, à chaque message, si elle a un email
+async function notifierDestinataire(senior, auteur, contenu, dest) {
+  if (!dest.email || (await adressesDesinscrites(supabaseAdmin)).has(dest.email.toLowerCase())) return 0
+  const extrait = contenu.length > 280 ? contenu.slice(0, 277) + '…' : contenu
+  const { error } = await resend.emails.send({
+    from: 'Holiris <contact@holiris.fr>',
+    to: dest.email,
+    subject: auteur.nom.split(' ')[0] + ' vous a écrit — suivi de ' + senior.name,
+    headers: entetesDesinscription(dest.email),
+    html: emailNouveauMessage({
+      prenom: escapeHtml(dest.name?.split(' ')[0]),
+      auteurNom: escapeHtml(auteur.nom),
+      auteurRole: escapeHtml(auteur.role),
+      seniorName: escapeHtml(senior.name),
+      extrait: escapeHtml(extrait),
+      pourVous: true,
+      desinscription: lienDesinscription(dest.email).page,
+    }),
+  })
+  if (error) { console.error('Erreur notification message:', error); return 0 }
+  return 1
+}
+
 // Email aux autres participants ayant un compte, au plus un par heure et par personne
 async function notifier(senior, auteurUserId, auteur, contenu) {
   const [{ data: fam }, { data: interv }, { data: gest }] = await Promise.all([
@@ -77,13 +109,15 @@ export async function POST(request) {
     const user = await utilisateurCourant()
     if (!user) return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 })
 
-    const { seniorId, texte } = await request.json()
+    const { seniorId, texte, destinataire } = await request.json()
     const brut = String(texte || '').trim().slice(0, 2000)
     if (!seniorId || !brut) return NextResponse.json({ success: false, error: 'Message vide' }, { status: 400 })
 
     const auteur = await auteurPour(user, seniorId)
     if (!auteur) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
     const { data: senior } = await supabaseAdmin.from('seniors').select('id, name, structure_id').eq('id', seniorId).single()
+    const dest = destinataire ? await destinataireValide(destinataire, seniorId) : null
+    if (destinataire && !dest) return NextResponse.json({ success: false, error: 'Destinataire introuvable' }, { status: 400 })
 
     // Filtre médical : seule la partie non médicale est publiée
     const { medical, note: contenu } = await analyserNote(brut)
@@ -92,12 +126,13 @@ export async function POST(request) {
     if (contenu) {
       const { data, error } = await supabaseAdmin.from('messages').insert({
         senior_id: seniorId, auteur_user_id: user.id, auteur_nom: auteur.nom, auteur_role: auteur.role || null, contenu,
+        ...(dest ? { destinataire_type: dest.type, destinataire_id: dest.id, destinataire_nom: dest.name } : {}),
       }).select().single()
       if (error) throw error
       message = data
     }
     const signalementId = medical ? await creerSignalement({ seniorId, auteur, source: 'messages' }) : null
-    const notifies = message ? await notifier(senior, user.id, auteur, contenu) : 0
+    const notifies = !message ? 0 : dest ? await notifierDestinataire(senior, auteur, contenu, dest) : await notifier(senior, user.id, auteur, contenu)
     await marquerLu(user.id, seniorId)
 
     return NextResponse.json({ success: true, message, medical, signalementId, notePartielle: !!contenu, notifies })

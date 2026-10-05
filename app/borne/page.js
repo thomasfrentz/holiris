@@ -67,6 +67,8 @@ export default function Borne() {
   const [reponseMedicale, setReponseMedicale] = useState('')
   const [alertesAccueil, setAlertesAccueil] = useState([])
   const [messagesAccueil, setMessagesAccueil] = useState([]) // [{ prenom, nombre }]
+  const [messagesJour, setMessagesJour] = useState([]) // messages adressés aux intervenants attendus aujourd'hui
+  const [messageOuvert, setMessageOuvert] = useState(null)
   // Notifications retirées de l'accueil, sur cette tablette seulement (le tableau de bord n'est pas touché)
   const [masques, setMasques] = useState(() => {
     try { return JSON.parse(memoire.lire('holiris_borne_masques')) || { alertes: [], messages: '' } }
@@ -191,6 +193,8 @@ export default function Borne() {
         .then(d => { if (d) setAlertesAccueil(d.alertes || []) }).catch(() => {})
       fetch('/api/borne?nonlus=tous&code=' + code).then(r => r.ok ? r.json() : null)
         .then(d => { if (d) setMessagesAccueil(d.messages || []) }).catch(() => {})
+      fetch('/api/borne-messages?code=' + code).then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setMessagesJour(d.messages || []) }).catch(() => {})
     }
     const personnesAJour = () => fetch('/api/borne?code=' + code).then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.personnes) setPersonnes(d.personnes) }).catch(() => {})
@@ -220,6 +224,13 @@ export default function Borne() {
     }, 15000)
     return () => clearInterval(t)
   }, [miseAJour, step, visio])
+
+  // « Lu » sur un message adressé à un intervenant : il disparaît de la borne
+  async function marquerMessageLu(m) {
+    setMessageOuvert(null)
+    setMessagesJour(prev => prev.filter(x => x.id !== m.id))
+    fetch('/api/borne-messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: borneInfo?.code, id: m.id }) }).catch(() => {})
+  }
 
   function masquer(modif) {
     setMasques(prev => {
@@ -597,6 +608,28 @@ export default function Borne() {
     </div>
   )
 
+  // Message adressé à un intervenant, ouvert depuis l'accueil
+  if (step === 'accueil' && messageOuvert) return page(
+    <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column' }}>
+      {retour('Accueil', () => setMessageOuvert(null))}
+      <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'center' }}>Message</p>
+      <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, textAlign: 'center', margin: '6px 0 20px' }}>Pour {messageOuvert.destinataire_nom}</h2>
+      <div style={{ background: C.carte, borderRadius: 24, padding: '26px 28px', boxShadow: OMBRE, marginBottom: 22 }}>
+        <p style={{ fontSize: 22, lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{messageOuvert.contenu}</p>
+        <p style={{ fontSize: 17, color: C.gris, marginTop: 18, textAlign: 'right' }}>
+          — {messageOuvert.auteur_nom}{messageOuvert.auteur_role ? `, ${messageOuvert.auteur_role}` : ''}
+          <span style={{ display: 'block', fontSize: 14, color: C.grisClair, marginTop: 2 }}>
+            {new Date(messageOuvert.created_at).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </p>
+      </div>
+      <button onClick={() => marquerMessageLu(messageOuvert)} className="borne-bouton"
+        style={bouton(C.sauge, '#fff', { fontSize: 21, padding: '22px', boxShadow: '0 12px 28px rgba(74,136,112,0.28)' })}>
+        ✓ Lu
+      </button>
+    </div>
+  )
+
   if (step === 'accueil') {
     const nonMasquees = alertesAccueil.filter(a => !masques.alertes.includes(a.id))
     const urgentes = nonMasquees.filter(a => a.niveau === 'danger')
@@ -614,13 +647,21 @@ export default function Borne() {
         </div>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
-          <Logo taille={alertesVisibles.length || messagesVisibles ? 96 : 140} />
+          <Logo taille={alertesVisibles.length || messagesVisibles || messagesJour.length ? 96 : 140} />
           <h1 style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
           <p style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
         </div>
 
-        {(alertesVisibles.length > 0 || messagesVisibles) && (
+        {(alertesVisibles.length > 0 || messagesVisibles || messagesJour.length > 0) && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+            {messagesJour.map(m => (
+              <button key={m.id} onClick={() => setMessageOuvert(m)} className="borne-bouton"
+                style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#fff', border: `2px solid ${C.lilas}`, borderRadius: 16, padding: '14px 18px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
+                <span style={{ fontSize: 26 }}>✉️</span>
+                <span style={{ fontSize: 19, fontWeight: 600, flex: 1 }}>Message pour {m.destinataire_nom?.split(' ')[0]}</span>
+                <span style={{ fontSize: 15, color: C.lilasFonce, fontWeight: 500 }}>Lire ›</span>
+              </button>
+            ))}
             {alertesVisibles.map(a => (
               <div key={a.id} style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: a.niveau === 'danger' ? C.rouge : C.ambre, flexShrink: 0 }}>

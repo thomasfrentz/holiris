@@ -22,6 +22,8 @@ export default function Messages() {
   const [erreur, setErreur] = useState('')
   const [question, setQuestion] = useState(null)
   const [dictee, setDictee] = useState('') // '' | 'enregistrement' | 'transcription'
+  const [personnes, setPersonnes] = useState([]) // destinataires possibles : { cle, type, id, nom, role }
+  const [pour, setPour] = useState('') // '' = tout le monde, sinon « type:id »
   const recorderRef = useRef(null)
   const finRef = useRef(null)
 
@@ -63,6 +65,24 @@ export default function Messages() {
 
   useEffect(() => { finRef.current?.scrollIntoView({ block: 'end' }) }, [messages.length])
 
+  // Personnes du dossier, pour adresser un message à l'une d'elles
+  useEffect(() => {
+    if (!seniorId) return
+    let actif = true
+    Promise.all([
+      supabase.from('famille').select('id, name, role, user_id').eq('senior_id', seniorId).is('archived_at', null).order('name'),
+      supabase.from('intervenants').select('id, name, role, user_id').eq('senior_id', seniorId).is('archived_at', null).order('name'),
+    ]).then(([f, i]) => {
+      if (!actif) return
+      setPour('')
+      setPersonnes([
+        ...(f.data || []).map(p => ({ cle: 'famille:' + p.id, type: 'famille', id: p.id, nom: p.name, role: p.role, user_id: p.user_id })),
+        ...(i.data || []).map(p => ({ cle: 'intervenant:' + p.id, type: 'intervenant', id: p.id, nom: p.name, role: p.role, user_id: p.user_id })),
+      ])
+    })
+    return () => { actif = false }
+  }, [seniorId, supabase])
+
   // Fil affiché = fil lu (ouverture et messages reçus pendant la lecture)
   useEffect(() => {
     if (!seniorId || chargement || document.visibilityState !== 'visible') return
@@ -73,7 +93,7 @@ export default function Messages() {
     if (!texte.trim() || envoi) return
     setEnvoi(true); setErreur('')
     try {
-      const r = await (await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId, texte }) })).json()
+      const r = await (await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId, texte, destinataire: personnes.find(p => p.cle === pour) || null }) })).json()
       if (!r.success) { setErreur(r.error || 'Le message n\'a pas pu être envoyé.'); setEnvoi(false); return }
       if (r.message) setMessages(prev => prev.some(m => m.id === r.message.id) ? prev : [...prev, r.message])
       if (r.signalementId) setQuestion({ id: r.signalementId, notePartielle: r.notePartielle })
@@ -160,6 +180,11 @@ export default function Messages() {
                     {moi ? 'Vous' : <><strong style={{ color: '#4A8870', fontWeight: 600 }}>{m.auteur_nom}</strong>{m.auteur_role ? ' · ' + m.auteur_role : ''}</>} · {heure(m.created_at)}
                   </div>
                 )}
+                {m.destinataire_nom && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#8B6FAA', margin: '2px 4px 3px' }}>
+                    À {m.destinataire_id && personnes.some(p => p.id === m.destinataire_id && p.user_id === userId) ? 'vous' : m.destinataire_nom}
+                  </div>
+                )}
                 <div style={{
                   maxWidth: '82%', padding: '9px 13px', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   background: moi ? '#7FAF9B' : '#F3F6F4', color: moi ? '#fff' : '#1F2A24',
@@ -172,7 +197,18 @@ export default function Messages() {
         </div>
 
         {erreur && <div style={{ fontSize: 13, color: '#C4606A', marginTop: 8 }}>{erreur}</div>}
-        <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13, color: '#6F7C75' }}>
+          <label htmlFor="destinataire">À :</label>
+          <select id="destinataire" value={pour} onChange={e => setPour(e.target.value)}
+            style={{ flex: 1, maxWidth: 360, padding: '7px 10px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#1F2A24' }}>
+            <option value="">Tout le monde</option>
+            {personnes.filter(p => p.user_id !== userId).map(p => (
+              <option key={p.cle} value={p.cle}>{p.nom}{p.role ? ' · ' + p.role : ''}</option>
+            ))}
+          </select>
+          {pour && <span style={{ fontSize: 12, color: '#9BB5AA' }}>visible par tous, seul·e le·la destinataire est prévenu·e</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'flex-end' }}>
           <textarea rows={2} value={texte} onChange={e => setTexte(e.target.value)} placeholder={dictee === 'enregistrement' ? 'Parlez, puis touchez « Arrêter »…' : 'Votre message…'}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) { e.preventDefault(); envoyer() } }}
             style={{ flex: 1, padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 10, fontSize: 15, outline: 'none', fontFamily: 'inherit', resize: 'none', background: '#fff', lineHeight: 1.45 }} />
