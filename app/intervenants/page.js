@@ -240,7 +240,7 @@ export default function Intervenants() {
             <input type="email" placeholder="Email (facultatif)" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Sans email ni téléphone, l&apos;intervenant laisse ses notes sur la borne. Avec un email, il reçoit un lien pour créer son compte ; avec un numéro WhatsApp, il peut aussi envoyer ses notes par WhatsApp.
+              Sans email ni téléphone, l&apos;intervenant laisse ses notes sur la borne. Avec un email ou un numéro WhatsApp, il reçoit un lien pour créer son compte (sans email, il indiquera le sien à l&apos;inscription) ; avec le numéro, il peut aussi envoyer ses notes par WhatsApp.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
