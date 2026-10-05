@@ -34,7 +34,8 @@ export async function POST(request) {
       const { data } = await supabaseAdmin.from(table)
         .select('email').eq('invite_token', jeton).is('archived_at', null).maybeSingle()
       if (!data) return NextResponse.json({ success: false, error: 'Ce lien d\'invitation n\'est plus valide.' }, { status: 400 })
-      if (data.email?.toLowerCase() !== adresse) return NextResponse.json({ success: false, error: 'Utilisez l\'adresse email à laquelle vous avez reçu l\'invitation.' }, { status: 400 })
+      // Fiche sans email (invitation reçue par WhatsApp) : l'adresse saisie devient celle de la fiche
+      if (data.email && data.email.toLowerCase() !== adresse) return NextResponse.json({ success: false, error: 'Utilisez l\'adresse email à laquelle vous avez reçu l\'invitation.' }, { status: 400 })
     } else {
       return NextResponse.json({ success: false, error: 'Lien d\'inscription invalide.' }, { status: 400 })
     }
@@ -56,6 +57,8 @@ export async function POST(request) {
     // Invitation proche ou intervenant : accès activé tout de suite, pour toutes les invitations
     // en attente à cette adresse (le jeton a prouvé l'accès à la boîte mail)
     if (type === 'famille' || type === 'intervenant') {
+      await supabaseAdmin.from(type === 'famille' ? 'famille' : 'intervenants')
+        .update({ user_id: created.user.id, email: adresse, invite_token: null }).eq('invite_token', jeton).is('user_id', null)
       for (const table of ['famille', 'intervenants']) {
         await supabaseAdmin.from(table).update({ user_id: created.user.id, invite_token: null })
           .ilike('email', adresse).is('user_id', null).is('archived_at', null)

@@ -73,7 +73,7 @@ export default function Famille() {
   }).catch(() => {})
 
   async function inviteMembre() {
-    if (!prenom || !role || !email) return
+    if (!prenom || !role || (!email.trim() && !telephone.trim())) return
     setSaving(true)
     const whatsapp = telephone ? telephone.replace(/\s/g, '').replace(/^0/, '+33') : null
     const nomComplet = prenom + (nom ? ' ' + nom : '')
@@ -82,13 +82,14 @@ export default function Famille() {
       senior_id: selectedSeniorId,
       name: nomComplet,
       role, phone: telephone || null, whatsapp,
-      email: email.trim().toLowerCase(),
+      email: email.trim() ? email.trim().toLowerCase() : null,
     }).select()
 
     if (!error && data) {
 
       // Email d'accès : rattachement direct si le compte existe, sinon invitation à créer un compte
-      try {
+      if (!email.trim()) setInviteSent(nomComplet + ' par WhatsApp')
+      else try {
         const res = await fetch('/api/invitation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -299,7 +300,7 @@ export default function Famille() {
               {[...new Set([...roles, ...(edition.role ? [edition.role] : [])])].map(r => <option key={r} value={r}>{r}</option>)}
             </select>
             <input placeholder="Téléphone / WhatsApp" value={edition.telephone} onChange={e => setEdition({ ...edition, telephone: e.target.value })} style={{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }} />
-            <input type="email" placeholder="Email *" value={edition.email} onChange={e => setEdition({ ...edition, email: e.target.value })} style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1' }} />
+            <input type="email" placeholder={m.user_id ? 'Email *' : 'Email'} value={edition.email} onChange={e => setEdition({ ...edition, email: e.target.value })} style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1' }} />
             <input placeholder="Adresse" value={edition.adresse} onChange={e => setEdition({ ...edition, adresse: e.target.value })} style={{ ...{ padding: '9px 12px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', minWidth: 0 }, gridColumn: '1 / -1' }} />
           </div>
           <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 10 }}>
@@ -308,8 +309,8 @@ export default function Famille() {
               : 'Si vous changez l\'email, une nouvelle invitation est envoyée à la nouvelle adresse.'}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => enregistrerEdition(m)} disabled={enregistrement || !edition.prenom.trim() || !edition.role || !edition.email.trim()}
-              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!edition.prenom.trim() || !edition.role || !edition.email.trim()) ? 0.5 : 1 }}>
+            <button onClick={() => enregistrerEdition(m)} disabled={enregistrement || !edition.prenom.trim() || !edition.role || (!edition.email.trim() && !edition.telephone.trim())}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!edition.prenom.trim() || !edition.role || (!edition.email.trim() && !edition.telephone.trim())) ? 0.5 : 1 }}>
               {enregistrement ? 'Enregistrement...' : 'Enregistrer'}
             </button>
             <button onClick={() => setEdition(null)}
@@ -363,15 +364,15 @@ export default function Famille() {
               style={{ padding: '10px 14px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC' }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <input type="email" placeholder="Email *" value={email} onChange={e => setEmail(e.target.value)}
+            <input type="email" placeholder="Email (ou au moins le numéro WhatsApp)" value={email} onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#FAFCFC', boxSizing: 'border-box' }} />
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>
-              Lien d'accès envoyé par email (création de compte si besoin) · Avec le numéro WhatsApp, le proche peut aussi envoyer ses notes par WhatsApp
+              Avec un email, le lien d&apos;accès est envoyé par email. Sans email, il est envoyé par WhatsApp : le proche indiquera son email en créant son compte. Avec le numéro WhatsApp, il peut aussi envoyer ses notes par WhatsApp.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={inviteMembre} disabled={saving || !prenom || !role || !email}
-              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !role || !email) ? 0.5 : 1 }}>
+            <button onClick={inviteMembre} disabled={saving || !prenom || !role || (!email.trim() && !telephone.trim())}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!prenom || !role || (!email.trim() && !telephone.trim())) ? 0.5 : 1 }}>
               {saving ? 'Envoi...' : 'Inviter'}
             </button>
             <button onClick={resetForm}

@@ -26,16 +26,18 @@ export async function POST(request) {
 
     const nouvelEmail = String(email || '').trim().toLowerCase()
     if (!String(prenom || '').trim() || !role) return NextResponse.json({ success: false, error: 'Prénom et lien obligatoires' }, { status: 400 })
-    if (!emailValide(nouvelEmail)) return NextResponse.json({ success: false, error: 'Email invalide' }, { status: 400 })
-
     const tel = String(telephone || '').trim()
+    if (nouvelEmail && !emailValide(nouvelEmail)) return NextResponse.json({ success: false, error: 'Email invalide' }, { status: 400 })
+    if (!nouvelEmail && membre.user_id) return NextResponse.json({ success: false, error: 'L\'email est nécessaire pour un proche qui a un compte.' }, { status: 400 })
+    if (!nouvelEmail && !tel) return NextResponse.json({ success: false, error: 'Indiquez au moins un email ou un numéro WhatsApp.' }, { status: 400 })
+
     const emailChange = nouvelEmail !== (membre.email || '').toLowerCase()
     const { error } = await supabaseAdmin.from('famille').update({
       name: (String(prenom).trim() + ' ' + String(nom || '').trim()).trim(),
       role,
       phone: tel || null,
       whatsapp: tel ? tel.replace(/\s/g, '').replace(/^0/, '+33') : null,
-      email: nouvelEmail,
+      email: nouvelEmail || null,
       adresse: String(adresse || '').trim() || null,
       // Sans compte, un nouvel email invalide l'ancien lien d'invitation (envoyé à l'ancienne adresse)
       ...(emailChange && !membre.user_id ? { invite_token: null } : {}),
@@ -44,7 +46,7 @@ export async function POST(request) {
 
     // Sans compte : invitation envoyée à la nouvelle adresse
     let invite = null
-    if (emailChange && !membre.user_id) {
+    if (emailChange && nouvelEmail && !membre.user_id) {
       const { data: aJour } = await supabaseAdmin.from('famille').select('*, seniors!famille_senior_id_fkey(name)').eq('id', id).single()
       invite = await inviterMembre({ table: 'famille', type: 'famille', membre: aJour })
     }

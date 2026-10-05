@@ -40,7 +40,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Cette invitation a été envoyée à ' + ligne.email + ' : connectez-vous avec cette adresse.' }, { status: 403 })
     }
 
-    await supabaseAdmin.from(table).update({ user_id: user.id, invite_token: null }).eq('id', ligne.id)
+    await supabaseAdmin.from(table).update({ user_id: user.id, invite_token: null, ...(ligne.email ? {} : { email: user.email?.toLowerCase() }) }).eq('id', ligne.id)
     // Rattacher aussi les autres seniors en attente pour ce même email
     if (ligne.email) {
       await supabaseAdmin.from(table).update({ user_id: user.id, invite_token: null })
