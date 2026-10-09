@@ -170,6 +170,23 @@ export default function Intervenants() {
     else alert(result.error || 'Erreur')
   }
 
+  async function renvoyerWhatsapp(i) {
+    const r = await (await fetch('/api/whatsapp-bienvenue', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'intervenant', id: i.id }),
+    })).json().catch(() => ({}))
+    setEmailSent(r.success ? 'Lien Holiris renvoyé par WhatsApp à ' + i.name : 'Envoi WhatsApp impossible' + (r.erreur ? ' : ' + r.erreur : ''))
+  }
+
+  // Le lien de la borne sur téléphone et le lien WhatsApp reçu cessent de fonctionner (toutes ses fiches)
+  async function couperAccesTelephone(i) {
+    if (!confirm(`Couper l'accès de ${i.name} depuis son téléphone ? Son lien ne fonctionnera plus. Vous pourrez lui renvoyer un nouveau lien par WhatsApp.`)) return
+    const r = await (await fetch('/api/ma-borne', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'couper', id: i.id }),
+    })).json().catch(() => ({}))
+    setEmailSent(r.success ? 'Accès téléphone coupé pour ' + i.name : 'Impossible de couper l\'accès' + (r.error ? ' : ' + r.error : ''))
+    loadData()
+  }
+
   async function archiverIntervenant(id) {
     const { error } = await supabase.from('intervenants').update({ archived_at: new Date().toISOString() }).eq('id', id)
     if (!error) loadData()
@@ -281,7 +298,8 @@ export default function Intervenants() {
                   {i.email && <span>{i.phone ? '· ' : ''}{i.email}</span>}
                   {i.user_id && <span style={{ color: '#4A8870', fontWeight: 500 }}>· Compte actif</span>}
                   {!i.user_id && i.email && <span style={{ color: '#C4844A' }}>· Invitation envoyée</span>}
-                  {!i.user_id && !i.email && <span style={{ color: '#8B6FAA' }}>{i.phone ? '· ' : ''}Notes sur la borne · sans compte</span>}
+                  {!i.user_id && !i.email && !i.jeton_mobile && <span style={{ color: '#8B6FAA' }}>{i.phone ? '· ' : ''}Notes sur la borne · sans compte</span>}
+                  {!i.user_id && i.jeton_mobile && <span style={{ color: '#8B6FAA' }}>· Utilise Holiris sur son téléphone, sans compte</span>}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -299,6 +317,20 @@ export default function Intervenants() {
                         Renvoyer email
                       </button>
                     )}
+                    {i.phone && (
+                      <button onClick={() => renvoyerWhatsapp(i)}
+                        style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                        Renvoyer le lien WhatsApp
+                      </button>
+                    )}
+                  </>
+                )}
+                {i.jeton_mobile && (
+                  <>
+                    <button onClick={() => couperAccesTelephone(i)} title="Téléphone perdu ou intervenant parti : son lien ne fonctionne plus"
+                      style={{ background: '#FBEDEE', color: '#C4434F', border: '1px solid #F0CDD1', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                      Couper l&apos;accès téléphone
+                    </button>
                   </>
                 )}
                 {(i.id === medecinTraitantId || /m[ée]decin|docteur|g[ée]n[ée]raliste/i.test(i.role || '')) && (i.id === medecinTraitantId ? (

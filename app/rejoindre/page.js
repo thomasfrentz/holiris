@@ -61,6 +61,18 @@ function RejoindreContent() {
     setTimeout(() => router.push(typeParam === 'famille' ? '/app' : '/espace-intervenant'), 2000)
   }
 
+  // Intervenant : utiliser Holiris sur son téléphone sans compte (laisser des notes, lire ses messages)
+  async function sansCompte() {
+    const res = await fetch('/api/ma-borne', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'activer', invitation: token })
+    })
+    const result = await res.json()
+    if (!result.success) { alert(result.error || 'Ce lien n\'est plus valide.'); return }
+    window.location.href = '/ma-borne?j=' + encodeURIComponent(result.jeton)
+  }
+
   if (status === 'loading') return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg, #FCFDFC 0%, #F0F7F4 50%, #F5F0FA 100%)', fontFamily: "'Inter', sans-serif" }}>
       <div style={{ color: '#9BB5AA' }}>Vérification...</div>
@@ -118,12 +130,24 @@ function RejoindreContent() {
 
         <button onClick={activer}
           style={{ width: '100%', background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '14px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Activer mon accès →
+          {type === 'intervenant' ? 'Créer mon compte →' : 'Activer mon accès →'}
         </button>
 
-        <div style={{ fontSize: 11, color: '#C8DDD4', marginTop: 16 }}>
+        <div style={{ fontSize: 11, color: '#C8DDD4', marginTop: 12 }}>
           Pas encore de compte ? Vous serez invité(e) à le créer, puis votre accès sera activé.
         </div>
+
+        {type === 'intervenant' && (
+          <>
+            <button onClick={sansCompte}
+              style={{ width: '100%', marginTop: 20, background: '#fff', color: '#4A8870', border: '1.5px solid #7FAF9B', borderRadius: 8, padding: '13px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Utiliser sans compte
+            </button>
+            <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 10, lineHeight: 1.5 }}>
+              Sans compte, vous laissez vos notes depuis votre téléphone, comme sur la borne, et vous lisez les messages qui vous sont adressés.
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

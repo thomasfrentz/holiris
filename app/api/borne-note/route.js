@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { enregistrerNote } from '@/lib/notesMedicales'
+import { ficheAutorisee } from '@/lib/accesMobile'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -9,7 +10,18 @@ const supabase = createClient(
 
 export async function POST(request) {
   try {
-    const { note, intervenantId, personneType, intervenantName, intervenantRole, seniorId } = await request.json()
+    const { note, intervenantId, personneType, intervenantName, intervenantRole, seniorId, code, jeton } = await request.json()
+
+    // La note doit venir de la borne du senior (son code) ou de la borne sur téléphone de l'intervenant (son jeton)
+    let autorise = false
+    if (code) {
+      const { data: borne } = await supabase.from('bornes').select('senior_id')
+        .eq('code', String(code).trim().toUpperCase()).maybeSingle()
+      autorise = !!borne && borne.senior_id === seniorId
+    } else if (jeton) {
+      autorise = personneType !== 'famille' && await ficheAutorisee(jeton, intervenantId, seniorId)
+    }
+    if (!autorise) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
 
     // Coordonnées de l'auteur, pour qu'il puisse être recontacté en cas d'information médicale
     const table = personneType === 'famille' ? 'famille' : 'intervenants'

@@ -374,7 +374,8 @@ export default function Borne() {
           personneType: selectedPersonne.type || 'intervenant',
           intervenantName: selectedPersonne.name,
           intervenantRole: selectedPersonne.role || '',
-          seniorId: borneInfo.senior_id
+          seniorId: borneInfo.senior_id,
+          code: borneInfo.code
         })
       })
       const result = await res.json()
