@@ -233,7 +233,7 @@ export default function Messages() {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Messages</div>
           <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Le fil de {senior?.name?.split(' ')[0]}</h1>
-          <p className="fil-sous-titre" style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>Visible par la famille, les intervenants et la structure qui suivent {senior?.name}.</p>
+          <p className="fil-sous-titre" style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>Visible par la famille, les intervenants et la structure qui suivent {senior?.name}, sauf les messages privés.</p>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 16px 4px' }}>
@@ -260,7 +260,7 @@ export default function Messages() {
                 )}
                 {m.destinataire_nom && (
                   <div style={{ fontSize: 11, fontWeight: 600, color: '#8B6FAA', margin: '2px 4px 3px' }}>
-                    À {m.destinataire_id && personnes.some(p => p.id === m.destinataire_id && p.user_id === userId) ? 'vous' : m.destinataire_nom}
+                    À {m.destinataire_id && personnes.some(p => p.id === m.destinataire_id && p.user_id === userId) ? 'vous' : m.destinataire_nom} · privé
                   </div>
                 )}
                 <div style={{
@@ -290,7 +290,7 @@ export default function Messages() {
           </select>
           {pour === 'senior'
             ? <span style={{ fontSize: 12, color: '#9BB5AA' }}>seul·e {prenomSenior} le verra, sur sa borne</span>
-            : pour && <span style={{ fontSize: 12, color: '#9BB5AA' }}>visible par tous, seul·e le·la destinataire est prévenu·e</span>}
+            : pour && <span style={{ fontSize: 12, color: '#9BB5AA' }}>privé : seul·e {personnes.find(p => p.cle === pour)?.nom?.split(' ')[0]} le verra</span>}
         </div>
         {pour === 'senior' && vocal?.etat === 'pret' ? (
           <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
