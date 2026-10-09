@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 import { escapeHtml, emailSansPassage, envoyerEnLots, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
+import { envoyerPush, comptesDuSenior } from '@/lib/push'
 
 // Tâche quotidienne : un senior sans aucune note depuis 3 jours (ni intervenant, ni proche) déclenche une alerte
 // sur le tableau de bord et un email aux proches. Une seule fois par période de silence.
@@ -40,6 +41,12 @@ export async function GET(request) {
         message: `Aucun passage enregistré pour ${prenom} depuis le ${dateLongue(depuis)}`,
       })
       silencieux.push({ ...senior, prenom, depuis })
+      await envoyerPush({ userIds: await comptesDuSenior(senior.id, { intervenants: false }) }, {
+        title: `⚠️ Pas de nouvelles de ${prenom}`,
+        body: `Aucun passage enregistré depuis le ${dateLongue(depuis)}. Avez-vous des nouvelles ?`,
+        url: '/note',
+        tag: 'sans-passage-' + senior.id,
+      })
     }
 
     if (!silencieux.length) return NextResponse.json({ success: true, alertes: 0, emails: 0 })

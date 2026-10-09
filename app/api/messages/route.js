@@ -4,6 +4,7 @@ import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveu
 import { analyserNote, creerSignalement } from '@/lib/notesMedicales'
 import { marquerLu } from '@/lib/messagesNonLus'
 import { escapeHtml, emailNouveauMessage, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
+import { envoyerPush, comptesDuSenior } from '@/lib/push'
 
 // Fil de discussion d'un senior : envoi d'un message (filtre médical, puis notification par email).
 // La lecture se fait directement depuis le navigateur, protégée par les règles d'accès.
@@ -30,7 +31,7 @@ async function auteurPour(user, seniorId) {
 async function destinataireValide(dest, seniorId) {
   if (!dest?.id || !['famille', 'intervenant'].includes(dest.type)) return null
   const table = dest.type === 'famille' ? 'famille' : 'intervenants'
-  const { data } = await supabaseAdmin.from(table).select('id, name, email, user_id')
+  const { data } = await supabaseAdmin.from(table).select('id, name, email, user_id' + (table === 'intervenants' ? ', jeton_mobile' : ''))
     .eq('id', dest.id).eq('senior_id', seniorId).is('archived_at', null).maybeSingle()
   return data ? { ...data, type: dest.type } : null
 }
@@ -133,6 +134,19 @@ export async function POST(request) {
     }
     const signalementId = medical ? await creerSignalement({ seniorId, auteur, source: 'messages' }) : null
     const notifies = !message ? 0 : dest ? await notifierDestinataire(senior, auteur, contenu, dest) : await notifier(senior, user.id, auteur, contenu)
+    if (message) {
+      // Notification sur téléphone, en plus de l'email : le destinataire choisi, sinon tous ceux qui suivent le senior
+      const extrait = contenu.length > 140 ? contenu.slice(0, 137) + '…' : contenu
+      const cibles = dest
+        ? { userIds: [dest.user_id], jetons: dest.user_id ? [] : [dest.jeton_mobile] }
+        : { userIds: (await comptesDuSenior(seniorId)).filter(id => id !== user.id) }
+      await envoyerPush(cibles, {
+        title: `💬 ${auteur.nom.split(' ')[0]}${dest ? ' vous a écrit' : ''} · ${senior.name.split(' ')[0]}`,
+        body: extrait,
+        url: dest && !dest.user_id ? '/ma-borne' : '/messages',
+        tag: 'messages-' + seniorId,
+      })
+    }
     await marquerLu(user.id, seniorId)
 
     return NextResponse.json({ success: true, message, medical, signalementId, notePartielle: !!contenu, notifies })

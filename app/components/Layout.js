@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { useNonLus } from '../lib/useNonLus'
+import ActiverNotifications from './ActiverNotifications'
 
 // Rôle de l'utilisateur connecté : structure dont il est gestionnaire (nom), et admin Holiris
 function useRole() {
@@ -227,6 +228,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
             <span style={{ flex: 1, fontSize: 13, color: '#6F7C75' }}><strong style={{ color: '#8B6FAA' }}>Installer l&apos;application</strong> pour dicter vos notes</span>
             <span style={{ color: '#8B6FAA' }}>→</span>
           </Link>
+          <ActiverNotifications />
           {children}
         </main>
 

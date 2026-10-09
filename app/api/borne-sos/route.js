@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/serveur'
 import { escapeHtml, emailSos, envoyerEnLots } from '@/lib/emails'
 import { creerLienVisio } from '@/lib/visio'
 import { autorisationsSignees } from '@/lib/documents'
+import { envoyerPush, comptesDuSenior } from '@/lib/push'
 
 // Bouton SOS de la borne : alerte rouge sur le tableau de bord, email et WhatsApp à toute la famille,
 // chacun avec un lien personnel (une seule utilisation) pour activer la caméra et le micro de la borne.
@@ -71,6 +72,13 @@ export async function POST(request) {
     await supabaseAdmin.from('alertes').insert({
       senior_id: borne.senior_id, type: 'sos', niveau: 'danger',
       message: `🆘 SOS déclenché depuis la borne à ${heure}` + (auto ? ' (sans réponse à la confirmation)' : ''),
+    })
+    // Notification immédiate sur le téléphone des proches, en plus de l'email et de WhatsApp
+    await envoyerPush({ userIds: await comptesDuSenior(borne.senior_id, { intervenants: false, structure: false }) }, {
+      title: `🆘 SOS — ${seniorName}`,
+      body: `${seniorName.split(' ')[0]} a demandé de l'aide depuis la borne à ${heure}.`,
+      url: '/app',
+      tag: 'sos-' + borne.senior_id,
     })
 
     const { data: famille } = await supabaseAdmin.from('famille')

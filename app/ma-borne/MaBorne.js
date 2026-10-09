@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import ActiverNotifications from '../components/ActiverNotifications'
 
 // Borne sur téléphone : un intervenant sans compte laisse ses notes depuis son téléphone,
 // avec le lien personnel reçu par WhatsApp (holiris.fr/ma-borne?j=…). Même parcours que la borne du domicile.
@@ -334,6 +335,8 @@ export default function MaBorne() {
             </button>
           ))}
         </div>
+
+        <div style={{ marginTop: 22 }}><ActiverNotifications jeton={jeton} /></div>
 
         {aideInstallation && (
           <div style={{ background: C.carte, border: `1px solid ${C.bord}`, borderRadius: 18, padding: '16px 18px', marginTop: 26, fontSize: 14, color: C.gris, lineHeight: 1.6 }}>

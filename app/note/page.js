@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import NoteVocale from '../components/NoteVocale'
+import ActiverNotifications from '../components/ActiverNotifications'
 import { useNonLus } from '../lib/useNonLus'
 
 // Écran « Note rapide » : point d'entrée de l'application installée sur le téléphone
@@ -130,6 +131,7 @@ export default function NoteRapide() {
               Bonjour{prenom ? ' ' + prenom : ''} 👋
             </div>
             <div style={{ fontSize: 14, color: '#6F7C75', textAlign: 'center', marginBottom: 22 }}>Comment s&apos;est passée la visite ?</div>
+            <ActiverNotifications />
 
             <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 14, padding: '12px 16px', marginBottom: 28 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 4 }}>Note pour</div>
