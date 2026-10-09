@@ -51,6 +51,7 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
   const nonLus = useNonLus()
   // Seuls les messages du senior actif sont signalés
   const nbMessages = nonLus.parSenior[selectedSeniorId]?.nombre || 0
+  const [menuMobile, setMenuMobile] = useState(false)
 
   const navItemsAdmin = [
     { icon: 'flux', label: 'Flux en temps réel', href: '/app' },
@@ -74,14 +75,22 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
   const navItemStructure = { icon: 'structure', label: 'Ma structure', href: '/structure' }
   const navItems = isIntervenant ? navItemsIntervenant : structure ? [navItemStructure, ...navItemsAdmin] : navItemsAdmin
 
+  // Téléphone : les onglets du quotidien en bas ; Profil, Documents, Assistant et Structure dans le menu du haut
   const bottomNavItems = isIntervenant ? navItemsIntervenant : [
     { icon: 'flux', label: '', href: '/app' },
     { icon: 'agenda', label: 'Agenda', href: '/agenda' },
     { icon: 'messages', label: 'Messages', href: '/messages' },
+    { icon: 'ordonnances', label: 'Ordo.', href: '/ordonnances' },
     { icon: 'famille', label: 'Famille', href: '/famille' },
     { icon: 'intervenants', label: 'Équipe', href: '/intervenants' },
     { icon: 'carnet', label: 'Carnet', href: '/carnet' },
-    structure ? { icon: 'structure', label: 'Structure', href: '/structure' } : { icon: 'profil', label: 'Profil', href: '/profil' },
+  ]
+
+  const menuMobileItems = isIntervenant ? [] : [
+    ...(structure ? [navItemStructure] : []),
+    { icon: 'ordonnances', label: 'Documents', href: '/documents' },
+    { icon: 'assistant', label: 'Assistant IA', href: '/assistant' },
+    { icon: 'profil', label: 'Profil', href: '/profil' },
   ]
 
   return (
@@ -118,6 +127,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         .hl-card { background: #fff; border: 1px solid #E8EFEB; border-radius: 12px; transition: box-shadow 0.2s, border-color 0.2s; }
         .hl-card:hover { box-shadow: 0 4px 16px rgba(127,175,155,0.12); border-color: #C8DDD4; }
 
+        .hl-topbar { display: none; }
+        @media (max-width: 768px) { .hl-topbar { display: flex; } }
         .hl-install-mobile, .hl-admin-mobile { display: none; }
         @media (max-width: 768px) { .hl-install-mobile, .hl-admin-mobile { display: flex; } }
         @media (display-mode: standalone) { .hl-install, .hl-install-mobile { display: none !important; } }
@@ -216,6 +227,47 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
         <main className="hl-main hl-scroll" style={{
           flex: 1, padding: '36px 40px', overflowY: 'auto', background: '#F7F9F8',
         }}>
+          {/* En-tête téléphone : dossier actif et menu (Profil, Documents, Assistant, Structure) */}
+          <div className="hl-topbar" style={{ alignItems: 'center', gap: 10, marginBottom: 16, position: 'relative' }}>
+            <Link href="/app" aria-label="Accueil" style={{ display: 'flex' }}>
+              <svg width="30" height="30" viewBox="0 0 64 64" fill="none">
+                <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="2.2" fill="none"/>
+                <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#BC84C6" strokeWidth="2.2" fill="none"/>
+                <circle cx="32" cy="32" r="4.5" fill="#7FAF9B"/>
+                <circle cx="32" cy="32" r="2" fill="#fff"/>
+              </svg>
+            </Link>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {senior && (seniors?.length > 1 ? (
+                <select value={selectedSeniorId || ''} onChange={e => switchSenior(e.target.value)} aria-label="Dossier actif"
+                  style={{ maxWidth: '100%', background: 'transparent', color: '#1F2A24', border: 'none', fontSize: 19, outline: 'none', fontFamily: "'Cormorant Garamond', serif", fontWeight: 500, padding: 0 }}>
+                  {seniors.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+              ) : (
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 19, fontWeight: 500, color: '#1F2A24', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{senior.name}</div>
+              ))}
+            </div>
+            {menuMobileItems.length > 0 && (
+              <button onClick={() => setMenuMobile(m => !m)} aria-label="Menu" aria-expanded={menuMobile}
+                style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid #E8EFEB', background: menuMobile ? '#EAF4EF' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4A8870" strokeWidth="1.8" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+              </button>
+            )}
+            {menuMobile && (
+              <>
+                <div onClick={() => setMenuMobile(false)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+                <div style={{ position: 'absolute', top: 48, right: 0, zIndex: 151, background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, boxShadow: '0 12px 32px rgba(31,42,36,0.14)', padding: 6, minWidth: 210 }}>
+                  {menuMobileItems.map(item => (
+                    <Link key={item.href} href={item.href} onClick={() => setMenuMobile(false)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 8, textDecoration: 'none', background: pathname === item.href ? '#EAF4EF' : 'transparent' }}>
+                      <Icon type={item.icon} active={pathname === item.href} size={18} />
+                      <span style={{ fontSize: 14, color: '#1F2A24' }}>{item.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           {adminHoliris && (
             <Link href="/admin" className="hl-admin-mobile" style={{ textDecoration: 'none', alignItems: 'center', gap: 10, background: '#FEF0F1', border: '1px solid #F2C4C8', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
               <span style={{ fontSize: 16 }}>⚙️</span>
