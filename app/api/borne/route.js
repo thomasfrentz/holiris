@@ -44,6 +44,7 @@ export async function GET(request) {
     const { data: alertes } = await supabaseAdmin.from('alertes')
       .select('id, niveau, message, created_at')
       .eq('senior_id', borne.senior_id).eq('lu', false).gte('created_at', depuis)
+      .or('type.is.null,type.neq.sans_passage') // « aucun passage » : pour la famille, pas pour l'écran du senior
       .order('created_at', { ascending: false }).limit(5)
     // Les urgentes d'abord, comme sur le tableau de bord
     return NextResponse.json({ alertes: (alertes || []).sort((a, b) => (b.niveau === 'danger') - (a.niveau === 'danger')) })

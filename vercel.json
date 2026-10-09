@@ -11,6 +11,10 @@
     {
       "path": "/api/comptes-rendus",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/sans-passage",
+      "schedule": "0 7 * * *"
     }
   ]
 }
