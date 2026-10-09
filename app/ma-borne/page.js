@@ -69,6 +69,11 @@ export default function MaBorne() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique du lien au montage
     if (!j) { setStep('invalide'); return }
     memoire.ecrire('holiris_ma_borne', j)
+    // L'icône ajoutée à l'écran d'accueil doit rouvrir ce lien, pas l'application avec compte
+    const manifeste = '/api/ma-borne/manifest?j=' + encodeURIComponent(j)
+    const liens = document.querySelectorAll('link[rel="manifest"]')
+    if (liens.length) liens.forEach(l => { l.href = manifeste })
+    else { const l = document.createElement('link'); l.rel = 'manifest'; l.href = manifeste; document.head.appendChild(l) }
     setJeton(j)
     setAideInstallation(!memoire.lire('holiris_ma_borne_aide_vue'))
     charger(j)

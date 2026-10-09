@@ -25,7 +25,14 @@ export default function NoteRapide() {
   useEffect(() => {
     async function charger() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login?redirect=' + encodeURIComponent('/note')); return }
+      if (!user) {
+        // Intervenant sans compte (borne sur téléphone) : l'icône de l'écran d'accueil ouvre sa page
+        let jeton = null
+        try { jeton = window.localStorage.getItem('holiris_ma_borne') } catch {}
+        if (jeton) { window.location.replace('/ma-borne?j=' + encodeURIComponent(jeton)); return }
+        router.push('/login?redirect=' + encodeURIComponent('/note'))
+        return
+      }
 
       const [{ data: interv }, { data: fam }, { data: gestion }] = await Promise.all([
         supabase.from('intervenants').select('name, senior_id, selected_senior_id, seniors!intervenants_senior_id_fkey(id, name)').eq('user_id', user.id).is('archived_at', null),
