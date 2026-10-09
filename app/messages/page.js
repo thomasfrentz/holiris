@@ -23,8 +23,11 @@ export default function Messages() {
   const [question, setQuestion] = useState(null)
   const [dictee, setDictee] = useState('') // '' | 'enregistrement' | 'transcription'
   const [personnes, setPersonnes] = useState([]) // destinataires possibles : { cle, type, id, nom, role }
-  const [pour, setPour] = useState('') // '' = tout le monde, sinon « type:id »
+  const [pour, setPour] = useState('') // '' = tout le monde, 'senior' = sur sa borne, sinon « type:id »
+  const [messagesSenior, setMessagesSenior] = useState([]) // mes messages privés au senior (borne)
+  const [vocal, setVocal] = useState(null) // message vocal au senior : { etat: 'enregistrement' | 'pret', blob, url, duree }
   const recorderRef = useRef(null)
+  const vocalRef = useRef(null)
   const finRef = useRef(null)
 
   // Proche, gestionnaire ou admin : dossiers habituels ; intervenant : ceux de son espace
@@ -83,6 +86,15 @@ export default function Messages() {
     return () => { actif = false }
   }, [seniorId, supabase])
 
+  // Mes messages au senior (privés) : affichés dans le fil, pour moi seul, avec leur statut de lecture
+  useEffect(() => {
+    if (!seniorId) return
+    let actif = true
+    fetch('/api/messages-senior?seniorId=' + seniorId).then(r => r.ok ? r.json() : { messages: [] })
+      .then(d => { if (actif) setMessagesSenior(d.messages || []) }).catch(() => {})
+    return () => { actif = false }
+  }, [seniorId])
+
   // Fil affiché = fil lu (ouverture et messages reçus pendant la lecture)
   useEffect(() => {
     if (!seniorId || chargement || document.visibilityState !== 'visible') return
@@ -91,6 +103,7 @@ export default function Messages() {
 
   async function envoyer() {
     if (!texte.trim() || envoi) return
+    if (pour === 'senior') return envoyerAuSenior()
     setEnvoi(true); setErreur('')
     try {
       const r = await (await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId, texte, destinataire: personnes.find(p => p.cle === pour) || null }) })).json()
@@ -98,6 +111,56 @@ export default function Messages() {
       if (r.message) setMessages(prev => prev.some(m => m.id === r.message.id) ? prev : [...prev, r.message])
       if (r.signalementId) setQuestion({ id: r.signalementId, notePartielle: r.notePartielle })
       setTexte('')
+    } catch { setErreur('Erreur réseau, réessayez.') }
+    setEnvoi(false)
+  }
+
+  // Message écrit au senior, lu sur sa borne
+  async function envoyerAuSenior() {
+    setEnvoi(true); setErreur('')
+    try {
+      const r = await (await fetch('/api/messages-senior', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId, texte }) })).json()
+      if (!r.success) { setErreur(r.error || 'Le message n\'a pas pu être envoyé.'); setEnvoi(false); return }
+      setMessagesSenior(prev => [...prev, r.message])
+      setTexte('')
+    } catch { setErreur('Erreur réseau, réessayez.') }
+    setEnvoi(false)
+  }
+
+  // Message vocal au senior : sa vraie voix, écoutée sur la borne (2 minutes au plus)
+  async function enregistrerVocal() {
+    if (vocal?.etat === 'enregistrement') { vocalRef.current?.stop(); return }
+    setErreur('')
+    try {
+      const format = ['audio/webm', 'audio/mp4', 'audio/ogg'].find(f => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(f)) || ''
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream, format ? { mimeType: format } : undefined)
+      const morceaux = []
+      const debut = Date.now()
+      const limite = setTimeout(() => recorder.state === 'recording' && recorder.stop(), 120000)
+      recorder.ondataavailable = e => { if (e.data.size) morceaux.push(e.data) }
+      recorder.onstop = () => {
+        clearTimeout(limite)
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(morceaux, { type: recorder.mimeType || format || 'audio/webm' })
+        setVocal({ etat: 'pret', blob, url: URL.createObjectURL(blob), duree: Math.round((Date.now() - debut) / 1000) })
+      }
+      recorder.start(); vocalRef.current = recorder; setVocal({ etat: 'enregistrement' })
+    } catch { setErreur('Micro indisponible.') }
+  }
+
+  async function envoyerVocal() {
+    if (!vocal?.blob || envoi) return
+    setEnvoi(true); setErreur('')
+    try {
+      const fd = new FormData()
+      fd.append('seniorId', seniorId)
+      fd.append('duree', String(vocal.duree || 0))
+      fd.append('audio', vocal.blob, 'message.' + (vocal.blob.type.includes('mp4') ? 'm4a' : vocal.blob.type.includes('ogg') ? 'ogg' : 'webm'))
+      const r = await (await fetch('/api/messages-senior', { method: 'POST', body: fd })).json()
+      if (!r.success) { setErreur(r.error || 'Le message vocal n\'a pas pu être envoyé.'); setEnvoi(false); return }
+      setMessagesSenior(prev => [...prev, r.message])
+      setVocal(null)
     } catch { setErreur('Erreur réseau, réessayez.') }
     setEnvoi(false)
   }
@@ -135,6 +198,16 @@ export default function Messages() {
   )
   if (!seniors.length) return <AucunDossier isAdmin={famille.isAdmin} />
 
+  const prenomSenior = senior?.name?.split(' ')[0] || ''
+  const estProche = personnes.some(p => p.type === 'famille' && p.user_id === userId)
+  const fil = [
+    ...messages,
+    ...messagesSenior.map(m => ({ ...m, auteur_user_id: userId, prive: true })),
+  ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  const statutBorne = m => m.lu_at
+    ? '✓ Lu sur la borne le ' + new Date(m.lu_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' à ' + new Date(m.lu_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : m.retire ? 'Non lu, retiré de la borne après 7 jours' : 'Pas encore lu'
+
   const heure = d => {
     const date = new Date(d), auj = new Date()
     const memeJour = date.toDateString() === auj.toDateString()
@@ -166,18 +239,23 @@ export default function Messages() {
         <div style={{ flex: 1, overflowY: 'auto', background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 16px 4px' }}>
           {chargement ? (
             <div style={{ color: '#9BB5AA', fontSize: 14, textAlign: 'center', padding: 24 }}>Chargement…</div>
-          ) : !messages.length ? (
+          ) : !fil.length ? (
             <div style={{ color: '#9BB5AA', fontSize: 14, textAlign: 'center', padding: '40px 16px', lineHeight: 1.7 }}>
               Aucun message pour l&apos;instant.<br />Écrivez le premier : toute l&apos;équipe de {senior?.name?.split(' ')[0]} le recevra.
             </div>
-          ) : messages.map((m, idx) => {
+          ) : fil.map((m, idx) => {
             const moi = m.auteur_user_id === userId
-            const suite = idx > 0 && messages[idx - 1].auteur_user_id === m.auteur_user_id && new Date(m.created_at) - new Date(messages[idx - 1].created_at) < 10 * 60 * 1000
+            const suite = !m.prive && idx > 0 && !fil[idx - 1].prive && fil[idx - 1].auteur_user_id === m.auteur_user_id && new Date(m.created_at) - new Date(fil[idx - 1].created_at) < 10 * 60 * 1000
             return (
-              <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: moi ? 'flex-end' : 'flex-start', marginTop: suite ? 3 : 12 }}>
+              <div key={(m.prive ? 's' : 'm') + m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: moi ? 'flex-end' : 'flex-start', marginTop: suite ? 3 : 12 }}>
                 {!suite && (
                   <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 3, padding: '0 4px' }}>
                     {moi ? 'Vous' : <><strong style={{ color: '#4A8870', fontWeight: 600 }}>{m.auteur_nom}</strong>{m.auteur_role ? ' · ' + m.auteur_role : ''}</>} · {heure(m.created_at)}
+                  </div>
+                )}
+                {m.prive && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#8B6FAA', margin: '2px 4px 3px' }}>
+                    À {prenomSenior}, sur sa borne · privé
                   </div>
                 )}
                 {m.destinataire_nom && (
@@ -189,7 +267,10 @@ export default function Messages() {
                   maxWidth: '82%', padding: '9px 13px', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   background: moi ? '#7FAF9B' : '#F3F6F4', color: moi ? '#fff' : '#1F2A24',
                   borderRadius: moi ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                }}>{m.contenu}</div>
+                }}>{m.type === 'vocal'
+                  ? (m.audio_url ? <audio controls preload="none" src={m.audio_url} style={{ maxWidth: 240, display: 'block' }} /> : '🎙 Message vocal')
+                  : m.contenu}</div>
+                {m.prive && <div style={{ fontSize: 11, color: m.lu_at ? '#4A8870' : '#9BB5AA', margin: '3px 4px 0' }}>{statutBorne(m)}</div>}
               </div>
             )
           })}
@@ -202,25 +283,49 @@ export default function Messages() {
           <select id="destinataire" value={pour} onChange={e => setPour(e.target.value)}
             style={{ flex: 1, maxWidth: 360, padding: '7px 10px', border: '1px solid #C8DDD4', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', color: '#1F2A24' }}>
             <option value="">Tout le monde</option>
+            {estProche && <option value="senior">{prenomSenior}, sur sa borne (privé)</option>}
             {personnes.filter(p => p.user_id !== userId).map(p => (
               <option key={p.cle} value={p.cle}>{p.nom}{p.role ? ' · ' + p.role : ''}</option>
             ))}
           </select>
-          {pour && <span style={{ fontSize: 12, color: '#9BB5AA' }}>visible par tous, seul·e le·la destinataire est prévenu·e</span>}
+          {pour === 'senior'
+            ? <span style={{ fontSize: 12, color: '#9BB5AA' }}>seul·e {prenomSenior} le verra, sur sa borne</span>
+            : pour && <span style={{ fontSize: 12, color: '#9BB5AA' }}>visible par tous, seul·e le·la destinataire est prévenu·e</span>}
         </div>
+        {pour === 'senior' && vocal?.etat === 'pret' ? (
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <audio controls src={vocal.url} style={{ flex: 1, minWidth: 200, height: 44 }} />
+            <button onClick={() => setVocal(null)} disabled={envoi}
+              style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 10, padding: '0 14px', height: 48, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Recommencer
+            </button>
+            <button onClick={envoyerVocal} disabled={envoi}
+              style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 10, padding: '0 18px', height: 48, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: envoi ? 0.5 : 1 }}>
+              {envoi ? '…' : 'Envoyer le vocal'}
+            </button>
+          </div>
+        ) : (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'flex-end' }}>
           <textarea rows={2} value={texte} onChange={e => setTexte(e.target.value)} placeholder={dictee === 'enregistrement' ? 'Parlez, puis touchez « Arrêter »…' : 'Votre message…'}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) { e.preventDefault(); envoyer() } }}
             style={{ flex: 1, padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 10, fontSize: 15, outline: 'none', fontFamily: 'inherit', resize: 'none', background: '#fff', lineHeight: 1.45 }} />
+          {pour === 'senior' ? (
+            <button onClick={enregistrerVocal} title={'Message vocal pour ' + prenomSenior}
+              style={{ background: vocal?.etat === 'enregistrement' ? '#FBECED' : '#F4F5F5', color: vocal?.etat === 'enregistrement' ? '#C4606A' : '#6F7C75', border: 'none', borderRadius: 10, padding: '0 14px', height: 48, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              {vocal?.etat === 'enregistrement' ? 'Arrêter' : <>🎙<span className="fil-dicter-mot"> Vocal</span></>}
+            </button>
+          ) : (
           <button onClick={dicter} disabled={dictee === 'transcription'} title="Dicter un message"
             style={{ background: dictee === 'enregistrement' ? '#FBECED' : '#F4F5F5', color: dictee === 'enregistrement' ? '#C4606A' : '#6F7C75', border: 'none', borderRadius: 10, padding: '0 14px', height: 48, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
             {dictee === 'transcription' ? '…' : dictee === 'enregistrement' ? 'Arrêter' : <>🎙<span className="fil-dicter-mot"> Dicter</span></>}
           </button>
+          )}
           <button onClick={envoyer} disabled={envoi || !texte.trim()}
             style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 10, padding: '0 18px', height: 48, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: !texte.trim() || envoi ? 0.5 : 1 }}>
             {envoi ? '…' : 'Envoyer'}
           </button>
         </div>
+        )}
       </div>
     </Layout>
   )

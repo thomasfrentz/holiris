@@ -69,6 +69,10 @@ export default function Borne() {
   const [messagesAccueil, setMessagesAccueil] = useState([]) // [{ prenom, nombre }]
   const [messagesJour, setMessagesJour] = useState([]) // messages adressés aux intervenants attendus aujourd'hui
   const [messageOuvert, setMessageOuvert] = useState(null)
+  const [messagesSenior, setMessagesSenior] = useState([]) // messages des proches pour le senior
+  const [messageSeniorOuvert, setMessageSeniorOuvert] = useState(null)
+  const [lecture, setLecture] = useState(false) // message en cours de lecture à voix haute ou d'écoute
+  const audioMessageRef = useRef(null)
   // Notifications retirées de l'accueil, sur cette tablette seulement (le tableau de bord n'est pas touché)
   const [masques, setMasques] = useState(() => {
     try { return JSON.parse(memoire.lire('holiris_borne_masques')) || { alertes: [], messages: '' } }
@@ -195,6 +199,8 @@ export default function Borne() {
         .then(d => { if (d) setMessagesAccueil(d.messages || []) }).catch(() => {})
       fetch('/api/borne-messages?code=' + code).then(r => r.ok ? r.json() : null)
         .then(d => { if (d) setMessagesJour(d.messages || []) }).catch(() => {})
+      fetch('/api/messages-senior?code=' + code).then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setMessagesSenior(d.messages || []) }).catch(() => {})
     }
     const personnesAJour = () => fetch('/api/borne?code=' + code).then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.personnes) setPersonnes(d.personnes) }).catch(() => {})
@@ -230,6 +236,44 @@ export default function Borne() {
     setMessageOuvert(null)
     setMessagesJour(prev => prev.filter(x => x.id !== m.id))
     fetch('/api/borne-messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: borneInfo?.code, id: m.id }) }).catch(() => {})
+  }
+
+  // Message d'un proche pour le senior : lecture à voix haute (écrit) ou écoute (vocal), puis « Lu »
+  const syntheseVocale = typeof window !== 'undefined' && 'speechSynthesis' in window
+  function arreterLecture() {
+    try { window.speechSynthesis?.cancel() } catch {}
+    audioMessageRef.current?.pause()
+    setLecture(false)
+  }
+  function ecouterMessage(m) {
+    if (lecture) { arreterLecture(); return }
+    if (m.type === 'vocal') {
+      const audio = audioMessageRef.current
+      if (!audio) return
+      audio.currentTime = 0
+      audio.play().then(() => setLecture(true)).catch(() => setLecture(false))
+      return
+    }
+    try {
+      const phrase = new SpeechSynthesisUtterance(m.contenu)
+      phrase.lang = 'fr-FR'
+      phrase.rate = 0.9
+      const voix = window.speechSynthesis.getVoices().find(v => v.lang?.startsWith('fr'))
+      if (voix) phrase.voice = voix
+      phrase.onend = () => setLecture(false)
+      phrase.onerror = () => setLecture(false)
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(phrase)
+      setLecture(true)
+    } catch { setLecture(false) }
+  }
+  function fermerMessageSenior(lu) {
+    arreterLecture()
+    const m = messageSeniorOuvert
+    setMessageSeniorOuvert(null)
+    if (!lu || !m) return
+    setMessagesSenior(prev => prev.filter(x => x.id !== m.id))
+    fetch('/api/messages-senior', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'lu', code: borneInfo?.code, id: m.id }) }).catch(() => {})
   }
 
   function masquer(modif) {
@@ -609,6 +653,52 @@ export default function Borne() {
     </div>
   )
 
+  // Message d'un proche pour le senior, ouvert depuis l'accueil
+  if (step === 'accueil' && messageSeniorOuvert) {
+    const m = messageSeniorOuvert
+    const prenom = m.auteur_nom?.split(' ')[0]
+    return page(
+      <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column' }}>
+        {retour('Accueil', () => fermerMessageSenior(false))}
+        <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'center' }}>
+          {new Date(m.created_at).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+        </p>
+        <h2 style={{ fontFamily: TITRE, fontSize: 44, fontWeight: 500, textAlign: 'center', margin: '6px 0 22px' }}>Message de {prenom}</h2>
+        {m.type === 'vocal' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 26 }}>
+            <audio ref={audioMessageRef} src={m.audio_url || undefined} preload="auto" onEnded={() => setLecture(false)} onPause={() => setLecture(false)} />
+            <button onClick={() => ecouterMessage(m)} className="borne-bouton" disabled={!m.audio_url}
+              style={{ width: 190, height: 190, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff',
+                background: lecture ? C.lilasFonce : `linear-gradient(145deg, ${C.lilas}, ${C.lilasFonce})`, boxShadow: '0 16px 36px rgba(139,111,170,0.35)' }}>
+              <span style={{ fontSize: 60, lineHeight: 1 }}>{lecture ? '❚❚' : '▶'}</span>
+              <span style={{ fontSize: 17, fontWeight: 600, letterSpacing: '0.06em' }}>{lecture ? 'PAUSE' : 'ÉCOUTER'}</span>
+            </button>
+            <p style={{ fontSize: 20, color: C.gris, textAlign: 'center' }}>
+              {m.audio_url ? `${prenom} vous a laissé un message vocal${m.duree ? ` (${m.duree < 60 ? m.duree + ' secondes' : Math.round(m.duree / 60) + ' min'})` : ''}.` : 'Le message vocal n’a pas pu être chargé.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ background: C.carte, borderRadius: 24, padding: '28px 30px', boxShadow: OMBRE, marginBottom: 20 }}>
+            <p style={{ fontSize: 28, lineHeight: 1.55, whiteSpace: 'pre-wrap', margin: 0 }}>{m.contenu}</p>
+            <p style={{ fontSize: 20, color: C.gris, marginTop: 18, textAlign: 'right' }}>— {prenom}</p>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          {m.type !== 'vocal' && syntheseVocale && (
+            <button onClick={() => ecouterMessage(m)} className="borne-bouton"
+              style={bouton(C.carte, C.lilasFonce, { flex: '1 1 220px', border: `2px solid ${C.lilas}`, fontSize: 21 })}>
+              {lecture ? '■ Arrêter' : '🔊 Écouter'}
+            </button>
+          )}
+          <button onClick={() => fermerMessageSenior(true)} className="borne-bouton"
+            style={bouton(C.sauge, '#fff', { flex: '2 1 260px', fontSize: 22, padding: '22px', boxShadow: '0 12px 28px rgba(74,136,112,0.28)' })}>
+            ✓ Lu
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Message adressé à un intervenant, ouvert depuis l'accueil
   if (step === 'accueil' && messageOuvert) return page(
     <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column' }}>
@@ -637,6 +727,7 @@ export default function Borne() {
     const autres = nonMasquees.filter(a => a.niveau !== 'danger')
     const alertesVisibles = [...urgentes, ...autres].slice(0, 3)
     const messagesVisibles = messagesAccueil.length > 0 && JSON.stringify(messagesAccueil) !== masques.messages
+    const aDesMessagesSenior = messagesSenior.length > 0
     return page(
       <div style={{ width: '100%', maxWidth: 820, display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
         <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: C.gris, fontSize: 16 }}>
@@ -648,13 +739,24 @@ export default function Borne() {
         </div>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
-          <Logo taille={alertesVisibles.length || messagesVisibles || messagesJour.length ? 96 : 140} />
+          <Logo taille={alertesVisibles.length || messagesVisibles || messagesJour.length || aDesMessagesSenior ? 96 : 140} />
           <h1 style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
           <p style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
         </div>
 
-        {(alertesVisibles.length > 0 || messagesVisibles || messagesJour.length > 0) && (
+        {(alertesVisibles.length > 0 || messagesVisibles || messagesJour.length > 0 || aDesMessagesSenior) && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+            {messagesSenior.map(m => (
+              <button key={'s' + m.id} onClick={() => setMessageSeniorOuvert(m)} className="borne-bouton"
+                style={{ display: 'flex', gap: 16, alignItems: 'center', background: C.lilasClair, border: `2px solid ${C.lilas}`, borderRadius: 18, padding: '18px 20px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
+                <span style={{ fontSize: 34 }}>{m.type === 'vocal' ? '🎧' : '💌'}</span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: 'block', fontSize: 23, fontWeight: 600 }}>Message de {m.auteur_nom?.split(' ')[0]}</span>
+                  <span style={{ fontSize: 16, color: C.gris }}>{m.type === 'vocal' ? 'Message vocal à écouter' : 'Touchez pour le lire'}</span>
+                </span>
+                <span style={{ fontSize: 18, color: C.lilasFonce, fontWeight: 600 }}>{m.type === 'vocal' ? 'Écouter ›' : 'Lire ›'}</span>
+              </button>
+            ))}
             {messagesJour.map(m => (
               <button key={m.id} onClick={() => setMessageOuvert(m)} className="borne-bouton"
                 style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#fff', border: `2px solid ${C.lilas}`, borderRadius: 16, padding: '14px 18px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
