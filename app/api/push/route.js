@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin, utilisateurCourant } from '@/lib/serveur'
 import { fichesDuJeton } from '@/lib/accesMobile'
+import { testerPush } from '@/lib/push'
 
 // Abonnement d'un téléphone aux notifications : rattaché au compte connecté,
 // ou au lien de la borne sur téléphone pour un intervenant sans compte
@@ -31,6 +32,14 @@ export async function POST(request) {
     console.error('Erreur abonnement notifications:', error.message)
     return NextResponse.json({ success: false, error: 'Abonnement impossible' }, { status: 500 })
   }
+}
+
+// Diagnostic : /api/push?test=1 envoie une notification de test aux appareils du compte connecté
+export async function GET(request) {
+  if (!new URL(request.url).searchParams.get('test')) return NextResponse.json({ error: 'Paramètre manquant' }, { status: 400 })
+  const user = await utilisateurCourant()
+  if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  return NextResponse.json(await testerPush(user.id))
 }
 
 // Désactivation depuis le téléphone
