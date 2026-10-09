@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 // Bouton « Activer les notifications » : abonne ce téléphone (ou ordinateur) aux notifications Holiris.
 // Sur iPhone, Apple ne les autorise que dans l'application ajoutée à l'écran d'accueil.
 // jeton : intervenant sans compte (borne sur téléphone) ; sinon le compte connecté.
-const CLE = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const CLE = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '').trim()
 
 function versOctets(base64) {
   const brut = atob((base64 + '='.repeat((4 - base64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'))
