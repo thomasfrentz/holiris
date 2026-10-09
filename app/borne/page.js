@@ -73,6 +73,8 @@ export default function Borne() {
   const [messageSeniorOuvert, setMessageSeniorOuvert] = useState(null)
   const [lecture, setLecture] = useState(false) // message en cours de lecture à voix haute ou d'écoute
   const audioMessageRef = useRef(null)
+  const sonRef = useRef(null) // contexte audio du carillon
+  const messagesSeniorChargesRef = useRef(false) // le suivi du carillon attend la première liste reçue
   // Notifications retirées de l'accueil, sur cette tablette seulement (le tableau de bord n'est pas touché)
   const [masques, setMasques] = useState(() => {
     try { return JSON.parse(memoire.lire('holiris_borne_masques')) || { alertes: [], messages: '' } }
@@ -200,7 +202,7 @@ export default function Borne() {
       fetch('/api/borne-messages?code=' + code).then(r => r.ok ? r.json() : null)
         .then(d => { if (d) setMessagesJour(d.messages || []) }).catch(() => {})
       fetch('/api/messages-senior?code=' + code).then(r => r.ok ? r.json() : null)
-        .then(d => { if (d) setMessagesSenior(d.messages || []) }).catch(() => {})
+        .then(d => { if (d) { messagesSeniorChargesRef.current = true; setMessagesSenior(d.messages || []) } }).catch(() => {})
     }
     const personnesAJour = () => fetch('/api/borne?code=' + code).then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.personnes) setPersonnes(d.personnes) }).catch(() => {})
@@ -237,6 +239,62 @@ export default function Borne() {
     setMessagesJour(prev => prev.filter(x => x.id !== m.id))
     fetch('/api/borne-messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: borneInfo?.code, id: m.id }) }).catch(() => {})
   }
+
+  // ── Carillon : un message d'un proche arrive ──
+  // Trois notes douces à l'arrivée, puis un rappel toutes les 30 minutes tant qu'il n'est pas lu (3 au plus),
+  // jamais entre 21 h et 8 h. Les navigateurs n'autorisent le son qu'après un premier toucher de l'écran
+  // (ou si le navigateur kiosque autorise la lecture automatique).
+  function debloquerSon() {
+    try {
+      if (!sonRef.current) sonRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      if (sonRef.current.state === 'suspended') sonRef.current.resume().catch(() => {})
+    } catch {}
+  }
+  function carillon() {
+    debloquerSon()
+    const ctx = sonRef.current
+    if (!ctx || ctx.state !== 'running') return false
+    const debut = ctx.currentTime + 0.05
+    ;[523.25, 659.25, 783.99].forEach((frequence, i) => {
+      const osc = ctx.createOscillator()
+      const volume = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = frequence
+      const t = debut + i * 0.38
+      volume.gain.setValueAtTime(0, t)
+      volume.gain.linearRampToValueAtTime(0.22, t + 0.03)
+      volume.gain.exponentialRampToValueAtTime(0.001, t + 1.4)
+      osc.connect(volume).connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + 1.5)
+    })
+    return true
+  }
+
+  useEffect(() => {
+    const verifier = () => {
+      const heure = new Date().getHours()
+      if (heure >= 21 || heure < 8) return
+      if (step !== 'accueil' || visio || messageSeniorOuvert || !messagesSeniorChargesRef.current) return
+      let suivi = {}
+      try { suivi = JSON.parse(memoire.lire('holiris_borne_carillon')) || {} } catch {}
+      const ids = new Set(messagesSenior.map(m => String(m.id)))
+      for (const id of Object.keys(suivi)) if (!ids.has(id)) delete suivi[id] // messages lus ou retirés
+      const maintenant = Date.now()
+      const aSonner = messagesSenior.filter(m => {
+        const s = suivi[m.id]
+        return !s || (s.rappels < 3 && maintenant - s.derniere >= 30 * 60 * 1000)
+      })
+      if (aSonner.length && carillon()) {
+        for (const m of aSonner) suivi[m.id] = suivi[m.id] ? { derniere: maintenant, rappels: suivi[m.id].rappels + 1 } : { derniere: maintenant, rappels: 0 }
+      }
+      memoire.ecrire('holiris_borne_carillon', JSON.stringify(suivi))
+    }
+    verifier()
+    const t = setInterval(verifier, 60 * 1000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- carillon ne lit que des refs
+  }, [messagesSenior, step, visio, messageSeniorOuvert])
 
   // Message d'un proche pour le senior : lecture à voix haute (écrit) ou écoute (vocal), puis « Lu »
   const syntheseVocale = typeof window !== 'undefined' && 'speechSynthesis' in window
@@ -586,7 +644,7 @@ export default function Borne() {
   // ── Mise en forme ──
 
   const page = (contenu, { fond = C.fond, haut = false } = {}) => (
-    <div onPointerDown={() => { derniereActionRef.current = Date.now() }}
+    <div onPointerDown={() => { derniereActionRef.current = Date.now(); debloquerSon() }}
       style={{ minHeight: '100dvh', background: fond, fontFamily: TEXTE, color: C.encre, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: haut ? 'flex-start' : 'center', padding: '28px 24px', boxSizing: 'border-box' }}>
       <style>{`
         @keyframes holiris-pulse { 0% { box-shadow: 0 0 0 0 rgba(196,67,79,0.35) } 70% { box-shadow: 0 0 0 26px rgba(196,67,79,0) } 100% { box-shadow: 0 0 0 0 rgba(196,67,79,0) } }
