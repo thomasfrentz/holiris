@@ -5,5 +5,6 @@ export const dynamic = 'force-dynamic'
 
 export function GET() {
   const version = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || 'local'
-  return NextResponse.json({ version }, { headers: { 'Cache-Control': 'no-store' } })
+  // heure : l'heure du serveur, pour recaler l'horloge des tablettes déréglées
+  return NextResponse.json({ version, heure: Date.now() }, { headers: { 'Cache-Control': 'no-store' } })
 }

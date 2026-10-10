@@ -202,9 +202,18 @@ export default function Borne() {
     return () => { document.removeEventListener('visibilitychange', auRetour); verrou?.release().catch(() => {}) }
   }, [])
 
+  // Horloge : recalée sur l'heure du serveur (tablette déréglée), vérifiée chaque seconde et au réveil de l'écran
+  // (les navigateurs ralentissent les minuteurs quand l'écran est en veille)
+  const decalageHeureRef = useRef(0)
   useEffect(() => {
-    const t = setInterval(() => setMaintenant(new Date()), 30000)
-    return () => clearInterval(t)
+    const maj = () => setMaintenant(prec => {
+      const n = new Date(Date.now() + decalageHeureRef.current)
+      return Math.floor(n / 60000) === Math.floor(prec / 60000) ? prec : n
+    })
+    const t = setInterval(maj, 1000)
+    document.addEventListener('visibilitychange', maj)
+    window.addEventListener('focus', maj)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', maj); window.removeEventListener('focus', maj) }
   }, [])
 
   // Alertes en cours et messages non lus, actualisés toutes les 2 minutes ; liste des personnes toutes les 10 minutes
@@ -233,6 +242,8 @@ export default function Borne() {
   // sans visio en cours et après une minute sans que personne ne touche l'écran
   useEffect(() => {
     const verifier = () => fetch('/api/version', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+      // Heure du serveur : corrige une tablette dont l'horloge dérive
+      if (d?.heure) decalageHeureRef.current = d.heure - Date.now()
       if (!d?.version) return
       if (!versionRef.current) versionRef.current = d.version
       else if (d.version !== versionRef.current) setMiseAJour(true)
@@ -290,7 +301,7 @@ export default function Borne() {
 
   useEffect(() => {
     const verifier = () => {
-      const heure = new Date().getHours()
+      const heure = Number(new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(new Date(Date.now() + decalageHeureRef.current)))
       if (heure >= 21 || heure < 8) return
       if (step !== 'accueil' || visio || messageSeniorOuvert || !messagesSeniorChargesRef.current) return
       let suivi = {}
@@ -809,8 +820,8 @@ export default function Borne() {
         <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: C.gris, fontSize: 16 }}>
           <span>Chez <strong style={{ color: C.encre, fontWeight: 500 }}>{borneInfo?.seniors?.name}</strong></span>
           <span style={{ textAlign: 'right' }}>
-            <strong style={{ fontFamily: TITRE, fontSize: 30, fontWeight: 500, color: C.encre }}>{maintenant.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</strong>
-            <span style={{ display: 'block', fontSize: 14 }}>{maintenant.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, l => l.toUpperCase())}</span>
+            <strong style={{ fontFamily: TITRE, fontSize: 30, fontWeight: 500, color: C.encre }}>{maintenant.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' })}</strong>
+            <span style={{ display: 'block', fontSize: 14 }}>{maintenant.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' }).replace(/^./, l => l.toUpperCase())}</span>
           </span>
         </div>
 
