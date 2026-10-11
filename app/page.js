@@ -1,40 +1,46 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
-import { useRouter } from 'next/navigation'
+import { redirect } from 'next/navigation'
+import { utilisateurCourant } from '@/lib/serveur'
 import Landing from './landing/page'
+import RedirectionSiConnecte from './components/RedirectionSiConnecte'
 
-export default function Home() {
-  const [checking, setChecking] = useState(true)
-  const router = useRouter()
+export const metadata = { alternates: { canonical: '/' } }
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// Page d'accueil rendue côté serveur : Google lit directement tout le texte de la présentation.
+// Un utilisateur connecté est envoyé vers son tableau de bord.
+export default async function Home() {
+  const user = await utilisateurCourant().catch(() => null)
+  if (user) redirect('/app')
+
+  const donneesStructurees = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': 'https://holiris.fr/#organisation',
+        name: 'Holiris',
+        url: 'https://holiris.fr',
+        logo: 'https://holiris.fr/icons/icon-512.png',
+        email: 'thomas.frentz@holiris.fr',
+        founder: { '@type': 'Person', name: 'Thomas Frentz' },
+        areaServed: { '@type': 'AdministrativeArea', name: 'Pyrénées-Orientales' },
+        description: 'Coordination du maintien à domicile des seniors : une borne chez la personne âgée et une application pour sa famille et ses intervenants.',
+      },
+      {
+        '@type': 'WebSite',
+        '@id': 'https://holiris.fr/#site',
+        name: 'Holiris',
+        url: 'https://holiris.fr',
+        inLanguage: 'fr-FR',
+        publisher: { '@id': 'https://holiris.fr/#organisation' },
+      },
+    ],
+  }
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(donneesStructurees) }} />
+      <RedirectionSiConnecte />
+      <Landing />
+    </>
   )
-
-  useEffect(() => {
-    async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        router.push('/app')
-      } else {
-        setChecking(false)
-      }
-    }
-    checkAuth()
-  }, [])
-
-  if (checking) return (
-    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#1E2820' }}>
-      <svg width="48" height="48" viewBox="0 0 64 64" fill="none">
-        <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#9AB89F" strokeWidth="1.2" fill="none"/>
-        <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(15 32 32)" stroke="#A89FCC" strokeWidth="1.2" fill="none"/>
-        <circle cx="32" cy="32" r="5" fill="#9AB89F"/>
-        <circle cx="32" cy="32" r="2.2" fill="#1E2820"/>
-      </svg>
-    </div>
-  )
-
-  return <Landing />
 }
