@@ -109,6 +109,7 @@ export default function Landing() {
 
         .nav-link { color: #6F7C75; text-decoration: none; font-size: 14px; font-weight: 400; transition: color 0.15s; }
         .nav-link:hover { color: #1F2A24; }
+        .nav-court { display: none; }
 
         .contact-champ { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: #4A6B5E; }
         .contact-champ input, .contact-champ select, .contact-champ textarea {
@@ -119,6 +120,14 @@ export default function Landing() {
 
         @media (max-width: 768px) {
           .nav-links { display: none !important; }
+          .nav-barre { padding: 10px 16px !important; gap: 10px; }
+          .nav-logo svg { width: 24px; height: 24px; }
+          .nav-logo span { font-size: 21px !important; }
+          .nav-actions { gap: 10px !important; }
+          .nav-connexion { font-size: 13px !important; }
+          .nav-long { display: none; }
+          .nav-court { display: inline; }
+          .nav-demande { padding: 8px 14px !important; font-size: 12.5px !important; }
           .hero-title { font-size: 72px !important; }
           .hero-sub { font-size: 17px !important; }
           .hero-btns { flex-direction: column !important; align-items: stretch !important; }
@@ -133,10 +142,15 @@ export default function Landing() {
           .contact-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
           .contact-ligne { grid-template-columns: 1fr !important; }
         }
+        @media (max-width: 380px) {
+          .nav-barre { padding: 10px 12px !important; }
+          .nav-logo span { font-size: 19px !important; }
+          .nav-demande { padding: 8px 11px !important; }
+        }
       `}</style>
 
       {/* ── NAV ── */}
-      <nav style={{
+      <nav className="nav-barre" style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '16px 48px',
@@ -145,7 +159,7 @@ export default function Landing() {
         WebkitBackdropFilter: 'blur(16px)',
         borderBottom: '1px solid #EBF0EC',
       }}>
-        <Logo size={28} />
+        <a href="#" className="nav-logo" style={{ textDecoration: 'none' }}><Logo size={28} /></a>
         <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
           <a href="#fonctionnalites" className="nav-link">Fonctionnalités</a>
           <a href="#alertes" className="nav-link">Alertes</a>
@@ -153,11 +167,11 @@ export default function Landing() {
           <a href="#tarifs" className="nav-link">Tarifs</a>
           <a href="#contact" className="nav-link">Contact</a>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Link href="/login" style={{ fontSize: 14, color: '#4A8870', fontWeight: 500, textDecoration: 'none' }}>
-            Se connecter
+        <div className="nav-actions" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Link href="/login" className="nav-connexion" style={{ fontSize: 14, color: '#4A8870', fontWeight: 500, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            <span className="nav-long">Se connecter</span><span className="nav-court">Connexion</span>
           </Link>
-          <Link href="/demande-acces" className="btn-primary" style={{ padding: '9px 22px', fontSize: 13 }}>
+          <Link href="/demande-acces" className="btn-primary nav-demande" style={{ padding: '9px 22px', fontSize: 13, whiteSpace: 'nowrap' }}>
             Demander un accès
           </Link>
         </div>
