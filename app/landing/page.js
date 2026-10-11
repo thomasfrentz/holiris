@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
 
 const Logo = ({ size = 28 }) => (
@@ -14,6 +15,67 @@ const Logo = ({ size = 28 }) => (
     </span>
   </div>
 )
+
+// Formulaire de contact : le message arrive par email à thomas.frentz@holiris.fr
+function FormulaireContact() {
+  const [form, setForm] = useState({ nom: '', email: '', telephone: '', profil: '', message: '', site_web: '' })
+  const [etat, setEtat] = useState('') // '' | envoi | envoye
+  const [erreur, setErreur] = useState('')
+  const maj = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  async function envoyer(e) {
+    e.preventDefault()
+    setErreur('')
+    setEtat('envoi')
+    try {
+      const r = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      const d = await r.json()
+      if (!d.success) throw new Error(d.error)
+      setEtat('envoye')
+    } catch (err) {
+      setErreur(err.message || 'Envoi impossible, réessayez plus tard.')
+      setEtat('')
+    }
+  }
+
+  if (etat === 'envoye') return (
+    <div style={{ background: '#fff', border: '1px solid #C8DDD4', borderRadius: 16, padding: '40px 32px', textAlign: 'center' }}>
+      <div style={{ fontSize: 30, marginBottom: 12 }}>💌</div>
+      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 500, color: '#1F2A24', marginBottom: 8 }}>Message envoyé, merci !</div>
+      <p style={{ fontSize: 14, color: '#6F7C75', lineHeight: 1.7 }}>Je vous réponds rapidement à l&apos;adresse {form.email}.</p>
+    </div>
+  )
+
+  return (
+    <form onSubmit={envoyer} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 16, padding: '32px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="contact-ligne" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <label className="contact-champ">Nom et prénom *<input required value={form.nom} onChange={maj('nom')} autoComplete="name" /></label>
+        <label className="contact-champ">Email *<input required type="email" value={form.email} onChange={maj('email')} autoComplete="email" /></label>
+      </div>
+      <div className="contact-ligne" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <label className="contact-champ">Téléphone<input type="tel" value={form.telephone} onChange={maj('telephone')} autoComplete="tel" /></label>
+        <label className="contact-champ">Vous êtes
+          <select value={form.profil} onChange={maj('profil')}>
+            <option value="">—</option>
+            <option>Un proche aidant</option>
+            <option>Un senior</option>
+            <option>Un intervenant à domicile</option>
+            <option>Une structure</option>
+            <option>Autre</option>
+          </select>
+        </label>
+      </div>
+      <label className="contact-champ">Votre message *<textarea required rows={5} value={form.message} onChange={maj('message')} /></label>
+      {/* Champ piège pour les robots, invisible pour les visiteurs */}
+      <input value={form.site_web} onChange={maj('site_web')} tabIndex={-1} autoComplete="off" aria-hidden="true"
+        style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
+      {erreur && <div style={{ fontSize: 13, color: '#C4606A' }}>{erreur}</div>}
+      <button type="submit" className="btn-primary" disabled={etat === 'envoi'} style={{ border: 'none', cursor: 'pointer', alignSelf: 'flex-start' }}>
+        {etat === 'envoi' ? 'Envoi…' : 'Envoyer le message →'}
+      </button>
+    </form>
+  )
+}
 
 export default function Landing() {
   return (
@@ -48,6 +110,13 @@ export default function Landing() {
         .nav-link { color: #6F7C75; text-decoration: none; font-size: 14px; font-weight: 400; transition: color 0.15s; }
         .nav-link:hover { color: #1F2A24; }
 
+        .contact-champ { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: #4A6B5E; }
+        .contact-champ input, .contact-champ select, .contact-champ textarea {
+          font-family: 'Inter', sans-serif; font-size: 15px; color: #1F2A24; background: #FCFDFC;
+          border: 1px solid #DCE6E0; border-radius: 8px; padding: 11px 12px; outline: none; resize: vertical; width: 100%;
+        }
+        .contact-champ input:focus, .contact-champ select:focus, .contact-champ textarea:focus { border-color: #7FAF9B; box-shadow: 0 0 0 3px rgba(127,175,155,0.15); }
+
         @media (max-width: 768px) {
           .nav-links { display: none !important; }
           .hero-title { font-size: 72px !important; }
@@ -61,6 +130,8 @@ export default function Landing() {
           .alertes-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
           .footer-inner { flex-direction: column !important; text-align: center !important; }
           .section-pad { padding: 64px 24px !important; }
+          .contact-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
+          .contact-ligne { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
@@ -80,6 +151,7 @@ export default function Landing() {
           <a href="#alertes" className="nav-link">Alertes</a>
           <a href="#comment" className="nav-link">Comment ça marche</a>
           <a href="#tarifs" className="nav-link">Tarifs</a>
+          <a href="#contact" className="nav-link">Contact</a>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <Link href="/login" style={{ fontSize: 14, color: '#4A8870', fontWeight: 500, textDecoration: 'none' }}>
@@ -409,6 +481,27 @@ export default function Landing() {
         <Link href="/demande-acces" className="btn-primary" style={{ fontSize: 15, padding: '14px 44px' }}>
           Demander un accès →
         </Link>
+      </div>
+
+      {/* ── CONTACT ── */}
+      <div id="contact" className="section-pad" style={{ padding: '96px 48px' }}>
+        <div className="contact-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 56, alignItems: 'start' }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: 14 }}>Contact</div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(34px, 4vw, 50px)', fontWeight: 400, color: '#1F2A24', lineHeight: 1.1, marginBottom: 20 }}>
+              Une question ?
+              <br /><span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>Écrivez-nous</span>
+            </h2>
+            <p style={{ fontSize: 15, color: '#6F7C75', lineHeight: 1.75, fontWeight: 300, marginBottom: 20 }}>
+              Pour en savoir plus sur Holiris, tester la borne chez un proche ou présenter Holiris à votre structure : laissez un message, je vous réponds personnellement.
+            </p>
+            <p style={{ fontSize: 14, color: '#3A4A40', lineHeight: 1.7 }}>
+              Thomas Frentz, fondateur de Holiris
+              <br /><a href="mailto:thomas.frentz@holiris.fr" style={{ color: '#4A8870', textDecoration: 'none' }}>thomas.frentz@holiris.fr</a>
+            </p>
+          </div>
+          <FormulaireContact />
+        </div>
       </div>
 
       {/* ── FOOTER ── */}
