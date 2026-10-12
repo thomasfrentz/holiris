@@ -4,10 +4,11 @@ import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 import AucunDossier from '../components/AucunDossier'
 
-// Documents à faire signer par le senior : conditions d'utilisation, autorisations, personne de confiance
+// Documents à faire signer par le senior : conditions d'utilisation, autorisations, prêt de la borne, personne de confiance
 const TYPES = [
   { type: 'cgu', titre: 'Conditions générales d’utilisation', description: 'Fonctionnement de Holiris, données concernées, droits RGPD.' },
   { type: 'autorisations', titre: 'Autorisations', description: 'Partage des nouvelles, borne, visio après un SOS, WhatsApp : oui ou non pour chacune.' },
+  { type: 'convention_pret', titre: 'Convention de prêt de la borne', description: 'Prêt gratuit de la tablette pendant le pilote : matériel, limites du SOS, casse, restitution.' },
   { type: 'personne_confiance', titre: 'Personne de confiance', description: 'Désignation de la personne prévenue en cas d’information médicale.' },
 ]
 const LIBELLES_AUTORISATIONS = { partage: 'Partage des nouvelles', borne: 'Borne au domicile', visio: 'Visio après un SOS', whatsapp: 'Notes par WhatsApp' }
