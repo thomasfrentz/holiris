@@ -674,12 +674,27 @@ export default function Borne() {
 
   const page = (contenu, { fond = C.fond, haut = false } = {}) => (
     <div onPointerDown={() => { derniereActionRef.current = Date.now(); debloquerSon() }}
-      style={{ minHeight: '100dvh', background: fond, fontFamily: TEXTE, color: C.encre, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: haut ? 'flex-start' : 'center', padding: '28px 24px', boxSizing: 'border-box' }}>
+      className="borne-page" style={{ minHeight: '100dvh', background: fond, fontFamily: TEXTE, color: C.encre, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: haut ? 'flex-start' : 'center', padding: '28px 24px', boxSizing: 'border-box' }}>
       <style>{`
         @keyframes holiris-pulse { 0% { box-shadow: 0 0 0 0 rgba(196,67,79,0.35) } 70% { box-shadow: 0 0 0 26px rgba(196,67,79,0) } 100% { box-shadow: 0 0 0 0 rgba(196,67,79,0) } }
         @keyframes holiris-tourne { to { transform: rotate(360deg) } }
         .borne-bouton { transition: transform 0.15s ease, box-shadow 0.15s ease; -webkit-tap-highlight-color: transparent; }
         .borne-bouton:active { transform: scale(0.98); }
+        /* Tablettes peu hautes (ex. 10 pouces HD, environ 960 × 600) : l'accueil doit tenir sans défiler */
+        @media (max-height: 720px) {
+          .borne-accueil.compact .borne-logo, .borne-accueil.compact .borne-devise { display: none; }
+          .borne-accueil.compact .borne-marque { padding: 4px 0 !important; }
+          .borne-accueil.compact .borne-titre { font-size: clamp(34px, 7vh, 52px) !important; margin: 0 !important; }
+          .borne-accueil .borne-cartes { gap: 8px !important; margin-bottom: 14px !important; }
+          .borne-accueil .borne-carte { padding-top: 11px !important; padding-bottom: 11px !important; }
+          .borne-accueil .borne-actions > button { padding-top: 20px !important; padding-bottom: 20px !important; }
+          .borne-accueil .borne-pied { margin-top: 10px !important; }
+        }
+        @media (max-height: 600px) {
+          .borne-page { padding: 16px 20px !important; }
+          .borne-accueil:not(.compact) .borne-logo svg { width: 90px; height: 90px; }
+          .borne-accueil:not(.compact) .borne-titre { font-size: 56px !important; }
+        }
       `}</style>
       {contenu}
     </div>
@@ -815,8 +830,9 @@ export default function Borne() {
     const alertesVisibles = [...urgentes, ...autres].slice(0, 3)
     const messagesVisibles = messagesAccueil.length > 0 && JSON.stringify(messagesAccueil) !== masques.messages
     const aDesMessagesSenior = messagesSenior.length > 0
+    const compact = alertesVisibles.length > 0 || messagesVisibles || messagesJour.length > 0 || aDesMessagesSenior
     return page(
-      <div style={{ width: '100%', maxWidth: 820, display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+      <div className={'borne-accueil' + (compact ? ' compact' : '')} style={{ width: '100%', maxWidth: 820, display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
         <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: C.gris, fontSize: 16 }}>
           <span>Chez <strong style={{ color: C.encre, fontWeight: 500 }}>{borneInfo?.seniors?.name}</strong></span>
           <span style={{ textAlign: 'right' }}>
@@ -825,16 +841,16 @@ export default function Borne() {
           </span>
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
-          <Logo taille={alertesVisibles.length || messagesVisibles || messagesJour.length || aDesMessagesSenior ? 96 : 140} />
-          <h1 style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
-          <p style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
+        <div className="borne-marque" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
+          <div className="borne-logo"><Logo taille={compact ? 96 : 140} /></div>
+          <h1 className="borne-titre" style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
+          <p className="borne-devise" style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
         </div>
 
-        {(alertesVisibles.length > 0 || messagesVisibles || messagesJour.length > 0 || aDesMessagesSenior) && (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+        {compact && (
+          <div className="borne-cartes" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
             {messagesSenior.map(m => (
-              <button key={'s' + m.id} onClick={() => setMessageSeniorOuvert(m)} className="borne-bouton"
+              <button key={'s' + m.id} onClick={() => setMessageSeniorOuvert(m)} className="borne-bouton borne-carte"
                 style={{ display: 'flex', gap: 16, alignItems: 'center', background: C.lilasClair, border: `2px solid ${C.lilas}`, borderRadius: 18, padding: '18px 20px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
                 <span style={{ fontSize: 34 }}>{m.type === 'vocal' ? '🎧' : '💌'}</span>
                 <span style={{ flex: 1 }}>
@@ -845,7 +861,7 @@ export default function Borne() {
               </button>
             ))}
             {messagesJour.map(m => (
-              <button key={m.id} onClick={() => setMessageOuvert(m)} className="borne-bouton"
+              <button key={m.id} onClick={() => setMessageOuvert(m)} className="borne-bouton borne-carte"
                 style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#fff', border: `2px solid ${C.lilas}`, borderRadius: 16, padding: '14px 18px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
                 <span style={{ fontSize: 26 }}>✉️</span>
                 <span style={{ fontSize: 19, fontWeight: 600, flex: 1 }}>Message pour {m.destinataire_nom?.split(' ')[0]}</span>
@@ -853,7 +869,7 @@ export default function Borne() {
               </button>
             ))}
             {alertesVisibles.map(a => (
-              <div key={a.id} style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
+              <div key={a.id} className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
                 <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: a.niveau === 'danger' ? C.rouge : C.ambre, flexShrink: 0 }}>
                   {a.niveau === 'danger' ? 'Urgent' : 'À surveiller'}
                 </span>
@@ -863,7 +879,7 @@ export default function Borne() {
               </div>
             ))}
             {messagesVisibles && (
-              <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: C.lilasClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
+              <div className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: C.lilasClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
                 <span style={{ fontSize: 24 }}>💬</span>
                 <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>
                   Nouveaux messages pour {listePrenoms(messagesAccueil.map(m => `${m.prenom} (${m.nombre})`))}
@@ -875,7 +891,7 @@ export default function Borne() {
           </div>
         )}
 
-        <div style={{ width: '100%', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div className="borne-actions" style={{ width: '100%', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <button onClick={() => { setShowInvite(false); setStep('choix') }} className="borne-bouton"
             style={bouton(C.sauge, '#fff', { flex: '2 1 320px', padding: '30px 28px', fontSize: 24, borderRadius: 24, boxShadow: '0 12px 28px rgba(74,136,112,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 })}>
             <span style={{ fontSize: 30 }}>🎙</span> Enregistrer une note
@@ -887,7 +903,7 @@ export default function Borne() {
           </button>
         </div>
 
-        <div style={{ marginTop: 22, display: 'flex', justifyContent: 'center', gap: 22, flexWrap: 'wrap' }}>
+        <div className="borne-pied" style={{ marginTop: 22, display: 'flex', justifyContent: 'center', gap: 22, flexWrap: 'wrap' }}>
           <button onClick={autoriserCamera} style={{ background: 'none', border: 'none', color: cameraAutorisee === false ? C.rouge : '#B9C4BE', fontSize: 12, cursor: 'pointer', fontFamily: TEXTE }}>
             {cameraAutorisee === true ? '✓ Caméra autorisée' : cameraAutorisee === false ? '📷 Caméra refusée : autorisez-la dans les réglages' : '📷 Autoriser la caméra (visio SOS)'}
           </button>
