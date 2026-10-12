@@ -682,9 +682,12 @@ export default function Borne() {
         .borne-bouton:active { transform: scale(0.98); }
         /* Tablettes peu hautes (ex. 10 pouces HD, environ 960 × 600) : l'accueil doit tenir sans défiler */
         @media (max-height: 720px) {
-          .borne-accueil.compact .borne-logo, .borne-accueil.compact .borne-devise { display: none; }
-          .borne-accueil.compact .borne-marque { padding: 4px 0 !important; }
-          .borne-accueil.compact .borne-titre { font-size: clamp(34px, 7vh, 52px) !important; margin: 0 !important; }
+          /* Le logo reste en filigrane derrière, les messages et alertes passent devant */
+          .borne-accueil.compact .borne-marque { position: absolute; inset: 0; justify-content: flex-start !important; padding: 2vh 0 0 !important; pointer-events: none; }
+          .borne-accueil.compact .borne-logo svg { width: clamp(60px, 14vh, 96px); height: clamp(60px, 14vh, 96px); }
+          .borne-accueil.compact .borne-titre { font-size: clamp(44px, 10vh, 72px) !important; margin: 1.5vh 0 1vh !important; }
+          .borne-accueil.compact .borne-devise { display: none; }
+          .borne-accueil.compact .borne-cartes { margin-top: auto; position: relative; z-index: 1; }
           .borne-accueil .borne-cartes { gap: 8px !important; margin-bottom: 14px !important; }
           .borne-accueil .borne-carte { padding-top: 11px !important; padding-bottom: 11px !important; }
           .borne-accueil .borne-actions > button { padding-top: 20px !important; padding-bottom: 20px !important; }
@@ -841,55 +844,57 @@ export default function Borne() {
           </span>
         </div>
 
-        <div className="borne-marque" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
-          <div className="borne-logo"><Logo taille={compact ? 96 : 140} /></div>
-          <h1 className="borne-titre" style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
-          <p className="borne-devise" style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
-        </div>
-
-        {compact && (
-          <div className="borne-cartes" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
-            {messagesSenior.map(m => (
-              <button key={'s' + m.id} onClick={() => setMessageSeniorOuvert(m)} className="borne-bouton borne-carte"
-                style={{ display: 'flex', gap: 16, alignItems: 'center', background: C.lilasClair, border: `2px solid ${C.lilas}`, borderRadius: 18, padding: '18px 20px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
-                <span style={{ fontSize: 34 }}>{m.type === 'vocal' ? '🎧' : '💌'}</span>
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 23, fontWeight: 600 }}>Message de {m.auteur_nom?.split(' ')[0]}</span>
-                  <span style={{ fontSize: 16, color: C.gris }}>{m.type === 'vocal' ? 'Message vocal à écouter' : 'Touchez pour le lire'}</span>
-                </span>
-                <span style={{ fontSize: 18, color: C.lilasFonce, fontWeight: 600 }}>{m.type === 'vocal' ? 'Écouter ›' : 'Lire ›'}</span>
-              </button>
-            ))}
-            {messagesJour.map(m => (
-              <button key={m.id} onClick={() => setMessageOuvert(m)} className="borne-bouton borne-carte"
-                style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#fff', border: `2px solid ${C.lilas}`, borderRadius: 16, padding: '14px 18px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
-                <span style={{ fontSize: 26 }}>✉️</span>
-                <span style={{ fontSize: 19, fontWeight: 600, flex: 1 }}>Message pour {m.destinataire_nom?.split(' ')[0]}</span>
-                <span style={{ fontSize: 15, color: C.lilasFonce, fontWeight: 500 }}>Lire ›</span>
-              </button>
-            ))}
-            {alertesVisibles.map(a => (
-              <div key={a.id} className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: a.niveau === 'danger' ? C.rouge : C.ambre, flexShrink: 0 }}>
-                  {a.niveau === 'danger' ? 'Urgent' : 'À surveiller'}
-                </span>
-                <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>{a.message}</span>
-                <span style={{ fontSize: 13, color: C.gris, flexShrink: 0 }}>{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
-                <button onClick={() => masquerAlerte(a.id)} aria-label="Retirer cette alerte" className="borne-bouton" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.7)', color: C.gris, fontSize: 22, lineHeight: 1, cursor: 'pointer', fontFamily: TEXTE }}>×</button>
-              </div>
-            ))}
-            {messagesVisibles && (
-              <div className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: C.lilasClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
-                <span style={{ fontSize: 24 }}>💬</span>
-                <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>
-                  Nouveaux messages pour {listePrenoms(messagesAccueil.map(m => `${m.prenom} (${m.nombre})`))}
-                  <span style={{ color: C.gris }}> — à lire sur le téléphone ou sur holiris.fr</span>
-                </span>
-                <button onClick={masquerMessages} aria-label="Retirer l'annonce des messages" className="borne-bouton" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.7)', color: C.gris, fontSize: 22, lineHeight: 1, cursor: 'pointer', fontFamily: TEXTE }}>×</button>
-              </div>
-            )}
+        <div className="borne-zone" style={{ flex: 1, width: '100%', minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+          <div className="borne-marque" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '18px 0' }}>
+            <div className="borne-logo"><Logo taille={compact ? 96 : 140} /></div>
+            <h1 className="borne-titre" style={{ fontFamily: TITRE, fontSize: 72, fontWeight: 500, letterSpacing: '0.05em', lineHeight: 1, margin: '14px 0 10px' }}>Holiris</h1>
+            <p className="borne-devise" style={{ fontFamily: TITRE, fontStyle: 'italic', fontSize: 26, color: C.saugeFonce }}>Prendre soin de ceux qui nous sont chers</p>
           </div>
-        )}
+
+          {compact && (
+            <div className="borne-cartes" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+              {messagesSenior.map(m => (
+                <button key={'s' + m.id} onClick={() => setMessageSeniorOuvert(m)} className="borne-bouton borne-carte"
+                  style={{ display: 'flex', gap: 16, alignItems: 'center', background: C.lilasClair, border: `2px solid ${C.lilas}`, borderRadius: 18, padding: '18px 20px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
+                  <span style={{ fontSize: 34 }}>{m.type === 'vocal' ? '🎧' : '💌'}</span>
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: 23, fontWeight: 600 }}>Message de {m.auteur_nom?.split(' ')[0]}</span>
+                    <span style={{ fontSize: 16, color: C.gris }}>{m.type === 'vocal' ? 'Message vocal à écouter' : 'Touchez pour le lire'}</span>
+                  </span>
+                  <span style={{ fontSize: 18, color: C.lilasFonce, fontWeight: 600 }}>{m.type === 'vocal' ? 'Écouter ›' : 'Lire ›'}</span>
+                </button>
+              ))}
+              {messagesJour.map(m => (
+                <button key={m.id} onClick={() => setMessageOuvert(m)} className="borne-bouton borne-carte"
+                  style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#fff', border: `2px solid ${C.lilas}`, borderRadius: 16, padding: '14px 18px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
+                  <span style={{ fontSize: 26 }}>✉️</span>
+                  <span style={{ fontSize: 19, fontWeight: 600, flex: 1 }}>Message pour {m.destinataire_nom?.split(' ')[0]}</span>
+                  <span style={{ fontSize: 15, color: C.lilasFonce, fontWeight: 500 }}>Lire ›</span>
+                </button>
+              ))}
+              {alertesVisibles.map(a => (
+                <div key={a.id} className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: a.niveau === 'danger' ? C.rouge : C.ambre, flexShrink: 0 }}>
+                    {a.niveau === 'danger' ? 'Urgent' : 'À surveiller'}
+                  </span>
+                  <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>{a.message}</span>
+                  <span style={{ fontSize: 13, color: C.gris, flexShrink: 0 }}>{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                  <button onClick={() => masquerAlerte(a.id)} aria-label="Retirer cette alerte" className="borne-bouton" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.7)', color: C.gris, fontSize: 22, lineHeight: 1, cursor: 'pointer', fontFamily: TEXTE }}>×</button>
+                </div>
+              ))}
+              {messagesVisibles && (
+                <div className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: C.lilasClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
+                  <span style={{ fontSize: 24 }}>💬</span>
+                  <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>
+                    Nouveaux messages pour {listePrenoms(messagesAccueil.map(m => `${m.prenom} (${m.nombre})`))}
+                    <span style={{ color: C.gris }}> — à lire sur le téléphone ou sur holiris.fr</span>
+                  </span>
+                  <button onClick={masquerMessages} aria-label="Retirer l'annonce des messages" className="borne-bouton" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.7)', color: C.gris, fontSize: 22, lineHeight: 1, cursor: 'pointer', fontFamily: TEXTE }}>×</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="borne-actions" style={{ width: '100%', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <button onClick={() => { setShowInvite(false); setStep('choix') }} className="borne-bouton"
