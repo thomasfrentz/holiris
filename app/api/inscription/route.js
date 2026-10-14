@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
+import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/serveur'
+import { escapeHtml, emailBienvenueFamille } from '@/lib/emails'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Création de compte contrôlée : uniquement avec un lien d'invitation ou une demande d'accès validée.
 // Les inscriptions publiques sont désactivées dans Supabase ; seul ce serveur peut créer un compte.
@@ -62,6 +66,24 @@ export async function POST(request) {
       for (const table of ['famille', 'intervenants']) {
         await supabaseAdmin.from(table).update({ user_id: created.user.id, invite_token: null })
           .ilike('email', adresse).is('user_id', null).is('archived_at', null)
+      }
+    }
+
+    // Proche invité : email de bienvenue famille (son WhatsApp de bienvenue est parti à l'ajout de son numéro)
+    if (type === 'famille') {
+      const { data: suivis } = await supabaseAdmin.from('famille')
+        .select('name, seniors!famille_senior_id_fkey(name)').eq('user_id', created.user.id).is('archived_at', null).limit(1)
+      const f = suivis?.[0]
+      if (f?.seniors?.name) {
+        try {
+          await resend.emails.send({
+            from: 'Holiris <contact@holiris.fr>',
+            to: adresse,
+            replyTo: 'thomas.frentz@holiris.fr',
+            subject: `Bienvenue sur Holiris, ${f.name.split(' ')[0]}`,
+            html: emailBienvenueFamille({ prenom: escapeHtml(f.name.split(' ')[0]), seniorName: escapeHtml(f.seniors.name) }),
+          })
+        } catch (e) { console.error('Erreur email bienvenue famille:', e.message) }
       }
     }
 
