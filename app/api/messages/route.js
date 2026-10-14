@@ -22,9 +22,10 @@ async function auteurPour(user, seniorId) {
   if (fam?.[0]) { const f = fam[0]; return { type: 'famille', id: f.id, nom: f.name, role: f.role, telephone: f.phone, email: f.email || user.email } }
   if (!await peutGererSenior(user.id, seniorId)) return null
   const { data: g } = await supabaseAdmin.from('structure_membres').select('id, nom, email, structures(nom)').eq('user_id', user.id).limit(1).maybeSingle()
-  if (g) return { type: 'structure', id: g.id, nom: g.nom || g.email.split('@')[0], role: g.structures?.nom || 'Structure', email: g.email }
-  const { data: a } = await supabaseAdmin.from('famille').select('id, name').eq('user_id', user.id).eq('is_admin', true).limit(1).maybeSingle()
-  return { type: 'famille', id: a?.id, nom: a?.name || user.email.split('@')[0], role: 'Holiris', email: user.email }
+  if (g) return { type: 'structure', id: g.id, nom: g.nom || g.email.split('@')[0], role: 'Gestionnaire de structure', email: g.email }
+  // Admin qui ne suit pas ce senior : il écrit en tant qu'intervenant Holiris
+  const { data: a } = await supabaseAdmin.from('famille').select('name').eq('user_id', user.id).eq('is_admin', true).limit(1).maybeSingle()
+  return { type: 'intervenant', id: null, nom: a?.name || user.email.split('@')[0], role: 'Administrateur Holiris', email: user.email }
 }
 
 // Destinataire choisi : une fiche famille ou intervenant de ce senior (null = tout le monde)

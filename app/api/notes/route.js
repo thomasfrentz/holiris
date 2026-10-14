@@ -13,26 +13,32 @@ export async function POST(request) {
     const user = await utilisateurCourant()
     if (!user) return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 })
 
-    // L'auteur doit suivre ce senior (ou être admin côté famille)
+    // L'auteur doit suivre ce senior, gérer sa structure, ou être admin
     const table = source === 'intervenant' ? 'intervenants' : 'famille'
     const { data: lignes } = await supabaseAdmin.from(table)
       .select('*').eq('user_id', user.id).is('archived_at', null)
     let ligne = (lignes || []).find(l => l.senior_id === seniorId)
-      || (source === 'famille' ? (lignes || []).find(l => l.is_admin) : null)
-    // Gestionnaire de la structure du senior : il écrit en son nom, au titre de la structure
+    let sourceNote = source
+    // Gestionnaire de la structure du senior : il écrit en son nom, en tant que gestionnaire de structure
     if (!ligne && source === 'famille' && await peutGererSenior(user.id, seniorId)) {
       const { data: g } = await supabaseAdmin.from('structure_membres')
-        .select('id, nom, email, structures(nom)').eq('user_id', user.id).limit(1).maybeSingle()
-      if (g) ligne = { id: g.id, name: g.nom || g.email.split('@')[0], role: g.structures?.nom || 'Structure', email: g.email }
+        .select('id, nom, email').eq('user_id', user.id).limit(1).maybeSingle()
+      if (g) ligne = { id: g.id, name: g.nom || g.email.split('@')[0], role: 'Gestionnaire de structure', email: g.email }
+    }
+    // Admin qui ne suit pas ce senior : note d'intervenant, en tant qu'administrateur Holiris
+    if (!ligne) {
+      const { data: a } = await supabaseAdmin.from('famille').select('name, email')
+        .eq('user_id', user.id).eq('is_admin', true).is('archived_at', null).limit(1).maybeSingle()
+      if (a) { ligne = { id: null, name: a.name, role: 'Administrateur Holiris', email: a.email }; sourceNote = 'intervenant' }
     }
     if (!ligne) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
 
     const result = await enregistrerNote({
       seniorId,
       texte: texte.trim(),
-      source,
+      source: sourceNote,
       auteur: {
-        type: source,
+        type: sourceNote,
         id: ligne.id,
         nom: ligne.name || ligne.email?.split('@')[0] || (source === 'famille' ? 'Famille' : 'Intervenant'),
         role: ligne.role,
