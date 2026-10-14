@@ -341,8 +341,8 @@ export default function MaBorne() {
         {aideInstallation && (
           <div style={{ background: C.carte, border: `1px solid ${C.bord}`, borderRadius: 18, padding: '16px 18px', marginTop: 26, fontSize: 14, color: C.gris, lineHeight: 1.6 }}>
             <strong style={{ color: C.encre, fontSize: 15 }}>Gardez Holiris sur votre écran d’accueil</strong>
-            <p style={{ margin: '6px 0 0' }}>iPhone : touchez <strong>Partager</strong> (le carré avec une flèche) puis <strong>Sur l’écran d’accueil</strong>.</p>
-            <p style={{ margin: '4px 0 0' }}>Android : touchez <strong>⋮</strong> en haut à droite puis <strong>Ajouter à l’écran d’accueil</strong>.</p>
+            <p style={{ margin: '6px 0 0' }}>iPhone (dans Safari) : touchez les trois points <strong>⋯</strong> en bas à droite, puis <strong>Partager</strong> (ou directement le carré avec une flèche s’il est visible), puis <strong>Sur l’écran d’accueil</strong>.</p>
+            <p style={{ margin: '4px 0 0' }}>Android (dans Chrome) : touchez <strong>⋮</strong> en haut à droite puis <strong>Installer l’application</strong> ou <strong>Ajouter à l’écran d’accueil</strong>.</p>
             <button onClick={masquerAide} style={{ background: 'none', border: 'none', color: C.saugeFonce, fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: 0, marginTop: 10, fontFamily: TEXTE }}>C’est fait</button>
           </div>
         )}
