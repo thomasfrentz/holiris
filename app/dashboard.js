@@ -110,6 +110,8 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     .filter(a => !a.lu && !ordonnancesLues.includes(a.id))
     .sort((a, b) => (b.niveau === 'danger') - (a.niveau === 'danger'))
 
+  // Événement avec plusieurs intervenants : le premier est affiché, puis « +1 », « +2 »…
+  const autresIntervenants = (e) => (e.intervenant_ids?.length > 1 ? ' +' + (e.intervenant_ids.length - 1) : '')
   const noteSourceLabel = (s) => s === 'whatsapp_audio' ? 'Note vocale' : s === 'whatsapp_text' ? 'WhatsApp' : 'Note'
   const noteSourceColor = (s) => {
     if (s === 'whatsapp_audio') return { color: '#BC84C6', bg: '#F3EDF7' }
@@ -217,7 +219,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                 <div style={{ fontSize: 13, color: '#1F2A24', fontWeight: 500 }}>{prochainEvent.label}</div>
                 <div style={{ fontSize: 12, color: '#9BB5AA' }}>
                   {new Date(prochainEvent.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  {prochainEvent.intervenants && <span> · {prochainEvent.intervenants.name}</span>}
+                  {prochainEvent.intervenants && <span> · {prochainEvent.intervenants.name}{autresIntervenants(prochainEvent)}</span>}
                 </div>
                 {prochainEvent.type && (
                   <div style={{ marginTop: 4 }}>
@@ -248,7 +250,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                   {new Date(dernierPassage.scheduled_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })}
                   {' · '}
                   {new Date(dernierPassage.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  {dernierPassage.intervenants && <span> · {dernierPassage.intervenants.name}</span>}
+                  {dernierPassage.intervenants && <span> · {dernierPassage.intervenants.name}{autresIntervenants(dernierPassage)}</span>}
                 </div>
                 {dernierPassage.type && (
                   <div style={{ marginTop: 4 }}>

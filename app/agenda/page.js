@@ -16,7 +16,7 @@ export default function Agenda() {
 
   const [label, setLabel] = useState('')
   const [type, setType] = useState('care')
-  const [intervenantId, setIntervenantId] = useState('')
+  const [intervenantIds, setIntervenantIds] = useState([])
   const [date, setDate] = useState('')
   const [heure, setHeure] = useState('')
   const [recurrence, setRecurrence] = useState('none')
@@ -65,6 +65,16 @@ export default function Agenda() {
     }
     loadData()
   }, [selectedSeniorId])
+
+  function toggleIntervenant(id) {
+    setIntervenantIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  }
+
+  // Noms des intervenants d'un événement (anciens événements : un seul, dans intervenant_id)
+  function nomsIntervenants(e) {
+    const ids = e.intervenant_ids?.length ? e.intervenant_ids : e.intervenant_id ? [e.intervenant_id] : []
+    return ids.map(id => intervenants.find(i => i.id === id)?.name || (e.intervenants?.id === id ? e.intervenants.name : null)).filter(Boolean).join(', ')
+  }
 
   function toggleDay(day) {
     setRecurrenceDays(prev =>
@@ -119,7 +129,8 @@ export default function Agenda() {
     const scheduledAt = new Date(date + 'T' + heure).toISOString()
     const baseEvent = {
       senior_id: selectedSeniorId,
-      intervenant_id: intervenantId || null,
+      intervenant_id: intervenantIds[0] || null,
+      intervenant_ids: intervenantIds,
       label, type,
       scheduled_at: scheduledAt,
       status: 'a_venir',
@@ -139,7 +150,7 @@ export default function Agenda() {
         }
       }
       setEvents(prev => [...prev, ...allNewEvents].sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at)))
-      setLabel(''); setType('care'); setIntervenantId(''); setDate(''); setHeure('')
+      setLabel(''); setType('care'); setIntervenantIds([]); setDate(''); setHeure('')
       setRecurrence('none'); setRecurrenceDays([]); setShowForm(false)
     }
     setSaving(false)
@@ -228,15 +239,25 @@ export default function Agenda() {
               </select>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Intervenant</label>
-              <select value={intervenantId} onChange={e => setIntervenantId(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'Georgia, serif', background: '#fff' }}>
-                <option value="">Aucun</option>
-                {intervenants.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-              </select>
-            </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Intervenants (un ou plusieurs)</label>
+            {intervenants.filter(i => !i.archived_at).length === 0 ? (
+              <div style={{ fontSize: 13, color: '#aaa' }}>Aucun intervenant dans ce dossier</div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {intervenants.filter(i => !i.archived_at).map(i => (
+                  <button key={i.id} type="button" onClick={() => toggleIntervenant(i.id)}
+                    style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', fontWeight: 'bold',
+                      background: intervenantIds.includes(i.id) ? '#12201a' : '#f0f4f0',
+                      color: intervenantIds.includes(i.id) ? '#2ecc71' : '#888',
+                      border: intervenantIds.includes(i.id) ? '1px solid #12201a' : '1px solid #ddd' }}>
+                    {intervenantIds.includes(i.id) ? '✓ ' : ''}{i.name}{i.role ? ' · ' + i.role : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
               <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Date de début</label>
               <input type="date" value={date} onChange={e => setDate(e.target.value)}
@@ -322,7 +343,7 @@ export default function Agenda() {
                     </div>
                     <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
                       {new Date(e.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                      {e.intervenants && ' · ' + e.intervenants.name}
+                      {nomsIntervenants(e) && ' · ' + nomsIntervenants(e)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -26,11 +26,13 @@ export async function GET(request) {
   // Rendez-vous d'aujourd'hui avec ces intervenants
   const aujourdhui = jourParis(Date.now())
   const ids = [...new Set(messages.map(m => m.destinataire_id))]
-  const { data: rdv } = await supabaseAdmin.from('events').select('intervenant_id, scheduled_at')
-    .eq('senior_id', borne.senior_id).in('intervenant_id', ids)
+  const { data: rdv } = await supabaseAdmin.from('events').select('intervenant_id, intervenant_ids, scheduled_at')
+    .eq('senior_id', borne.senior_id)
     .gte('scheduled_at', new Date(Date.now() - 36 * 3600 * 1000).toISOString())
     .lte('scheduled_at', new Date(Date.now() + 36 * 3600 * 1000).toISOString())
-  const venusAujourdhui = new Set((rdv || []).filter(e => jourParis(e.scheduled_at) === aujourdhui).map(e => e.intervenant_id))
+  // Tous les intervenants du rendez-vous, pas seulement le premier
+  const venusAujourdhui = new Set((rdv || []).filter(e => jourParis(e.scheduled_at) === aujourdhui)
+    .flatMap(e => e.intervenant_ids?.length ? e.intervenant_ids : [e.intervenant_id]).filter(id => ids.includes(id)))
 
   // Déjà lus par l'intervenant depuis son compte (fil ouvert après le message)
   const { data: fiches } = await supabaseAdmin.from('intervenants').select('id, user_id').in('id', ids)

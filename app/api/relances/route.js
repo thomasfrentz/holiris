@@ -20,12 +20,19 @@ export async function GET(request) {
     const maintenant = new Date()
     const ilYa7j = new Date(maintenant.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const { data: events } = await supabase
+    const { data: evenements } = await supabase
       .from('events')
-      .select('*, intervenants(*), seniors(*)')
+      .select('*, seniors(*)')
       .gte('scheduled_at', ilYa7j.toISOString())
       .lte('scheduled_at', maintenant.toISOString())
       .not('intervenant_id', 'is', null)
+
+    // Un événement peut avoir plusieurs intervenants : une entrée par intervenant, chacun est relancé
+    const idsDe = e => e.intervenant_ids?.length ? e.intervenant_ids : [e.intervenant_id]
+    const tousIds = [...new Set((evenements || []).flatMap(idsDe))]
+    const { data: fiches } = tousIds.length ? await supabase.from('intervenants').select('*').in('id', tousIds) : { data: [] }
+    const parId = new Map((fiches || []).map(f => [f.id, f]))
+    const events = (evenements || []).flatMap(e => idsDe(e).filter(id => parId.has(id)).map(id => ({ ...e, intervenants: parId.get(id) })))
 
     // Proches sans nouvelles depuis 7 jours : envoyée chaque semaine, qu'il y ait eu des passages ou non
     const famillesRelancees = await relancerFamilles(ilYa7j)

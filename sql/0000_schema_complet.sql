@@ -63,7 +63,8 @@ create table if not exists events (
   status text default 'a_venir',
   created_at timestamp with time zone default now(),
   recurrence text,
-  recurrence_days text
+  recurrence_days text,
+  intervenant_ids uuid[] not null default '{}'
 );
 
 create table if not exists notes (
