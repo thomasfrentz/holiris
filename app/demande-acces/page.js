@@ -70,7 +70,7 @@ export default function DemandeAcces() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div><label style={label}>Proche suivi</label><input placeholder="Prénom et nom" value={form.seniorNom} onChange={maj('seniorNom')} style={input} /></div>
-              <div><label style={label}>Ville</label><input value={form.seniorVille} onChange={maj('seniorVille')} style={input} /></div>
+              <div><label style={label}>Ville de résidence</label><input value={form.seniorVille} onChange={maj('seniorVille')} style={input} /></div>
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={label}>Votre lien avec ce proche suivi</label>

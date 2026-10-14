@@ -339,7 +339,7 @@ export default function Profil() {
                     <input type="date" value={seniorDate} onChange={e => setSeniorDate(e.target.value)} style={inputStyle} />
                   </div>
                   <div>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>Ville</label>
+                    <label style={{ ...labelStyle, fontSize: 10 }}>Ville de résidence</label>
                     <input placeholder="Paris" value={seniorVille} onChange={e => setSeniorVille(e.target.value)} style={inputStyle} />
                   </div>
                 </div>

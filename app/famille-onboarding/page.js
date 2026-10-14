@@ -158,7 +158,7 @@ export default function FamilleOnboarding() {
           </div>
 
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Ville</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Ville de résidence</label>
             <input placeholder="Paris" value={seniorVille} onChange={e => setSeniorVille(e.target.value)} style={inputStyle} />
           </div>
         </div>
