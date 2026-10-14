@@ -271,7 +271,7 @@ export default function Profil() {
       ) : (
       /* Mes proches */
       <div style={cardStyle}>
-        <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Mes proches</div>
+        <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Mes proches suivis</div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           {seniors.map(s => (
@@ -299,13 +299,13 @@ export default function Profil() {
         {!showAddSenior ? (
           <button onClick={() => setShowAddSenior(true)}
             style={{ background: 'none', border: '1px dashed #C8DDD4', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#9BB5AA', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>
-            + Ajouter un proche
+            + Ajouter un proche à suivre
           </button>
         ) : (
           <div style={{ background: '#F7F9F8', border: '1px solid #E8EFEB', borderRadius: 10, padding: 16 }}>
             {!addMode ? (
               <>
-                <div style={{ fontSize: 13, color: '#6F7C75', marginBottom: 12, textAlign: 'center' }}>Comment souhaitez-vous ajouter ce proche ?</div>
+                <div style={{ fontSize: 13, color: '#6F7C75', marginBottom: 12, textAlign: 'center' }}>Comment souhaitez-vous ajouter ce proche à suivre ?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <button onClick={() => setAddMode('creer')}
                     style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 0', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>

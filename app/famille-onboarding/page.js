@@ -112,7 +112,7 @@ export default function FamilleOnboarding() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <button onClick={() => setEtape('creer_senior')} style={{ ...btnPrimary, marginTop: 0, padding: '16px 0' }}>
-            Créer le dossier de mon proche
+            Créer le dossier de mon proche suivi
           </button>
           <p style={{ fontSize: 12, color: '#9BB5AA', textAlign: 'center', lineHeight: 1.6, marginTop: 4 }}>
             Invité(e) par un proche ? Cliquez sur le lien reçu par email pour accéder à son dossier.
@@ -137,7 +137,7 @@ export default function FamilleOnboarding() {
           Créer le dossier
         </h2>
         <p style={{ fontSize: 13, color: '#9BB5AA', textAlign: 'center', lineHeight: 1.6, marginBottom: 28, fontWeight: 300 }}>
-          Renseignez les informations de votre proche.
+          Renseignez les informations de votre proche suivi.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

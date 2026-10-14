@@ -69,11 +69,11 @@ export default function DemandeAcces() {
               <div><label style={label}>Téléphone</label><input type="tel" value={form.telephone} onChange={maj('telephone')} style={input} /></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div><label style={label}>Proche concerné</label><input placeholder="Prénom et nom" value={form.seniorNom} onChange={maj('seniorNom')} style={input} /></div>
+              <div><label style={label}>Proche suivi</label><input placeholder="Prénom et nom" value={form.seniorNom} onChange={maj('seniorNom')} style={input} /></div>
               <div><label style={label}>Ville</label><input value={form.seniorVille} onChange={maj('seniorVille')} style={input} /></div>
             </div>
             <div style={{ marginBottom: 14 }}>
-              <label style={label}>Votre lien avec ce proche</label>
+              <label style={label}>Votre lien avec ce proche suivi</label>
               <select value={form.lien} onChange={maj('lien')} style={{ ...input, cursor: 'pointer' }}>
                 <option value="">Choisir…</option>
                 {LIENS.map(l => <option key={l} value={l}>{l}</option>)}
