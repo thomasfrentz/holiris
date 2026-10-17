@@ -27,6 +27,8 @@ export default function Admin() {
   const [showForm, setShowForm] = useState(false)
   const [copied, setCopied] = useState(null)
   const [searchUser, setSearchUser] = useState('')
+  const [personnes, setPersonnes] = useState([])
+  const [filtreRole, setFiltreRole] = useState('tous') // tous | famille | intervenant | gestionnaire | admin
 
   const [prenom, setPrenom] = useState('')
   const [nom, setNom] = useState('')
@@ -52,6 +54,7 @@ export default function Admin() {
       age: s.date_naissance ? calculerAge(s.date_naissance) : s.age
     })))
     setUtilisateurs(data.utilisateurs || [])
+    setPersonnes(data.personnes || [])
 
     // Demandes d'accès : nécessite d'être connecté avec un compte admin
     const resDemandes = await fetch('/api/admin/demandes')
@@ -175,10 +178,10 @@ export default function Admin() {
     background: '#FAFCFC', color: '#1F2A24', width: '100%', boxSizing: 'border-box',
   }
 
-  const utilisateursFiltres = utilisateurs.filter(u =>
-    !searchUser ||
-    u.name?.toLowerCase().includes(searchUser.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchUser.toLowerCase())
+  const recherche = searchUser.toLowerCase()
+  const personnesFiltrees = personnes.filter(p =>
+    (filtreRole === 'tous' || (filtreRole === 'admin' ? p.admin : p.roles.some(r => r.type === filtreRole))) &&
+    (!recherche || [p.nom, p.email, p.telephone, ...p.roles.map(r => r.libelle)].some(v => v?.toLowerCase().includes(recherche)))
   )
 
   if (acces !== 'ok') return (
@@ -219,7 +222,7 @@ export default function Admin() {
         <div style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', gap: 16, alignItems: 'center' }}>
           <a href="/app" style={{ color: '#4A8870', textDecoration: 'none', fontWeight: 500 }}>← Retour à l&apos;application</a>
           <span>{seniors.length} senior{seniors.length > 1 ? 's' : ''}</span>
-          <span>{utilisateurs.length} utilisateur{utilisateurs.length > 1 ? 's' : ''}</span>
+          <span>{personnes.length} utilisateur{personnes.length > 1 ? 's' : ''}</span>
         </div>
       </header>
 
@@ -453,67 +456,73 @@ export default function Admin() {
               <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
               <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 20 }}>Utilisateurs & Admins</h1>
               <input
-                placeholder="Rechercher par nom ou email..."
+                placeholder="Rechercher par nom, email, téléphone ou senior..."
                 value={searchUser} onChange={e => setSearchUser(e.target.value)}
                 style={{ ...inputStyle, maxWidth: 400 }}
               />
             </div>
 
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: -12, marginBottom: 20 }}>
+              {[['tous', 'Tous'], ['famille', 'Proches'], ['intervenant', 'Intervenants'], ['gestionnaire', 'Gestionnaires'], ['admin', 'Admins']].map(([cle, libelle]) => (
+                <button key={cle} onClick={() => setFiltreRole(cle)} style={{
+                  background: filtreRole === cle ? '#7FAF9B' : '#fff', color: filtreRole === cle ? '#fff' : '#6F7C75',
+                  border: '1px solid ' + (filtreRole === cle ? '#7FAF9B' : '#E8EFEB'), borderRadius: 20, padding: '5px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                }}>{libelle} ({cle === 'tous' ? personnes.length : cle === 'admin' ? personnes.filter(p => p.admin).length : personnes.filter(p => p.roles.some(r => r.type === cle)).length})</button>
+              ))}
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {utilisateursFiltres.map((u) => (
-                <div key={u.id} style={{ background: '#fff', border: '1px solid ' + (u.archived_at ? '#F0D9B5' : '#E8EFEB'), borderRadius: 12, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', opacity: u.archived_at ? 0.75 : 1 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{u.name || '—'}</div>
-                      {u.is_admin && (
-                        <span style={{ background: '#EAF4EF', color: '#4A8870', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Admin</span>
-                      )}
-                      {u.user_id && (
-                        <span style={{ background: '#F3EDF7', color: '#8B6FAA', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Compte actif</span>
-                      )}
-                      {u.archived_at && (
-                        <span style={{ background: '#FDF3E7', color: '#C4844A', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Archivé le {new Date(u.archived_at).toLocaleDateString('fr-FR')}</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 12, color: '#9BB5AA' }}>
-                      {u.email || u.phone || '—'}
-                      {u.seniors?.name && <span> · Proche de {u.seniors.name}</span>}
-                      {u.role && <span> · {u.role}</span>}
-                    </div>
+              {personnesFiltrees.map(p => {
+                const toutArchive = p.roles.every(r => r.archive)
+                return (
+                <div key={p.cle} style={{ background: '#fff', border: '1px solid ' + (toutArchive ? '#F0D9B5' : '#E8EFEB'), borderRadius: 12, padding: '16px 22px', opacity: toutArchive ? 0.75 : 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{p.nom || '—'}</div>
+                    {p.admin && <span style={{ background: '#EAF4EF', color: '#4A8870', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Admin</span>}
+                    {p.compte ? <span style={{ background: '#F3EDF7', color: '#8B6FAA', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Compte actif</span>
+                      : p.sansCompte ? <span style={{ background: '#EAF4EF', color: '#4A8870', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Sans compte (lien WhatsApp)</span>
+                      : p.invitation ? <span style={{ background: '#FDF3E7', color: '#C4844A', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Invitation en attente</span>
+                      : <span style={{ background: '#F4F5F5', color: '#9BB5AA', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pas de compte</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-                  {u.archived_at ? (
-                    <>
-                      <button onClick={() => actionUtilisateur(u, 'restaurer')}
-                        style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        Restaurer
-                      </button>
-                      <button onClick={() => actionUtilisateur(u, 'supprimer')} title="Supprimer définitivement"
-                        style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 8, padding: '7px 10px', fontSize: 12, cursor: 'pointer' }}>
-                        🗑️
-                      </button>
-                    </>
-                  ) : !u.is_admin && (
-                    <button onClick={() => actionUtilisateur(u, 'archiver')}
-                      style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      Archiver
-                    </button>
-                  )}
-                  {!u.archived_at && (
-                  <button onClick={() => toggleAdmin(u.id, u.is_admin)} style={{
-                    background: u.is_admin ? '#FBECED' : '#EAF4EF',
-                    color: u.is_admin ? '#C4606A' : '#4A8870',
-                    border: '1px solid ' + (u.is_admin ? '#F2C4C8' : '#C8DDD4'),
-                    borderRadius: 8, padding: '7px 16px', fontSize: 12,
-                    fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
-                  }}>
-                    {u.is_admin ? 'Retirer admin' : 'Rendre admin'}
-                  </button>
-                  )}
+                  <div style={{ fontSize: 12, color: '#9BB5AA', marginBottom: 10 }}>{[p.email, p.telephone].filter(Boolean).join(' · ') || '—'}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {p.roles.map((r, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: r.archive ? '#C4844A' : '#4A6B5E', background: '#F7F9F8', borderRadius: 8, padding: '6px 10px' }}>
+                        <span style={{ flex: 1, minWidth: 180 }}>
+                          {{ famille: '👨‍👩‍👧', intervenant: '🧑‍⚕️', gestionnaire: '🏢' }[r.type]} {r.libelle}
+                          {r.archive && <span> · archivé{r.fiche?.archived_at ? ' le ' + new Date(r.fiche.archived_at).toLocaleDateString('fr-FR') : ''}</span>}
+                          {r.fiche?.is_admin && !r.archive && <span style={{ color: '#4A8870', fontWeight: 600 }}> · admin</span>}
+                        </span>
+                        {r.fiche && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {r.fiche.archived_at ? (
+                              <>
+                                <button onClick={() => actionUtilisateur(r.fiche, 'restaurer')}
+                                  style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Restaurer</button>
+                                <button onClick={() => actionUtilisateur(r.fiche, 'supprimer')} title="Supprimer définitivement"
+                                  style={{ background: '#FBECED', color: '#C4606A', border: '1px solid #F2C4C8', borderRadius: 8, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}>🗑️</button>
+                              </>
+                            ) : (
+                              <>
+                                {!r.fiche.is_admin && (
+                                  <button onClick={() => actionUtilisateur(r.fiche, 'archiver')}
+                                    style={{ background: '#FDF3E7', color: '#C4844A', border: '1px solid #F0D9B5', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Archiver</button>
+                                )}
+                                <button onClick={() => toggleAdmin(r.fiche.id, r.fiche.is_admin)}
+                                  style={{ background: r.fiche.is_admin ? '#FBECED' : '#EAF4EF', color: r.fiche.is_admin ? '#C4606A' : '#4A8870', border: '1px solid ' + (r.fiche.is_admin ? '#F2C4C8' : '#C8DDD4'), borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                  {r.fiche.is_admin ? 'Retirer admin' : 'Rendre admin'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-              {utilisateursFiltres.length === 0 && (
+                )
+              })}
+              {personnesFiltrees.length === 0 && (
                 <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center' }}>
                   <div style={{ fontSize: 14, color: '#9BB5AA' }}>Aucun utilisateur trouvé.</div>
                 </div>
