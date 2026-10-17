@@ -11,12 +11,13 @@ export default function MaStructure() {
   const [donnees, setDonnees] = useState(null)
   const [erreur, setErreur] = useState('')
   const [onglet, setOnglet] = useState('clients')
-  const [formulaire, setFormulaire] = useState(null) // 'client' | 'salarie' | 'gestionnaire'
+  const [formulaire, setFormulaire] = useState(null) // 'client' | 'rattachement' | 'salarie' | 'gestionnaire'
   const [envoi, setEnvoi] = useState(false)
   const [message, setMessage] = useState('')
   const [client, setClient] = useState({ prenom: '', nom: '', dateNaissance: '', ville: '' })
   const [salarie, setSalarie] = useState({ prenom: '', nom: '', role: '', telephone: '', email: '', seniorIds: [] })
   const [gestionnaire, setGestionnaire] = useState({ nom: '', email: '' })
+  const [rattachement, setRattachement] = useState({ seniorNom: '', emailProche: '' })
 
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
@@ -55,6 +56,12 @@ export default function MaStructure() {
     }
   }
 
+  async function demanderRattachement() {
+    if (await action({ action: 'demander_rattachement', ...rattachement }, 'Demande envoyée ✓ — si cette personne suit bien ce dossier, elle reçoit un email pour accepter.')) {
+      setRattachement({ seniorNom: '', emailProche: '' }); setFormulaire(null)
+    }
+  }
+
   async function creerSalarie() {
     if (await action({ action: 'creer_salarie', ...salarie }, 'Salarié ajouté ✓ — son invitation est envoyée par email')) {
       setSalarie({ prenom: '', nom: '', role: '', telephone: '', email: '', seniorIds: [] }); setFormulaire(null)
@@ -89,7 +96,8 @@ export default function MaStructure() {
     </div>
   )
 
-  const { structure, seniors: clients, salaries, gestionnaires } = donnees
+  const { structure, seniors: clients, salaries, gestionnaires, demandes = [] } = donnees
+  const STATUTS = { en_attente: ['En attente de la famille', '#C4844A'], acceptee: ['Acceptée', '#4A8870'], refusee: ['Refusée', '#C4606A'] }
 
   return (
     <Layout senior={selectedSenior} seniors={seniors} selectedSeniorId={selectedSeniorId} switchSenior={switchSenior} isAdmin={isAdmin}>
@@ -132,8 +140,41 @@ export default function MaStructure() {
                 <button onClick={() => setFormulaire(null)} style={btnGris}>Annuler</button>
               </div>
             </div>
+          ) : formulaire === 'rattachement' ? (
+            <div style={{ ...carte, marginBottom: 16 }}>
+              <div style={etiquette}>Rattacher un client existant</div>
+              <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.6, marginBottom: 14 }}>
+                Votre client a déjà un dossier Holiris créé par sa famille ? Indiquez son nom et l&apos;email d&apos;un proche qui suit ce dossier :
+                le proche reçoit un email pour accepter. Le dossier apparaît dans vos clients dès son accord.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 14 }}>
+                <input placeholder="Prénom et nom du client *" value={rattachement.seniorNom} onChange={e => setRattachement({ ...rattachement, seniorNom: e.target.value })} style={input} />
+                <input type="email" placeholder="Email d'un proche *" value={rattachement.emailProche} onChange={e => setRattachement({ ...rattachement, emailProche: e.target.value })} style={input} />
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={demanderRattachement} disabled={envoi || !rattachement.seniorNom || !rattachement.emailProche} style={{ ...btn, opacity: (!rattachement.seniorNom || !rattachement.emailProche) ? 0.5 : 1 }}>{envoi ? 'Envoi…' : 'Envoyer la demande'}</button>
+                <button onClick={() => setFormulaire(null)} style={btnGris}>Annuler</button>
+              </div>
+            </div>
           ) : (
-            <button onClick={() => setFormulaire('client')} style={{ ...btn, marginBottom: 16 }}>+ Nouveau client</button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+              <button onClick={() => setFormulaire('client')} style={btn}>+ Nouveau client</button>
+              <button onClick={() => setFormulaire('rattachement')} style={{ ...btn, background: '#fff', color: '#4A8870', border: '1.5px solid #7FAF9B' }}>Rattacher un client existant</button>
+            </div>
+          )}
+
+          {demandes.length > 0 && (
+            <div style={{ ...carte, marginBottom: 16 }}>
+              <div style={etiquette}>Demandes de rattachement</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {demandes.map(d => (
+                  <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 13, flexWrap: 'wrap' }}>
+                    <span style={{ color: '#1F2A24' }}>{d.senior_nom} <span style={{ color: '#9BB5AA' }}>· {d.email_proche} · {new Date(d.created_at).toLocaleDateString('fr-FR')}</span></span>
+                    <span style={{ color: STATUTS[d.statut]?.[1], fontWeight: 500 }}>{STATUTS[d.statut]?.[0]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {clients.length === 0 ? (

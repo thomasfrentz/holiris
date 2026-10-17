@@ -1,10 +1,22 @@
 import { NextResponse } from 'next/server'
+import { Resend } from 'resend'
+import { randomBytes } from 'crypto'
 import { supabaseAdmin, verifierGestionnaire } from '@/lib/serveur'
+import { escapeHtml, emailDemandeRattachement } from '@/lib/emails'
+import { empreinte } from '@/lib/documents'
 import { inviterMembre, inviterGestionnaire } from '@/lib/invitations'
 import { envoyerBienvenue } from '@/lib/whatsapp'
 
+const resend = new Resend(process.env.RESEND_API_KEY)
 const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const champ = (v, max = 120) => String(v ?? '').trim().slice(0, max)
+
+// Nom comparé sans accents, majuscules ni espaces en trop, dans les deux ordres (« Jeanne Martin » / « Martin Jeanne »)
+const normaliser = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, ' ').trim()
+const memeNom = (a, b) => {
+  const x = normaliser(a), y = normaliser(b)
+  return x === y || x === y.split(' ').reverse().join(' ')
+}
 
 function calculerAge(dateNaissance) {
   return Math.floor((new Date() - new Date(dateNaissance)) / (365.25 * 24 * 60 * 60 * 1000))
@@ -50,11 +62,13 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   if (!structureId) return NextResponse.json({ error: 'Réservé aux gestionnaires de structure' }, { status: 403 })
 
-  const [structure, seniors, salaries, gestionnaires] = await Promise.all([
+  const [structure, seniors, salaries, gestionnaires, demandes] = await Promise.all([
     supabaseAdmin.from('structures').select('id, nom, adresse, adresse_facturation').eq('id', structureId).single(),
     supabaseAdmin.from('seniors').select('id, name, city, age, date_naissance').eq('structure_id', structureId).order('name'),
     supabaseAdmin.from('salaries').select('*').eq('structure_id', structureId).is('archived_at', null).order('nom'),
     supabaseAdmin.from('structure_membres').select('id, nom, email, user_id, created_at').eq('structure_id', structureId).order('created_at'),
+    supabaseAdmin.from('demandes_rattachement').select('id, senior_nom, email_proche, statut, created_at')
+      .eq('structure_id', structureId).order('created_at', { ascending: false }).limit(20),
   ])
 
   // Affectations actives de chaque salarié
@@ -71,6 +85,7 @@ export async function GET() {
       seniorIds: (affectations || []).filter(a => a.salarie_id === s.id).map(a => a.senior_id),
       compteActif: (affectations || []).some(a => a.salarie_id === s.id && a.user_id),
     })),
+    demandes: demandes.data || [],
     gestionnaires: (gestionnaires.data || []).map(g => ({ id: g.id, nom: g.nom, email: g.email, compteActif: !!g.user_id, moi: g.user_id === user.id })),
   })
 }
@@ -134,6 +149,43 @@ export async function POST(request) {
       const maintenant = new Date().toISOString()
       await supabaseAdmin.from('salaries').update({ archived_at: maintenant }).eq('id', salarie.id)
       await supabaseAdmin.from('intervenants').update({ archived_at: maintenant }).eq('salarie_id', salarie.id).is('archived_at', null)
+      return NextResponse.json({ success: true })
+    }
+
+    // Rattacher un senior existant : un proche qui suit ce senior doit accepter.
+    // La réponse est la même que le senior existe ou non, pour ne rien révéler des dossiers.
+    if (body.action === 'demander_rattachement') {
+      const seniorNom = champ(body.seniorNom, 120), email = champ(body.emailProche, 200).toLowerCase()
+      if (!seniorNom || !EMAIL_VALIDE.test(email)) return NextResponse.json({ success: false, error: 'Nom du client et email d\'un proche requis' }, { status: 400 })
+
+      const { count } = await supabaseAdmin.from('demandes_rattachement').select('id', { count: 'exact', head: true })
+        .eq('structure_id', structureId).eq('statut', 'en_attente')
+      if (count >= 20) return NextResponse.json({ success: false, error: 'Trop de demandes en attente : attendez les réponses des familles.' }, { status: 429 })
+
+      const { data: fiches } = await supabaseAdmin.from('famille')
+        .select('id, name, senior_id, seniors!famille_senior_id_fkey(name, structure_id)')
+        .ilike('email', email).is('archived_at', null)
+      const fiche = (fiches || []).find(f => f.seniors && memeNom(f.seniors.name, seniorNom))
+      if (fiche?.seniors.structure_id === structureId) return NextResponse.json({ success: true, dejaRattache: true })
+
+      const jeton = fiche ? randomBytes(24).toString('base64url') : null
+      const { error } = await supabaseAdmin.from('demandes_rattachement').insert({
+        structure_id: structureId, demandeur_user_id: user.id, senior_nom: seniorNom, email_proche: email,
+        senior_id: fiche?.senior_id || null, famille_id: fiche?.id || null, jeton_hash: jeton ? empreinte(jeton) : null,
+      })
+      if (error) throw error
+
+      if (fiche) {
+        const { data: structure } = await supabaseAdmin.from('structures').select('nom').eq('id', structureId).single()
+        const { error: errMail } = await resend.emails.send({
+          from: 'Holiris <contact@holiris.fr>',
+          to: email,
+          replyTo: 'thomas.frentz@holiris.fr',
+          subject: `${structure.nom} demande à suivre le dossier de ${fiche.seniors.name}`,
+          html: emailDemandeRattachement({ prenom: escapeHtml(fiche.name.split(' ')[0]), structureNom: escapeHtml(structure.nom), seniorName: escapeHtml(fiche.seniors.name), jeton }),
+        })
+        if (errMail) console.error('Erreur email rattachement:', errMail)
+      }
       return NextResponse.json({ success: true })
     }
 
