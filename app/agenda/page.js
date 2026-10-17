@@ -22,6 +22,7 @@ export default function Agenda() {
   const [recurrence, setRecurrence] = useState('none')
   const [recurrenceDays, setRecurrenceDays] = useState([])
   const [voirPasses, setVoirPasses] = useState(false)
+  const [aSupprimer, setASupprimer] = useState(null) // événement récurrent : choix « celui-ci » ou « tous les suivants »
 
   const { seniors, selectedSenior: adminSenior, selectedSeniorId: adminSeniorId, switchSenior: adminSwitch, isAdmin, loading: seniorLoading } = useSenior()
   const { selectedSenior: intervenantSenior, selectedSeniorId: intervenantSeniorId, switchSenior: intervenantSwitch, seniorsList, isIntervenant, loading: intervenantLoading } = useIntervenant()
@@ -156,10 +157,23 @@ export default function Agenda() {
     setSaving(false)
   }
 
-  async function deleteEvent(id) {
+  // Occurrences suivantes d'une même série : chaque occurrence est un événement à part, reconnu
+  // par le même libellé, type, récurrence et heure, à partir de cette date
+  function occurrencesSuivantes(e) {
+    const heure = d => new Date(d).toTimeString().slice(0, 5)
+    return events.filter(x => x.label === e.label && x.type === e.type && x.recurrence === e.recurrence
+      && (x.recurrence_days || null) === (e.recurrence_days || null) && heure(x.scheduled_at) === heure(e.scheduled_at)
+      && new Date(x.scheduled_at) >= new Date(e.scheduled_at))
+  }
+
+  // portee : 'un' (cet événement) ou 'suivants' ; sans portée, un événement récurrent demande le choix
+  async function deleteEvent(e, portee) {
     if (!isAdmin) return
-    await supabase.from('events').delete().eq('id', id)
-    setEvents(prev => prev.filter(e => e.id !== id))
+    if (e.recurrence && !portee) { setASupprimer(e.id); return }
+    const ids = portee === 'suivants' ? occurrencesSuivantes(e).map(x => x.id) : [e.id]
+    const { error } = await supabase.from('events').delete().in('id', ids)
+    if (!error) setEvents(prev => prev.filter(x => !ids.includes(x.id)))
+    setASupprimer(null)
   }
 
   const statusConfig = {
@@ -348,8 +362,20 @@ export default function Agenda() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: cfg.color + '22', color: cfg.color, fontWeight: 'bold' }}>{cfg.label}</div>
-                    {isAdmin && (
-                      <button onClick={() => deleteEvent(e.id)}
+                    {isAdmin && aSupprimer === e.id && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <button onClick={() => deleteEvent(e, 'un')}
+                          style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>Celui-ci</button>
+                        <button onClick={() => deleteEvent(e, 'suivants')}
+                          style={{ background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
+                          Celui-ci et les suivants ({occurrencesSuivantes(e).length})
+                        </button>
+                        <button onClick={() => setASupprimer(null)}
+                          style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>Annuler</button>
+                      </div>
+                    )}
+                    {isAdmin && aSupprimer !== e.id && (
+                      <button onClick={() => deleteEvent(e)}
                         style={{ background: '#fdf0f0', color: '#e74c3c', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>🗑️</button>
                     )}
                   </div>
