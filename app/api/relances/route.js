@@ -47,7 +47,7 @@ export async function GET(request) {
     let relancesEnvoyees = 0
     let relancesEchouees = 0
 
-    // WhatsApp (modèle « relance_intervenant », en français) aux intervenants passés sans laisser de note
+    // WhatsApp (modèle « relances_intervenant », en français) aux intervenants passés sans laisser de note
     for (const event of events) {
       const intervenant = event.intervenants
       const numero = numeroWhatsapp(intervenant?.whatsapp || intervenant?.phone)
@@ -56,7 +56,7 @@ export async function GET(request) {
       intervenantsVus.add(intervenant.id)
       if (aDonneDesNouvelles(intervenant)) continue
 
-      const envoye = await envoyerModele(numero, 'relance_intervenant', [intervenant.name.split(' ')[0], event.seniors?.name || 'votre patient'])
+      const envoye = await envoyerModele(numero, 'relances_intervenant', [intervenant.name.split(' ')[0], event.seniors?.name || 'votre patient'])
       // Chaque tentative est enregistrée, avec la raison du refus de Meta en cas d'échec
       await supabase.from('relances').insert({
         event_id: event.id,
