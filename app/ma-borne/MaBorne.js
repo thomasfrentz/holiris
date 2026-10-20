@@ -59,6 +59,7 @@ export default function MaBorne() {
   const [signalement, setSignalement] = useState(null)
   const [reponseMedicale, setReponseMedicale] = useState('')
   const [aideInstallation, setAideInstallation] = useState(false)
+  const [resumes, setResumes] = useState({}) // par senior : 'chargement' | { resume, nbNotes } | 'erreur'
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -263,6 +264,16 @@ export default function MaBorne() {
     <div style={{ background: C.roseClair, border: '1px solid #F0CDD1', borderRadius: 14, padding: '12px 14px', fontSize: 15, color: '#8E2F38', marginBottom: 16 }}>{error}</div>
   )
 
+  // Résumé des 7 derniers jours d'un senior suivi, à la demande ; un second appui le referme
+  function basculerResume(seniorId) {
+    if (resumes[seniorId] && resumes[seniorId] !== 'chargement') { setResumes(r => ({ ...r, [seniorId]: undefined })); return }
+    setResumes(r => ({ ...r, [seniorId]: 'chargement' }))
+    fetch('/api/ma-borne?j=' + encodeURIComponent(jeton) + '&resume=' + encodeURIComponent(seniorId))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setResumes(r => ({ ...r, [seniorId]: data || 'erreur' })))
+      .catch(() => setResumes(r => ({ ...r, [seniorId]: 'erreur' })))
+  }
+
   if (step === 'loading') return page(<p style={{ color: C.grisClair, textAlign: 'center', marginTop: '40vh' }}>Chargement…</p>)
 
   if (step === 'invalide') return page(
@@ -334,6 +345,28 @@ export default function MaBorne() {
               </span>
             </button>
           ))}
+        </div>
+
+        <p style={{ fontSize: 12, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', margin: '26px 0 10px' }}>Les 7 derniers jours</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[...new Map(dossiers.map(d => [d.seniorId, d])).values()].map(d => {
+            const r = resumes[d.seniorId]
+            return (
+              <div key={d.seniorId} style={{ background: '#fff', border: `1px solid ${C.bord}`, borderRadius: 16, overflow: 'hidden' }}>
+                <button onClick={() => basculerResume(d.seniorId)} disabled={r === 'chargement'} className="mb-bouton"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: 'none', border: 'none', padding: '14px 16px', textAlign: 'left', cursor: 'pointer', fontFamily: TEXTE, color: C.encre }}>
+                  <span style={{ fontSize: 20 }}>📋</span>
+                  <span style={{ flex: 1, fontSize: 16, fontWeight: 500 }}>Résumé de la semaine chez {d.senior}</span>
+                  <span style={{ fontSize: 14, color: C.lilasFonce }}>{r === 'chargement' ? '…' : r ? 'Fermer' : 'Voir ›'}</span>
+                </button>
+                {r && r !== 'chargement' && (
+                  <p style={{ fontSize: 15, lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0, padding: '0 16px 16px', color: C.encre }}>
+                    {r === 'erreur' ? 'Le résumé n\'est pas disponible pour le moment.' : r.resume || 'Aucune note ces 7 derniers jours.'}
+                  </p>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         <div style={{ marginTop: 22 }}><ActiverNotifications jeton={jeton} /></div>

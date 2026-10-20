@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/serveur'
 import { nonLusPour } from '@/lib/messagesNonLus'
+import { resumeSemaine } from '@/lib/resumeSemaine'
 
 // Chargement d'une borne par son code (la borne n'a pas de compte connecté).
 // Le code de la borne sert de clé : il ne donne accès qu'au nom du senior et à la liste des personnes.
@@ -36,6 +37,12 @@ export async function GET(request) {
     if (!p?.user_id || p.senior_id !== borne.senior_id) return NextResponse.json({ nombre: 0, auteurs: [] })
     const { parSenior } = await nonLusPour(p.user_id, [borne.senior_id])
     return NextResponse.json(parSenior[borne.senior_id] || { nombre: 0, auteurs: [] })
+  }
+
+  // Résumé des 7 derniers jours, affiché à la personne qui a touché son nom
+  if (new URL(request.url).searchParams.get('resume')) {
+    try { return NextResponse.json(await resumeSemaine(borne.senior_id)) }
+    catch (error) { console.error('Erreur résumé borne:', error.message); return NextResponse.json({ error: 'Résumé indisponible' }, { status: 500 }) }
   }
 
   // Alertes non lues, affichées sur l'accueil de la borne

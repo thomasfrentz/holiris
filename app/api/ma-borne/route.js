@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
 import { jetonDepuisInvitation, fichesDuJeton, couperAcces } from '@/lib/accesMobile'
+import { resumeSemaine } from '@/lib/resumeSemaine'
 
 // Borne sur téléphone d'un intervenant sans compte. Le jeton du lien sert de clé : il donne accès
-// aux seniors suivis (nom seulement) et aux messages adressés à l'intervenant, jamais au reste du dossier.
+// aux seniors suivis (nom seulement), au résumé de leurs 7 derniers jours et aux messages adressés
+// à l'intervenant, jamais au reste du dossier.
 
 async function messagesPour(ficheIds) {
   if (!ficheIds.length) return []
@@ -19,6 +21,15 @@ export async function GET(request) {
   const jeton = new URL(request.url).searchParams.get('j')
   const fiches = await fichesDuJeton(jeton)
   if (!fiches.length) return NextResponse.json({ error: 'Lien invalide' }, { status: 404 })
+
+  // Résumé des 7 derniers jours d'un senior que cet intervenant suit
+  const seniorResume = new URL(request.url).searchParams.get('resume')
+  if (seniorResume) {
+    if (!fiches.some(f => f.senior_id === seniorResume)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    try { return NextResponse.json(await resumeSemaine(seniorResume)) }
+    catch (error) { console.error('Erreur résumé ma-borne:', error.message); return NextResponse.json({ error: 'Résumé indisponible' }, { status: 500 }) }
+  }
+
   return NextResponse.json({
     prenom: fiches[0].name.split(' ')[0],
     dossiers: fiches.map(f => ({ ficheId: f.id, seniorId: f.senior_id, senior: f.seniors?.name || '', nom: f.name, role: f.role })),

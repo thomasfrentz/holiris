@@ -81,6 +81,7 @@ export default function Borne() {
     catch { return { alertes: [], messages: '' } }
   })
   const [messagesBorne, setMessagesBorne] = useState(null) // { nombre, auteurs } de la personne qui enregistre
+  const [resumeBorne, setResumeBorne] = useState(null) // null | 'chargement' | { resume, nbNotes } | 'erreur'
   const [maintenant, setMaintenant] = useState(() => new Date())
   const [sosCompte, setSosCompte] = useState(0)
   const [sosResultat, setSosResultat] = useState(null) // { success, emails, whatsapp, dejaPrevenus }
@@ -416,6 +417,15 @@ export default function Borne() {
     setStep('enregistrement')
   }
 
+  // Résumé des 7 derniers jours, depuis l'accueil, consultable par tous (rédigé par l'IA à partir des notes)
+  function chargerResume() {
+    setResumeBorne('chargement')
+    fetch('/api/borne?resume=1&code=' + encodeURIComponent(borneInfo.code))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setResumeBorne(data || 'erreur'))
+      .catch(() => setResumeBorne('erreur'))
+  }
+
   function validerInvite() {
     if (!inviteNom.trim()) return
     choisirPersonne({ id: null, name: inviteNom.trim(), role: inviteRole.trim() || 'Visiteur', type: 'invite' })
@@ -692,6 +702,7 @@ export default function Borne() {
           .borne-accueil .borne-carte { padding-top: 11px !important; padding-bottom: 11px !important; }
           .borne-accueil .borne-actions > button { padding-top: 20px !important; padding-bottom: 20px !important; }
           .borne-accueil .borne-pied { margin-top: 10px !important; }
+          .borne-accueil .borne-resume { padding: 6px 16px !important; font-size: 14px !important; margin-bottom: 8px !important; }
         }
         @media (max-height: 600px) {
           .borne-page { padding: 16px 20px !important; }
@@ -805,6 +816,26 @@ export default function Borne() {
   }
 
   // Message adressé à un intervenant, ouvert depuis l'accueil
+  if (step === 'accueil' && resumeBorne) return page(
+    <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column' }}>
+      {retour('Accueil', () => setResumeBorne(null))}
+      <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'center' }}>Les 7 derniers jours</p>
+      <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, textAlign: 'center', margin: '6px 0 20px' }}>{borneInfo?.seniors?.name}</h2>
+      <div style={{ background: C.carte, borderRadius: 24, padding: '26px 28px', boxShadow: OMBRE }}>
+        {resumeBorne === 'chargement' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: '50%', border: `4px solid ${C.saugeClair}`, borderTopColor: C.sauge, animation: 'holiris-tourne 1s linear infinite' }} />
+            <p style={{ fontSize: 20, color: C.gris, margin: 0 }}>Préparation du résumé…</p>
+          </div>
+        ) : (
+          <p style={{ fontSize: 22, lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>
+            {resumeBorne === 'erreur' ? 'Le résumé n\'est pas disponible pour le moment.' : resumeBorne.resume || 'Aucune note ces 7 derniers jours.'}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+
   if (step === 'accueil' && messageOuvert) return page(
     <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column' }}>
       {retour('Accueil', () => setMessageOuvert(null))}
@@ -895,6 +926,11 @@ export default function Borne() {
             </div>
           )}
         </div>
+
+        <button onClick={chargerResume} className="borne-bouton borne-resume"
+          style={{ alignSelf: 'center', background: C.lilasClair, color: C.lilasFonce, border: 'none', borderRadius: 999, padding: '10px 22px', fontSize: 16, fontWeight: 500, cursor: 'pointer', marginBottom: 14, fontFamily: TEXTE }}>
+          📋 Résumé des 7 derniers jours
+        </button>
 
         <div className="borne-actions" style={{ width: '100%', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <button onClick={() => { setShowInvite(false); setStep('choix') }} className="borne-bouton"
