@@ -702,7 +702,7 @@ export default function Borne() {
           .borne-accueil .borne-carte { padding-top: 11px !important; padding-bottom: 11px !important; }
           .borne-accueil .borne-actions > button { padding-top: 20px !important; padding-bottom: 20px !important; }
           .borne-accueil .borne-pied { margin-top: 10px !important; }
-          .borne-accueil .borne-resume { padding: 6px 16px !important; font-size: 14px !important; margin-bottom: 8px !important; }
+          .borne-accueil .borne-resume { padding: 6px 16px !important; font-size: 14px !important; }
         }
         @media (max-height: 600px) {
           .borne-page { padding: 16px 20px !important; }
@@ -867,8 +867,12 @@ export default function Borne() {
     const compact = alertesVisibles.length > 0 || messagesVisibles || messagesJour.length > 0 || aDesMessagesSenior
     return page(
       <div className={'borne-accueil' + (compact ? ' compact' : '')} style={{ width: '100%', maxWidth: 820, display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: C.gris, fontSize: 16 }}>
+        <div style={{ width: '100%', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'start', gap: 12, color: C.gris, fontSize: 16 }}>
           <span>Chez <strong style={{ color: C.encre, fontWeight: 500 }}>{borneInfo?.seniors?.name}</strong></span>
+          <button onClick={chargerResume} className="borne-bouton borne-resume"
+            style={{ background: C.lilasClair, color: C.lilasFonce, border: 'none', borderRadius: 999, padding: '10px 22px', fontSize: 16, fontWeight: 500, cursor: 'pointer', fontFamily: TEXTE, whiteSpace: 'nowrap' }}>
+            📋 Résumé des 7 derniers jours
+          </button>
           <span style={{ textAlign: 'right' }}>
             <strong style={{ fontFamily: TITRE, fontSize: 30, fontWeight: 500, color: C.encre }}>{maintenant.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' })}</strong>
             <span style={{ display: 'block', fontSize: 14 }}>{maintenant.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' }).replace(/^./, l => l.toUpperCase())}</span>
@@ -926,11 +930,6 @@ export default function Borne() {
             </div>
           )}
         </div>
-
-        <button onClick={chargerResume} className="borne-bouton borne-resume"
-          style={{ alignSelf: 'center', background: C.lilasClair, color: C.lilasFonce, border: 'none', borderRadius: 999, padding: '10px 22px', fontSize: 16, fontWeight: 500, cursor: 'pointer', marginBottom: 14, fontFamily: TEXTE }}>
-          📋 Résumé des 7 derniers jours
-        </button>
 
         <div className="borne-actions" style={{ width: '100%', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <button onClick={() => { setShowInvite(false); setStep('choix') }} className="borne-bouton"
