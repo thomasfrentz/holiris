@@ -8,9 +8,10 @@ import QuestionMedicale from '../components/QuestionMedicale'
 import { useSenior } from '../lib/useSenior'
 import { useIntervenant } from '../lib/useIntervenant'
 
-// Messagerie d'un dossier, comme une messagerie classique : une conversation « Tous » (messages à tout le monde)
-// et une conversation privée par personne avec qui l'on a échangé ; pour un proche, la conversation avec
-// le senior sur sa borne. Les messages privés ne sont lisibles que par l'auteur et le destinataire.
+// Messagerie d'un dossier, comme une messagerie classique : une conversation « Tous » (messages à tout le monde),
+// une conversation privée par personne avec qui l'on a échangé, des groupes nommés ; pour un proche, la conversation
+// avec le senior sur sa borne. Les messages privés ne sont lisibles que par l'auteur et le destinataire, ceux d'un
+// groupe que par ses membres. Sous ses propres messages, on voit qui les a lus, et quand.
 const TOUS = 'tous'
 const SENIOR = 'senior'
 
@@ -36,6 +37,10 @@ export default function Messages() {
   const [nouvelle, setNouvelle] = useState(false) // choix d'une personne pour une nouvelle conversation
   const [vues, setVues] = useState({}) // dernière ouverture de chaque conversation (sur cet appareil)
   const [messagesSenior, setMessagesSenior] = useState([]) // mes messages au senior (borne)
+  const [groupes, setGroupes] = useState([]) // { id, nom, cree_par, membres: [user_id] }
+  const [formGroupe, setFormGroupe] = useState(null) // { id?, nom, membres: [user_id] } : création ou modification
+  const [lectures, setLectures] = useState({}) // message_id → [{ user_id, lu_at }] pour mes messages
+  const signalesLus = useRef(new Set()) // messages déjà marqués lus depuis cet écran
   const [vocal, setVocal] = useState(null) // message vocal au senior : { etat: 'enregistrement' | 'pret', blob, url, duree }
   const recorderRef = useRef(null)
   const vocalRef = useRef(null)
@@ -99,6 +104,40 @@ export default function Messages() {
     return () => { actif = false }
   }, [seniorId, supabase])
 
+  // Groupes dont je suis membre (les autres ne sont pas visibles)
+  useEffect(() => {
+    if (!seniorId) return
+    let actif = true
+    supabase.from('groupes_discussion').select('id, nom, cree_par, created_at, groupes_membres(user_id)').eq('senior_id', seniorId).order('created_at')
+      .then(({ data }) => { if (actif) setGroupes((data || []).map(g => ({ ...g, membres: (g.groupes_membres || []).map(m => m.user_id) }))) })
+    return () => { actif = false }
+  }, [seniorId, supabase])
+
+  // Accusés de lecture de mes messages, mis à jour en direct
+  const mesIds = messages.filter(m => m.auteur_user_id === userId).map(m => m.id)
+  const cleMesIds = mesIds.join(',')
+  useEffect(() => {
+    if (!cleMesIds) return
+    let actif = true
+    supabase.from('messages_lus').select('message_id, user_id, lu_at').in('message_id', cleMesIds.split(',')).then(({ data }) => {
+      if (!actif) return
+      const parMessage = {}
+      for (const l of data || []) (parMessage[l.message_id] ||= []).push(l)
+      setLectures(parMessage)
+    })
+    return () => { actif = false }
+  }, [cleMesIds, supabase])
+
+  useEffect(() => {
+    if (!userId) return
+    const canal = supabase.channel('lectures-' + userId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages_lus' },
+        p => setLectures(prev => (prev[p.new.message_id] || []).some(l => l.user_id === p.new.user_id) ? prev
+          : { ...prev, [p.new.message_id]: [...(prev[p.new.message_id] || []), p.new] }))
+      .subscribe()
+    return () => { supabase.removeChannel(canal) }
+  }, [userId, supabase])
+
   // Mes messages au senior (borne), avec leur statut de lecture
   useEffect(() => {
     if (!seniorId) return
@@ -134,12 +173,14 @@ export default function Messages() {
 
   useEffect(() => { finRef.current?.scrollIntoView({ block: 'end' }) }, [conv, messages.length, messagesSenior.length])
 
+
   // ── Conversations ──
   const prenomSenior = senior?.name?.split(' ')[0] || ''
   const mesFiches = new Set(personnes.filter(p => p.user_id === userId).map(p => p.id))
   const estProche = personnes.some(p => p.type === 'famille' && p.user_id === userId)
 
   function cleDe(m) {
+    if (m.groupe_id) return 'g:' + m.groupe_id
     if (!m.destinataire_id) return TOUS
     if (m.auteur_user_id === userId) {
       const p = personnes.find(x => x.id === m.destinataire_id)
@@ -155,13 +196,19 @@ export default function Messages() {
   const parConv = new Map()
   const ajouter = (cle, m) => { if (!parConv.has(cle)) parConv.set(cle, []); parConv.get(cle).push(m) }
   ajouter(TOUS, null)
+  for (const g of groupes) ajouter('g:' + g.id, null)
   for (const m of messages) { const cle = cleDe(m); if (cle) ajouter(cle, m) }
   if (estProche) { ajouter(SENIOR, null); for (const m of messagesSenior) ajouter(SENIOR, { ...m, auteur_user_id: userId, versSenior: true }) }
   for (const [cle, liste] of parConv) parConv.set(cle, liste.filter(Boolean).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
   if (conv !== TOUS && conv !== SENIOR && !parConv.has(conv)) parConv.set(conv, []) // nouvelle conversation, encore vide
 
+  const nomDe = uid => uid === userId ? 'Vous' : personnes.find(p => p.user_id === uid)?.nom || 'Membre'
   function infos(cle) {
     if (cle === TOUS) return { titre: 'Tous', sousTitre: 'Famille, intervenants et structure', icone: '👥' }
+    if (cle.startsWith('g:')) {
+      const g = groupes.find(x => x.id === cle.slice(2))
+      if (g) return { titre: g.nom, sousTitre: g.membres.map(nomDe).join(', '), icone: '💬', groupe: g }
+    }
     if (cle === SENIOR) return { titre: prenomSenior, sousTitre: 'Sur sa borne', icone: '💌' }
     const p = personnes.find(x => x.cle === cle)
     if (p) return { titre: p.nom, sousTitre: p.role || '', icone: null, personne: p }
@@ -184,7 +231,21 @@ export default function Messages() {
   const fil = parConv.get(conv) || []
   const actuelle = infos(conv)
   const destinataire = actuelle.personne || null
-  const peutRepondre = conv === TOUS || conv === SENIOR || !!destinataire
+  const groupe = actuelle.groupe || null
+  const peutRepondre = conv === TOUS || conv === SENIOR || !!destinataire || !!groupe
+  // Personnes qu'on peut ajouter à un groupe : comptes du dossier (une fois chacun)
+  const candidatsGroupe = [...new Map(personnes.filter(p => p.user_id && p.user_id !== userId).map(p => [p.user_id, p])).values()]
+
+  // Accusés de lecture : les messages des autres affichés dans la conversation ouverte sont marqués lus
+  const aSignaler = chargement || !userId ? '' : messages
+    .filter(m => cleDe(m) === conv && m.auteur_user_id !== userId).map(m => m.id).join(',')
+  useEffect(() => {
+    if (!aSignaler || document.visibilityState !== 'visible') return
+    const ids = aSignaler.split(',').filter(id => !signalesLus.current.has(id))
+    if (!ids.length) return
+    ids.forEach(id => signalesLus.current.add(id))
+    fetch('/api/messages/lus', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) }).catch(() => {})
+  }, [aSignaler])
   const nouveauxPossibles = personnes.filter(p => p.user_id !== userId && !parConv.has(p.cle))
 
   function ouvrir(cle) {
@@ -202,11 +263,27 @@ export default function Messages() {
     if (conv === SENIOR) return envoyerAuSenior()
     setEnvoi(true); setErreur('')
     try {
-      const r = await (await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId, texte, destinataire: destinataire ? { type: destinataire.type, id: destinataire.id } : null }) })).json()
+      const r = await (await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId, texte, groupeId: groupe?.id || null, destinataire: destinataire ? { type: destinataire.type, id: destinataire.id } : null }) })).json()
       if (!r.success) { setErreur(r.error || 'Le message n\'a pas pu être envoyé.'); setEnvoi(false); return }
       if (r.message) setMessages(prev => prev.some(m => m.id === r.message.id) ? prev : [...prev, r.message])
       if (r.signalementId) setQuestion({ id: r.signalementId, notePartielle: r.notePartielle })
       setTexte('')
+    } catch { setErreur('Erreur réseau, réessayez.') }
+    setEnvoi(false)
+  }
+
+  async function enregistrerGroupe() {
+    if (!formGroupe?.nom.trim() || !formGroupe.membres.length || envoi) return
+    setEnvoi(true); setErreur('')
+    try {
+      const corps = formGroupe.id
+        ? { action: 'modifier', groupeId: formGroupe.id, nom: formGroupe.nom, membres: formGroupe.membres }
+        : { action: 'creer', seniorId, nom: formGroupe.nom, membres: formGroupe.membres }
+      const r = await (await fetch('/api/messages/groupes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) })).json()
+      if (!r.success) { setErreur(r.error || 'Le groupe n\'a pas pu être enregistré.'); setEnvoi(false); return }
+      setGroupes(prev => [...prev.filter(g => g.id !== r.groupe.id), r.groupe])
+      setFormGroupe(null)
+      ouvrir('g:' + r.groupe.id)
     } catch { setErreur('Erreur réseau, réessayez.') }
     setEnvoi(false)
   }
@@ -309,9 +386,20 @@ export default function Messages() {
   const statutBorne = m => m.lu_at
     ? '✓ Lu sur la borne le ' + new Date(m.lu_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' à ' + new Date(m.lu_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     : m.retire ? 'Non lu, retiré de la borne après 7 jours' : 'Pas encore lu'
+  const quand = d => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' à ' + new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  function accuse(m) {
+    const lus = (lectures[m.id] || []).slice().sort((a, b) => new Date(a.lu_at) - new Date(b.lu_at))
+    if (m.destinataire_id) {
+      if (lus.length) return { lu: true, texte: '✓ Lu le ' + quand(lus[0].lu_at) }
+      if (m.lu_borne_at) return { lu: true, texte: '✓ Lu sur la borne ou le téléphone le ' + quand(m.lu_borne_at) }
+      return { lu: false, texte: 'Pas encore lu' }
+    }
+    if (!lus.length) return { lu: false, texte: 'Pas encore lu' }
+    return { lu: true, texte: '✓ Lu par ' + lus.map(l => nomDe(l.user_id).split(' ')[0] + ' (' + heureCourte(l.lu_at) + ')').join(', ') }
+  }
   const avatar = (c, taille = 36) => (
     <div style={{ width: taille, height: taille, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: c.icone ? taille * 0.48 : taille * 0.38, fontWeight: 600,
-      background: c.cle === TOUS ? '#EAF4EF' : c.cle === SENIOR ? '#F3EDF7' : '#F0F2F1', color: '#4A8870' }}>
+      background: c.cle === TOUS ? '#EAF4EF' : c.cle === SENIOR || c.cle?.startsWith('g:') ? '#F3EDF7' : '#F0F2F1', color: '#4A8870' }}>
       {c.icone || c.titre.split(' ').filter(Boolean).slice(0, 2).map(m => m[0]).join('').toUpperCase()}
     </div>
   )
@@ -382,6 +470,38 @@ export default function Messages() {
                 + Nouvelle conversation
               </button>
             ))}
+            {candidatsGroupe.length > 0 && !formGroupe && (
+              <button onClick={() => setFormGroupe({ nom: '', membres: [] })}
+                style={{ marginTop: 8, background: '#fff', color: '#4A8870', border: '1.5px solid #7FAF9B', borderRadius: 10, padding: '10px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                + Nouveau groupe
+              </button>
+            )}
+            {formGroupe && (
+              <div style={{ marginTop: 10, background: '#fff', border: '1px solid #C8DDD4', borderRadius: 12, padding: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>{formGroupe.id ? 'Modifier le groupe' : 'Nouveau groupe'}</div>
+                <input autoFocus placeholder="Nom du groupe (ex. Équipe soins)" value={formGroupe.nom} maxLength={60}
+                  onChange={e => setFormGroupe(f => ({ ...f, nom: e.target.value }))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '1px solid #E8EFEB', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', marginBottom: 8 }} />
+                <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                  {candidatsGroupe.map(p => (
+                    <label key={p.user_id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: '#1F2A24', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={formGroupe.membres.includes(p.user_id)}
+                        onChange={() => setFormGroupe(f => ({ ...f, membres: f.membres.includes(p.user_id) ? f.membres.filter(x => x !== p.user_id) : [...f.membres, p.user_id] }))} />
+                      <span>{p.nom}{p.role ? <span style={{ color: '#9BB5AA' }}> · {p.role}</span> : ''}</span>
+                    </label>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 10, lineHeight: 1.5 }}>Seules les personnes qui ont un compte Holiris peuvent rejoindre un groupe. Les messages du groupe ne sont visibles que par ses membres.</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={enregistrerGroupe} disabled={envoi || !formGroupe.nom.trim() || !formGroupe.membres.length}
+                    style={{ flex: 1, background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: !formGroupe.nom.trim() || !formGroupe.membres.length ? 0.5 : 1 }}>
+                    {envoi ? '…' : formGroupe.id ? 'Enregistrer' : 'Créer le groupe'}
+                  </button>
+                  <button onClick={() => setFormGroupe(null)}
+                    style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Conversation ouverte */}
@@ -390,12 +510,17 @@ export default function Messages() {
               <button className="msg-retour" onClick={() => setOuverteMobile(false)}
                 style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 999, padding: '6px 12px', fontSize: 13, color: '#6F7C75', cursor: 'pointer', fontFamily: 'inherit' }}>←</button>
               {avatar({ ...actuelle, cle: conv }, 32)}
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: '#1F2A24' }}>{actuelle.titre}</div>
-                <div style={{ fontSize: 12, color: '#9BB5AA' }}>
-                  {conv === TOUS ? `Visible par tous ceux qui suivent ${prenomSenior}` : conv === SENIOR ? `Privé · ${prenomSenior} lit ou écoute sur sa borne` : `Conversation privée${actuelle.sousTitre ? ' · ' + actuelle.sousTitre : ''}`}
+                <div style={{ fontSize: 12, color: '#9BB5AA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {conv === TOUS ? `Visible par tous ceux qui suivent ${prenomSenior}` : conv === SENIOR ? `Privé · ${prenomSenior} lit ou écoute sur sa borne`
+                    : groupe ? `Groupe privé · ${actuelle.sousTitre}` : `Conversation privée${actuelle.sousTitre ? ' · ' + actuelle.sousTitre : ''}`}
                 </div>
               </div>
+              {groupe && groupe.cree_par === userId && (
+                <button onClick={() => setFormGroupe({ id: groupe.id, nom: groupe.nom, membres: groupe.membres.filter(id => id !== userId) })}
+                  style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 999, padding: '6px 12px', fontSize: 12, color: '#6F7C75', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>Modifier</button>
+              )}
             </div>
 
             <div className="msg-fil" style={{ flex: 1, overflowY: 'auto', background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 16px 4px' }}>
@@ -405,6 +530,7 @@ export default function Messages() {
                 <div style={{ color: '#9BB5AA', fontSize: 14, textAlign: 'center', padding: '40px 16px', lineHeight: 1.7 }}>
                   {conv === TOUS ? <>Aucun message pour l&apos;instant.<br />Écrivez le premier : tous ceux qui suivent {prenomSenior} le recevront.</>
                     : conv === SENIOR ? <>Écrivez ou enregistrez un message vocal :<br />{prenomSenior} le lira ou l&apos;écoutera sur sa borne.</>
+                    : groupe ? <>Premier message du groupe « {groupe.nom} ».<br />Seuls ses membres le verront.</>
                     : <>Démarrez la conversation avec {actuelle.titre.split(' ')[0]}.<br />Vous seuls la verrez.</>}
                 </div>
               ) : fil.map((m, idx) => {
@@ -426,6 +552,7 @@ export default function Messages() {
                       ? (m.audio_url ? <audio controls preload="none" src={m.audio_url} style={{ maxWidth: 240, display: 'block' }} /> : '🎙 Message vocal')
                       : m.contenu}</div>
                     {m.versSenior && <div style={{ fontSize: 11, color: m.lu_at ? '#4A8870' : '#9BB5AA', margin: '3px 4px 0' }}>{statutBorne(m)}</div>}
+                    {moi && !m.versSenior && (() => { const a = accuse(m); return <div style={{ fontSize: 11, color: a.lu ? '#4A8870' : '#9BB5AA', margin: '3px 4px 0', maxWidth: '82%', textAlign: 'right' }}>{a.texte}</div> })()}
                   </div>
                 )
               })}
@@ -451,7 +578,7 @@ export default function Messages() {
             ) : (
               <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'flex-end' }}>
                 <textarea rows={2} value={texte} onChange={e => setTexte(e.target.value)}
-                  placeholder={dictee === 'enregistrement' || vocal?.etat === 'enregistrement' ? 'Parlez, puis touchez « Arrêter »…' : conv === TOUS ? 'Message à tout le monde…' : `Message à ${actuelle.titre.split(' ')[0]}…`}
+                  placeholder={dictee === 'enregistrement' || vocal?.etat === 'enregistrement' ? 'Parlez, puis touchez « Arrêter »…' : conv === TOUS ? 'Message à tout le monde…' : groupe ? `Message au groupe ${groupe.nom}…` : `Message à ${actuelle.titre.split(' ')[0]}…`}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) { e.preventDefault(); envoyer() } }}
                   style={{ flex: 1, padding: '10px 14px', border: '1px solid #C8DDD4', borderRadius: 10, fontSize: 15, outline: 'none', fontFamily: 'inherit', resize: 'none', background: '#fff', lineHeight: 1.45 }} />
                 {conv === SENIOR ? (

@@ -60,8 +60,9 @@ async function notifierDestinataire(senior, auteur, contenu, dest) {
   return 1
 }
 
-// Email aux autres participants ayant un compte, au plus un par heure et par personne
-async function notifier(senior, auteurUserId, auteur, contenu) {
+// Email aux autres participants ayant un compte, au plus un par heure et par personne.
+// membres : pour un groupe, seuls ses membres sont notifiés
+async function notifier(senior, auteurUserId, auteur, contenu, membres = null) {
   const [{ data: fam }, { data: interv }, { data: gest }] = await Promise.all([
     supabaseAdmin.from('famille').select('name, email, user_id').eq('senior_id', senior.id).is('archived_at', null).not('user_id', 'is', null),
     supabaseAdmin.from('intervenants').select('name, email, user_id').eq('senior_id', senior.id).is('archived_at', null).not('user_id', 'is', null),
@@ -72,7 +73,7 @@ async function notifier(senior, auteurUserId, auteur, contenu) {
   const desinscrits = await adressesDesinscrites(supabaseAdmin)
   const destinataires = new Map()
   for (const p of [...(fam || []), ...(interv || []), ...(gest || []).map(g => ({ ...g, name: g.nom }))]) {
-    if (!p.email || p.user_id === auteurUserId) continue
+    if (!p.email || p.user_id === auteurUserId || (membres && !membres.includes(p.user_id))) continue
     const email = p.email.toLowerCase()
     if (!desinscrits.has(email) && !destinataires.has(email)) destinataires.set(email, p)
   }
@@ -111,7 +112,7 @@ export async function POST(request) {
     const user = await utilisateurCourant()
     if (!user) return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 })
 
-    const { seniorId, texte, destinataire } = await request.json()
+    const { seniorId, texte, destinataire, groupeId } = await request.json()
     const brut = String(texte || '').trim().slice(0, 2000)
     if (!seniorId || !brut) return NextResponse.json({ success: false, error: 'Message vide' }, { status: 400 })
 
@@ -121,26 +122,38 @@ export async function POST(request) {
     const dest = destinataire ? await destinataireValide(destinataire, seniorId) : null
     if (destinataire && !dest) return NextResponse.json({ success: false, error: 'Destinataire introuvable' }, { status: 400 })
 
+    // Groupe de discussion : seuls ses membres peuvent y écrire et le lire
+    let membres = null
+    if (groupeId) {
+      const { data: groupe } = await supabaseAdmin.from('groupes_discussion').select('id, senior_id').eq('id', groupeId).maybeSingle()
+      const { data: lignes } = await supabaseAdmin.from('groupes_membres').select('user_id').eq('groupe_id', groupeId)
+      membres = (lignes || []).map(l => l.user_id)
+      if (!groupe || groupe.senior_id !== seniorId || !membres.includes(user.id)) return NextResponse.json({ success: false, error: 'Groupe introuvable' }, { status: 403 })
+    }
+
     // Filtre médical : seule la partie non médicale est publiée
     const { medical, note: contenu } = await analyserNote(brut)
 
     let message = null
     if (contenu) {
       const { data, error } = await supabaseAdmin.from('messages').insert({
-        senior_id: seniorId, auteur_user_id: user.id, auteur_nom: auteur.nom, auteur_role: auteur.role || null, contenu,
-        ...(dest ? { destinataire_type: dest.type, destinataire_id: dest.id, destinataire_nom: dest.name } : {}),
+        senior_id: seniorId, auteur_user_id: user.id, auteur_nom: auteur.nom, auteur_role: auteur.role || null, auteur_type: auteur.type, contenu,
+        ...(groupeId ? { groupe_id: groupeId } : dest ? { destinataire_type: dest.type, destinataire_id: dest.id, destinataire_nom: dest.name } : {}),
       }).select().single()
       if (error) throw error
       message = data
     }
     const signalementId = medical ? await creerSignalement({ seniorId, auteur, source: 'messages' }) : null
-    const notifies = !message ? 0 : dest ? await notifierDestinataire(senior, auteur, contenu, dest) : await notifier(senior, user.id, auteur, contenu)
+    const notifies = !message ? 0 : membres ? await notifier(senior, user.id, auteur, contenu, membres)
+      : dest ? await notifierDestinataire(senior, auteur, contenu, dest) : await notifier(senior, user.id, auteur, contenu)
     if (message) {
-      // Notification sur téléphone, en plus de l'email : le destinataire choisi, sinon tous ceux qui suivent le senior
+      // Notification sur téléphone, en plus de l'email : les membres du groupe, le destinataire choisi, sinon tous ceux qui suivent le senior
       const extrait = contenu.length > 140 ? contenu.slice(0, 137) + '…' : contenu
-      const cibles = dest
-        ? { userIds: [dest.user_id], jetons: dest.user_id ? [] : [dest.jeton_mobile] }
-        : { userIds: (await comptesDuSenior(seniorId)).filter(id => id !== user.id) }
+      const cibles = membres
+        ? { userIds: membres.filter(id => id !== user.id) }
+        : dest
+          ? { userIds: [dest.user_id], jetons: dest.user_id ? [] : [dest.jeton_mobile] }
+          : { userIds: (await comptesDuSenior(seniorId)).filter(id => id !== user.id) }
       await envoyerPush(cibles, {
         title: `💬 ${auteur.nom.split(' ')[0]}${dest ? ' vous a écrit' : ''} · ${senior.name.split(' ')[0]}`,
         body: extrait,

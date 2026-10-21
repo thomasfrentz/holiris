@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/serveur'
 
-// Messages adressés à un intervenant, affichés sur la borne le jour de son rendez-vous (dès 0 h, heure de Paris)
-// jusqu'à ce qu'il les lise (sur la borne, son téléphone ou le site). Le code de la borne sert de clé.
+// Messages adressés à un intervenant par la famille ou la structure, affichés sur la borne le jour de son
+// rendez-vous (dès 0 h, heure de Paris) jusqu'à ce qu'il les lise (sur la borne, son téléphone ou le site).
+// Les messages entre intervenants restent privés : jamais sur la borne. Le code de la borne sert de clé.
 
 const jourParis = d => new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date(d))
 
@@ -16,12 +17,21 @@ export async function GET(request) {
   const borne = await borneParCode(new URL(request.url).searchParams.get('code'))
   if (!borne) return NextResponse.json({ error: 'Code borne invalide' }, { status: 404 })
 
-  const { data: messages } = await supabaseAdmin.from('messages')
-    .select('id, contenu, auteur_nom, auteur_role, destinataire_id, destinataire_nom, created_at')
-    .eq('senior_id', borne.senior_id).eq('destinataire_type', 'intervenant').is('lu_borne_at', null)
+  const { data: tous } = await supabaseAdmin.from('messages')
+    .select('id, contenu, auteur_nom, auteur_role, auteur_type, auteur_user_id, destinataire_id, destinataire_nom, created_at')
+    .eq('senior_id', borne.senior_id).eq('destinataire_type', 'intervenant').is('lu_borne_at', null).is('groupe_id', null)
     .gte('created_at', new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
     .order('created_at', { ascending: true })
-  if (!messages?.length) return NextResponse.json({ messages: [] })
+  if (!tous?.length) return NextResponse.json({ messages: [] })
+
+  // Auteur intervenant : type enregistré, ou, pour les messages plus anciens, compte d'un intervenant
+  const sansType = [...new Set(tous.filter(m => !m.auteur_type).map(m => m.auteur_user_id))]
+  const { data: comptesIntervenants } = sansType.length
+    ? await supabaseAdmin.from('intervenants').select('user_id').in('user_id', sansType)
+    : { data: [] }
+  const auteursIntervenants = new Set((comptesIntervenants || []).map(c => c.user_id))
+  const messages = tous.filter(m => m.auteur_type ? m.auteur_type !== 'intervenant' : !auteursIntervenants.has(m.auteur_user_id))
+  if (!messages.length) return NextResponse.json({ messages: [] })
 
   // Rendez-vous d'aujourd'hui avec ces intervenants
   const aujourdhui = jourParis(Date.now())
@@ -44,7 +54,7 @@ export async function GET(request) {
 
   const aAfficher = messages.filter(m => venusAujourdhui.has(m.destinataire_id)
     && !(comptes[m.destinataire_id] && luJusqua[comptes[m.destinataire_id]] >= new Date(m.created_at).getTime()))
-  return NextResponse.json({ messages: aAfficher })
+  return NextResponse.json({ messages: aAfficher.map(({ auteur_user_id, auteur_type, ...m }) => m) })
 }
 
 // « Lu » touché sur la borne
