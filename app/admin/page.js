@@ -28,6 +28,7 @@ export default function Admin() {
   const [copied, setCopied] = useState(null)
   const [searchUser, setSearchUser] = useState('')
   const [personnes, setPersonnes] = useState([])
+  const [relance, setRelance] = useState({ jours: 3, liste: null, choisis: [], envoi: false, resultats: null })
   const [filtreRole, setFiltreRole] = useState('tous') // tous | famille | intervenant | gestionnaire | admin
 
   const [prenom, setPrenom] = useState('')
@@ -123,6 +124,22 @@ export default function Admin() {
       ? 'Utilisateur supprimé, ainsi que son compte de connexion.'
       : 'Utilisateur supprimé. Son compte de connexion est conservé : il a encore accès à d\'autres dossiers.')
     loadData()
+  }
+
+  // Relance WhatsApp manuelle des intervenants sans note (envoyée par le site, avec le jeton de production)
+  async function chargerRelances(jours = relance.jours) {
+    setRelance(r => ({ ...r, jours, liste: null, resultats: null }))
+    const res = await fetch('/api/admin/relances?jours=' + jours)
+    const data = res.ok ? await res.json() : { intervenants: [] }
+    setRelance(r => ({ ...r, liste: data.intervenants, choisis: data.intervenants.filter(i => i.passageId).map(i => i.id) }))
+  }
+
+  async function envoyerRelances() {
+    if (!relance.choisis.length || !confirm(`Envoyer une relance WhatsApp à ${relance.choisis.length} intervenant${relance.choisis.length > 1 ? 's' : ''} ?`)) return
+    setRelance(r => ({ ...r, envoi: true }))
+    const res = await fetch('/api/admin/relances', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: relance.choisis, jours: relance.jours }) })
+    const data = await res.json().catch(() => ({}))
+    setRelance(r => ({ ...r, envoi: false, resultats: data.resultats || [{ nom: 'Erreur', envoye: false, erreur: data.error || 'inconnue' }] }))
   }
 
   async function toggleAdmin(familleId, currentValue) {
@@ -233,8 +250,9 @@ export default function Admin() {
           { key: 'structures', label: 'Structures' },
           { key: 'utilisateurs', label: 'Utilisateurs & Admins' },
           { key: 'bornes', label: 'Bornes' },
+          { key: 'relances', label: 'Relances' },
         ].map(o => (
-          <button key={o.key} onClick={() => setOnglet(o.key)} style={{
+          <button key={o.key} onClick={() => { setOnglet(o.key); if (o.key === 'relances' && !relance.liste) chargerRelances() }} style={{
             background: 'none', border: 'none',
             borderBottom: onglet === o.key ? '2px solid #7FAF9B' : '2px solid transparent',
             padding: '14px 20px', fontSize: 13,
@@ -528,6 +546,60 @@ export default function Admin() {
                 </div>
               )}
             </div>
+          </>
+        )}
+
+        {onglet === 'relances' && (
+          <>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>WhatsApp</div>
+              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 12 }}>Relancer les intervenants</h1>
+              <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.6, maxWidth: 640 }}>
+                Intervenants avec un numéro, sans note depuis
+                <select value={relance.jours} onChange={e => chargerRelances(parseInt(e.target.value))}
+                  style={{ margin: '0 6px', padding: '3px 6px', border: '1px solid #E8EFEB', borderRadius: 6, fontFamily: 'inherit', fontSize: 13 }}>
+                  {[2, 3, 5, 7, 14].map(j => <option key={j} value={j}>{j} jours</option>)}
+                </select>.
+                Message envoyé : modèle WhatsApp « relances_intervenant ». Ceux qui ont eu un passage dans la période sont cochés d&apos;office.
+              </p>
+            </div>
+
+            {!relance.liste ? (
+              <div style={{ color: '#9BB5AA', fontSize: 14 }}>Chargement…</div>
+            ) : relance.liste.length === 0 ? (
+              <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '40px 20px', textAlign: 'center', fontSize: 14, color: '#9BB5AA' }}>Tous les intervenants joignables ont écrit récemment.</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+                  {relance.liste.map(i => {
+                    const coche = relance.choisis.includes(i.id)
+                    const resultat = relance.resultats?.find(r => r.id === i.id)
+                    return (
+                      <label key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: '1px solid ' + (coche ? '#C8DDD4' : '#E8EFEB'), borderRadius: 10, padding: '12px 16px', cursor: 'pointer', flexWrap: 'wrap' }}>
+                        <input type="checkbox" checked={coche} onChange={() => setRelance(r => ({ ...r, choisis: coche ? r.choisis.filter(x => x !== i.id) : [...r.choisis, i.id] }))} />
+                        <div style={{ flex: 1, minWidth: 220 }}>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: '#1F2A24' }}>{i.nom} <span style={{ fontWeight: 400, color: '#9BB5AA' }}>· {i.role || 'Intervenant'} · chez {i.senior}</span></div>
+                          <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>
+                            {i.passageLe ? 'Passage le ' + new Date(i.passageLe).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Aucun passage dans la période'}
+                            {' · '}{i.derniereNote ? 'dernière note le ' + new Date(i.derniereNote).toLocaleDateString('fr-FR') : 'aucune note'}
+                            {i.derniereRelance && ' · relancé le ' + new Date(i.derniereRelance).toLocaleDateString('fr-FR')}
+                          </div>
+                        </div>
+                        {resultat && (
+                          <span style={{ fontSize: 12, fontWeight: 500, color: resultat.envoye ? '#4A8870' : '#C4606A' }}>
+                            {resultat.envoye ? '✓ Envoyée' : '✗ ' + (resultat.erreur || 'Échec')}
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+                <button onClick={envoyerRelances} disabled={relance.envoi || !relance.choisis.length}
+                  style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 22px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: relance.choisis.length ? 1 : 0.5 }}>
+                  {relance.envoi ? 'Envoi…' : `Relancer ${relance.choisis.length} intervenant${relance.choisis.length > 1 ? 's' : ''}`}
+                </button>
+              </>
+            )}
           </>
         )}
 
