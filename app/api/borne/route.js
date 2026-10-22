@@ -53,8 +53,9 @@ export async function GET(request) {
       .eq('senior_id', borne.senior_id).eq('lu', false).gte('created_at', depuis)
       .or('type.is.null,type.neq.sans_passage') // « aucun passage » : pour la famille, pas pour l'écran du senior
       .order('created_at', { ascending: false }).limit(5)
-    // Les urgentes d'abord, comme sur le tableau de bord
-    return NextResponse.json({ alertes: (alertes || []).sort((a, b) => (b.niveau === 'danger') - (a.niveau === 'danger')) })
+    // Les urgentes d'abord, puis les alertes, puis les points à surveiller
+    const ordre = { danger: 0, warning: 1, surveiller: 2 }
+    return NextResponse.json({ alertes: (alertes || []).sort((a, b) => (ordre[a.niveau] ?? 1) - (ordre[b.niveau] ?? 1)) })
   }
 
   const [{ data: intervenants }, { data: famille }] = await Promise.all([

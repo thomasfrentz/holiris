@@ -859,9 +859,8 @@ export default function Borne() {
 
   if (step === 'accueil') {
     const nonMasquees = alertesAccueil.filter(a => !masques.alertes.includes(a.id))
-    const urgentes = nonMasquees.filter(a => a.niveau === 'danger')
-    const autres = nonMasquees.filter(a => a.niveau !== 'danger')
-    const alertesVisibles = [...urgentes, ...autres].slice(0, 3)
+    const ordre = { danger: 0, warning: 1, surveiller: 2 }
+    const alertesVisibles = [...nonMasquees].sort((a, b) => (ordre[a.niveau] ?? 1) - (ordre[b.niveau] ?? 1)).slice(0, 3)
     const messagesVisibles = messagesAccueil.length > 0 && JSON.stringify(messagesAccueil) !== masques.messages
     const aDesMessagesSenior = messagesSenior.length > 0
     const compact = alertesVisibles.length > 0 || messagesVisibles || messagesJour.length > 0 || aDesMessagesSenior
@@ -908,9 +907,9 @@ export default function Borne() {
                 </button>
               ))}
               {alertesVisibles.map(a => (
-                <div key={a.id} className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: a.niveau === 'danger' ? C.rouge : C.ambre, flexShrink: 0 }}>
-                    {a.niveau === 'danger' ? 'Urgent' : 'À surveiller'}
+                <div key={a.id} className="borne-carte" style={{ display: 'flex', gap: 14, alignItems: 'center', background: a.niveau === 'danger' ? C.roseClair : a.niveau === 'surveiller' ? C.saugeClair : C.ambreClair, borderRadius: 16, padding: '14px 18px', textAlign: 'left' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: a.niveau === 'danger' ? C.rouge : a.niveau === 'surveiller' ? C.saugeFonce : C.ambre, flexShrink: 0 }}>
+                    {a.niveau === 'danger' ? 'Urgent' : a.niveau === 'surveiller' ? 'À surveiller' : 'Alerte'}
                   </span>
                   <span style={{ fontSize: 17, lineHeight: 1.45, flex: 1 }}>{a.message}</span>
                   <span style={{ fontSize: 13, color: C.gris, flexShrink: 0 }}>{new Date(a.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>

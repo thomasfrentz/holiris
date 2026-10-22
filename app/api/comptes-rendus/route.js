@@ -93,7 +93,7 @@ export async function GET(request) {
           dateConsultation: escapeHtml(new Date(rdv.scheduled_at).toLocaleString('fr-FR', { timeZone: FUSEAU, weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })),
           depuis: escapeHtml(depuis),
           resume: escapeHtml(resume),
-          alertes: (alertes || []).slice(0, 8).map(a => ({ urgent: a.niveau === 'danger', date: escapeHtml(dateCourte(a.created_at)), message: escapeHtml(a.message) })),
+          alertes: (alertes || []).slice(0, 8).map(a => ({ urgent: a.niveau === 'danger', libelle: a.niveau === 'danger' ? 'Urgent' : a.niveau === 'surveiller' ? 'À surveiller' : 'Attention', date: escapeHtml(dateCourte(a.created_at)), message: escapeHtml(a.message) })),
           notes: (notes || []).slice(-6).reverse().map(n => ({ date: escapeHtml(dateCourte(n.created_at)), auteur: escapeHtml(n.intervenant_name || 'Proche'), contenu: escapeHtml(n.content) })),
           lienNote: lienNoteMedecin(medecin.id, rdv.senior_id, expire),
           desinscription: lienDesinscription(email).page,

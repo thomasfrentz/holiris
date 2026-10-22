@@ -106,9 +106,12 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     setAlertes(prev => prev.filter(a => !liste.includes(a.id)))
   }
 
+  // Les points à surveiller ne font pas de pop-up : ils restent dans le flux pendant 7 jours
   const alertesNonLues = alertes
-    .filter(a => !a.lu && !ordonnancesLues.includes(a.id))
+    .filter(a => !a.lu && a.niveau !== 'surveiller' && !ordonnancesLues.includes(a.id))
     .sort((a, b) => (b.niveau === 'danger') - (a.niveau === 'danger'))
+  const pointsASurveiller = alertes
+    .filter(a => !a.lu && a.niveau === 'surveiller' && now - new Date(a.created_at) < 7 * 86400000)
 
   // Événement avec plusieurs intervenants : le premier est affiché, puis « +1 », « +2 »…
   const autresIntervenants = (e) => (e.intervenant_ids?.length > 1 ? ' +' + (e.intervenant_ids.length - 1) : '')
@@ -290,6 +293,27 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
         </div>
 
       </div>
+
+      {/* Points à surveiller : sans notification, jusqu'à ce qu'ils soient vus */}
+      {pointsASurveiller.length > 0 && (
+        <Section title="Points à surveiller">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pointsASurveiller.map(a => (
+              <div key={a.id} className="hl-card" style={{ padding: '14px 18px', background: '#fff', borderLeft: '3px solid #9BB5AA', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: '#4A8870', letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 4 }}>
+                    À surveiller · {formatRelative(a.created_at)}
+                  </div>
+                  <div style={{ fontSize: 14, color: '#1F2A24', lineHeight: 1.5 }}>{a.message}</div>
+                </div>
+                <button onClick={() => marquerLu(a.id)} style={{ background: '#fff', border: '1px solid #E8EFEB', color: '#6F7C75', padding: '7px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', borderRadius: 6, fontFamily: 'inherit', flexShrink: 0 }}>
+                  Vu ✓
+                </button>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Notes */}
       <Section title="Dernières notes">

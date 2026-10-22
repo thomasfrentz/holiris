@@ -226,14 +226,15 @@ export default function IntervenantDashboard() {
           <div style={{ marginBottom: 16 }}>
             {alertes.map(a => {
               const danger = a.niveau === 'danger'
-              const color = danger ? '#D98992' : '#E6B98A'
-              const bg = danger ? '#FBECED' : '#FDF3E7'
-              const border = danger ? '#F2C4C8' : '#F0D9B5'
+              const surveiller = a.niveau === 'surveiller'
+              const color = danger ? '#D98992' : surveiller ? '#9BB5AA' : '#E6B98A'
+              const bg = danger ? '#FBECED' : surveiller ? '#F4F8F6' : '#FDF3E7'
+              const border = danger ? '#F2C4C8' : surveiller ? '#E8EFEB' : '#F0D9B5'
               return (
                 <div key={a.id} style={{ background: bg, border: '1px solid ' + border, borderLeft: '3px solid ' + color, borderRadius: 10, padding: '12px 16px', marginBottom: 8, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, marginTop: 5, flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: 10, color, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4 }}>{danger ? 'Urgent' : 'Attention'}</div>
+                    <div style={{ fontSize: 10, color, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 4 }}>{danger ? 'Urgent' : surveiller ? 'À surveiller' : 'Attention'}</div>
                     <div style={{ fontSize: 13, color: '#1F2A24' }}>{a.message}</div>
                   </div>
                 </div>
