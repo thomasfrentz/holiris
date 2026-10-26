@@ -38,7 +38,7 @@ export async function POST(request) {
     }
 
     // Texte fidèle à ce qui a été dit (mis au propre, sans résumé ni interprétation)
-    const note = await mettreAuPropre(rawText)
+    const note = await mettreAuPropre(rawText, contexte)
     return NextResponse.json({ success: true, note, rawText })
   } catch (err) {
     console.error('borne-transcribe error:', err)
