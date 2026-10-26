@@ -51,6 +51,7 @@ const listePrenoms = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' et ' + l[
 export default function Borne() {
   const [step, setStep] = useState('loading')
   const [codeInput, setCodeInput] = useState('')
+  const [preparation, setPreparation] = useState(false)
   const [borneInfo, setBorneInfo] = useState(null)
   const [personnes, setPersonnes] = useState([])
   const [selectedPersonne, setSelectedPersonne] = useState(null)
@@ -435,9 +436,11 @@ export default function Borne() {
   }
 
   async function startRecording() {
+    if (preparation) return
     setError('')
+    setPreparation(true)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
       chunksRef.current = []
       const mr = new MediaRecorder(stream)
       mediaRecorderRef.current = mr
@@ -449,12 +452,19 @@ export default function Borne() {
         setAudioBlob(blob)
         transcrire(blob)
       }
+      // Le micro met un instant à démarrer et à régler son volume : on n'invite à parler qu'une fois prêt,
+      // sinon le début de la phrase est perdu (« Jeanne va bien » transcrit « je vais… »)
+      const demarre = new Promise(r => { mr.onstart = r })
       mr.start()
+      await demarre
+      await new Promise(r => setTimeout(r, 600))
       setRecording(true)
       setDuration(0)
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000)
     } catch {
       setError("Impossible d'accéder au microphone.")
+    } finally {
+      setPreparation(false)
     }
   }
 
@@ -475,6 +485,7 @@ export default function Borne() {
     try {
       const formData = new FormData()
       formData.append('audio', blob, blob.type.includes('mp4') ? 'note.m4a' : 'note.webm')
+      if (borneInfo?.code) formData.append('code', borneInfo.code)
       const res = await fetch('/api/borne-transcribe', { method: 'POST', body: formData })
       const result = await res.json()
       if (result.success) {
@@ -1090,16 +1101,16 @@ export default function Borne() {
           </div>
         ) : (
           <>
-            <button onClick={recording ? () => stopRecording(true) : startRecording} className="borne-bouton"
-              style={{ width: 176, height: 176, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff',
+            <button onClick={recording ? () => stopRecording(true) : startRecording} disabled={preparation} className="borne-bouton"
+              style={{ opacity: preparation ? 0.6 : 1, width: 176, height: 176, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff',
                 background: recording ? C.rouge : `linear-gradient(145deg, ${C.sauge}, ${C.saugeFonce})`,
                 boxShadow: recording ? undefined : '0 16px 36px rgba(74,136,112,0.35)',
                 animation: recording ? 'holiris-pulse 1.6s infinite' : 'none' }}>
               <span style={{ fontSize: 50 }}>{recording ? '■' : '🎙'}</span>
-              <span style={{ fontSize: 15, letterSpacing: '0.12em', fontWeight: 600 }}>{recording ? formatDuration(duration) : 'PARLER'}</span>
+              <span style={{ fontSize: 15, letterSpacing: '0.12em', fontWeight: 600 }}>{recording ? formatDuration(duration) : preparation ? '…' : 'PARLER'}</span>
             </button>
             <p style={{ fontSize: 18, color: C.gris, textAlign: 'center' }}>
-              {recording ? 'Je vous écoute… touchez à nouveau quand vous avez fini' : 'Touchez le micro et racontez comment ça s\'est passé'}
+              {recording ? 'Je vous écoute… touchez à nouveau quand vous avez fini' : preparation ? 'Un instant, le micro se prépare…' : 'Touchez le micro et racontez comment ça s\'est passé'}
             </p>
           </>
         )}

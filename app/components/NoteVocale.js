@@ -54,6 +54,7 @@ export default function NoteVocale({ seniorId, source, onNoteAjoutee, grand = fa
       const formData = new FormData()
       const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'
       formData.append('audio', blob, 'note.' + extension)
+      if (seniorId) formData.append('seniorId', seniorId)
       const res = await fetch('/api/borne-transcribe', { method: 'POST', body: formData })
       const result = await res.json()
       if (!result.success || !result.note) throw new Error(result.rienEntendu ? result.error : '')
