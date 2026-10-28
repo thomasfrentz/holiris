@@ -7,6 +7,74 @@ import { useSenior } from '../lib/useSenior'
 
 const ROLES = ['Aide à domicile', 'Auxiliaire de vie', 'Aide-soignant·e', 'Infirmier·ère', 'Kinésithérapeute', 'Coordinateur·rice', 'Autre']
 
+// ── Import d'une liste de salariés : copiée depuis Excel (tabulations) ou fichier CSV (; ou ,) ──
+const sansAccents = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+// Intitulés de colonnes reconnus, tels qu'ils apparaissent dans les exports des logiciels métier
+const COLONNES = [
+  ['prenom', /^(prenom|first ?name)/],
+  ['nomComplet', /^(nom (complet|et prenom|prenom)|salarie|intervenant|identite|nom prenom)$/],
+  ['nom', /^(nom|nom de famille|last ?name|nom d.usage)$/],
+  ['role', /^(fonction|poste|qualification|metier|role|emploi|intitule)/],
+  ['telephone', /(tel|portable|mobile|gsm|whatsapp)/],
+  ['email', /(e-?mail|courriel|^mail)/],
+]
+
+// Découpe une ligne CSV en tenant compte des guillemets
+function decouper(ligne, sep) {
+  const champs = []
+  let cour = '', guillemets = false
+  for (let i = 0; i < ligne.length; i++) {
+    const c = ligne[i]
+    if (c === '"') { if (guillemets && ligne[i + 1] === '"') { cour += '"'; i++ } else guillemets = !guillemets }
+    else if (c === sep && !guillemets) { champs.push(cour.trim()); cour = '' }
+    else cour += c
+  }
+  return [...champs, cour.trim()]
+}
+
+// « DUPONT Marie » ou « Marie Dupont » : le mot en majuscules est le nom
+function separerNom(complet) {
+  const mots = complet.split(/\s+/).filter(Boolean)
+  const majuscules = mots.filter(m => m.length > 1 && m === m.toUpperCase())
+  if (majuscules.length && majuscules.length < mots.length) {
+    return { nom: majuscules.join(' '), prenom: mots.filter(m => !majuscules.includes(m)).join(' ') }
+  }
+  return { prenom: mots[0] || '', nom: mots.slice(1).join(' ') }
+}
+
+function lireListeSalaries(texte) {
+  const lignes = texte.split(/\r?\n/).filter(l => l.trim())
+  if (lignes.length < 2) return { erreur: 'Il faut une ligne d\'intitulés (Prénom, Nom, Email…) puis une ligne par salarié.' }
+  const premiere = lignes[0]
+  const sep = ['\t', ';', ','].sort((a, b) => premiere.split(b).length - premiere.split(a).length)[0]
+  const entetes = decouper(premiere, sep).map(sansAccents)
+  const index = {}
+  entetes.forEach((e, i) => {
+    const trouve = COLONNES.find(([cle, motif]) => index[cle] === undefined && motif.test(e))
+    if (trouve) index[trouve[0]] = i
+  })
+  if (index.email === undefined || (index.nom === undefined && index.nomComplet === undefined)) {
+    return { erreur: 'Colonnes non reconnues. La première ligne doit contenir au moins « Nom » (ou « Nom et prénom ») et « Email ».' }
+  }
+  const salaries = lignes.slice(1).map(l => {
+    const c = decouper(l, sep)
+    const val = cle => index[cle] !== undefined ? c[index[cle]] || '' : ''
+    let { prenom, nom } = { prenom: val('prenom'), nom: val('nom') }
+    if (index.nomComplet !== undefined && (!prenom || !nom)) ({ prenom, nom } = separerNom(val('nomComplet')))
+    const nomPropre = n => n.toLowerCase().replace(/(^|[\s-])\S/g, x => x.toUpperCase())
+    return { prenom: nomPropre(prenom), nom: nomPropre(nom), role: val('role'), telephone: val('telephone'), email: val('email').toLowerCase() }
+  })
+  return { salaries }
+}
+
+// Fichier exporté sous Windows : souvent en Windows-1252 plutôt qu'en UTF-8
+async function lireFichier(fichier) {
+  const octets = await fichier.arrayBuffer()
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(octets) }
+  catch { return new TextDecoder('windows-1252').decode(octets) }
+}
+
 export default function MaStructure() {
   const [donnees, setDonnees] = useState(null)
   const [erreur, setErreur] = useState('')
@@ -18,6 +86,8 @@ export default function MaStructure() {
   const [salarie, setSalarie] = useState({ prenom: '', nom: '', role: '', telephone: '', email: '', seniorIds: [] })
   const [gestionnaire, setGestionnaire] = useState({ nom: '', email: '' })
   const [rattachement, setRattachement] = useState({ seniorNom: '', emailProche: '' })
+  const [importTexte, setImportTexte] = useState('')
+  const [importResultat, setImportResultat] = useState(null) // résultat du dernier import : ajoutés et lignes ignorées
 
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
@@ -66,6 +136,22 @@ export default function MaStructure() {
     if (await action({ action: 'creer_salarie', ...salarie }, 'Salarié ajouté ✓ — son invitation est envoyée par email')) {
       setSalarie({ prenom: '', nom: '', role: '', telephone: '', email: '', seniorIds: [] }); setFormulaire(null)
     }
+  }
+
+  async function importerSalaries(liste) {
+    setEnvoi(true); setMessage(''); setImportResultat(null)
+    try {
+      const res = await fetch('/api/structure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'importer_salaries', lignes: liste }) })
+      const result = await res.json()
+      if (!result.success) { setMessage('Erreur : ' + (result.error || 'inconnue')); setEnvoi(false); return }
+      setImportResultat(result)
+      setMessage(result.ajoutes + ' salarié' + (result.ajoutes > 1 ? 's importés' : ' importé') + ' ✓ — affectez-les à leurs clients ci-dessous : leur invitation part à ce moment-là.')
+      setImportTexte(''); setFormulaire(null)
+      await charger()
+    } catch {
+      setMessage('Erreur réseau, réessayez.')
+    }
+    setEnvoi(false)
   }
 
   async function inviterGestionnaire() {
@@ -237,8 +323,65 @@ export default function MaStructure() {
                 <button onClick={() => setFormulaire(null)} style={btnGris}>Annuler</button>
               </div>
             </div>
-          ) : (
-            <button onClick={() => setFormulaire('salarie')} style={{ ...btn, marginBottom: 16 }}>+ Nouveau salarié</button>
+          ) : formulaire === 'import' ? (() => {
+            const lecture = importTexte.trim() ? lireListeSalaries(importTexte) : null
+            const valides = (lecture?.salaries || []).filter(s => s.prenom && s.nom && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email))
+            return (
+              <div style={{ ...carte, marginBottom: 16 }}>
+                <div style={etiquette}>Importer une liste de salariés</div>
+                <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.6, marginBottom: 12 }}>
+                  Exportez la liste de vos salariés depuis votre logiciel métier, ou ouvrez-la dans Excel, puis collez-la ci-dessous
+                  avec sa ligne d&apos;intitulés, ou choisissez le fichier CSV. Colonnes reconnues : Prénom, Nom (ou Nom et prénom), Fonction, Téléphone, Email.
+                </p>
+                <input type="file" accept=".csv,.txt,text/csv" onChange={async e => { const f = e.target.files?.[0]; if (f) setImportTexte(await lireFichier(f)); e.target.value = '' }}
+                  style={{ fontSize: 13, marginBottom: 10 }} />
+                <textarea value={importTexte} onChange={e => setImportTexte(e.target.value)} rows={6}
+                  placeholder={'Prénom\tNom\tFonction\tTéléphone\tEmail\nMarie\tDupont\tAuxiliaire de vie\t06 12 34 56 78\tmarie.dupont@exemple.fr'}
+                  style={{ ...input, fontFamily: 'ui-monospace, monospace', fontSize: 12, resize: 'vertical', marginBottom: 12 }} />
+                {lecture?.erreur && <div style={{ fontSize: 13, color: '#C4606A', marginBottom: 12 }}>{lecture.erreur}</div>}
+                {lecture?.salaries && (
+                  <div style={{ maxHeight: 260, overflow: 'auto', border: '1px solid #E8EFEB', borderRadius: 8, marginBottom: 12 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead><tr style={{ background: '#FAFCFC', color: '#9BB5AA', textAlign: 'left' }}>
+                        {['Prénom', 'Nom', 'Fonction', 'Téléphone', 'Email', ''].map(t => <th key={t} style={{ padding: '6px 10px', fontWeight: 500 }}>{t}</th>)}
+                      </tr></thead>
+                      <tbody>
+                        {lecture.salaries.map((s, i) => {
+                          const ok = valides.includes(s)
+                          return (
+                            <tr key={i} style={{ borderTop: '1px solid #F0F4F2', color: ok ? '#1F2A24' : '#9BB5AA' }}>
+                              <td style={{ padding: '6px 10px' }}>{s.prenom}</td><td style={{ padding: '6px 10px' }}>{s.nom}</td>
+                              <td style={{ padding: '6px 10px' }}>{s.role}</td><td style={{ padding: '6px 10px' }}>{s.telephone}</td>
+                              <td style={{ padding: '6px 10px' }}>{s.email}</td>
+                              <td style={{ padding: '6px 10px', color: ok ? '#4A8870' : '#C4844A', whiteSpace: 'nowrap' }}>{ok ? '✓' : !s.prenom || !s.nom ? 'Nom manquant' : 'Email manquant'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 14 }}>Aucune invitation n&apos;est envoyée à l&apos;import : elle part quand vous affectez le salarié à un client.</div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => importerSalaries(valides)} disabled={envoi || !valides.length} style={{ ...btn, opacity: valides.length ? 1 : 0.5 }}>
+                    {envoi ? 'Import…' : valides.length ? 'Importer ' + valides.length + ' salarié' + (valides.length > 1 ? 's' : '') : 'Importer'}
+                  </button>
+                  <button onClick={() => { setFormulaire(null); setImportTexte('') }} style={btnGris}>Annuler</button>
+                </div>
+              </div>
+            )
+          })() : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+              <button onClick={() => setFormulaire('salarie')} style={btn}>+ Nouveau salarié</button>
+              <button onClick={() => { setFormulaire('import'); setImportResultat(null) }} style={{ ...btn, background: '#fff', color: '#4A8870', border: '1.5px solid #7FAF9B' }}>Importer une liste</button>
+            </div>
+          )}
+
+          {importResultat?.ignores?.length > 0 && (
+            <div style={{ ...carte, marginBottom: 16, borderColor: '#F0D9B5', background: '#FDF8F1' }}>
+              <div style={{ fontSize: 13, color: '#C4844A', fontWeight: 500, marginBottom: 6 }}>{importResultat.ignores.length} ligne{importResultat.ignores.length > 1 ? 's' : ''} non importée{importResultat.ignores.length > 1 ? 's' : ''}</div>
+              {importResultat.ignores.map((x, i) => <div key={i} style={{ fontSize: 12, color: '#6F7C75' }}>{x.nom || 'Ligne ' + x.ligne} : {x.raison}</div>)}
+            </div>
           )}
 
           {salaries.length === 0 ? (

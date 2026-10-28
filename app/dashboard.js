@@ -15,13 +15,14 @@ const Section = ({ title, children }) => (
   </div>
 )
 
-export default function Dashboard({ initialSenior, initialEvents, initialNotes, initialTotalNotes, initialAlertes, initialOrdonnances, supabaseUrl, supabaseKey }) {
+export default function Dashboard({ initialSenior, initialEvents, initialNotes, initialTotalNotes, initialAlertes, initialOrdonnances, initialDerniereNoteIntervenant, supabaseUrl, supabaseKey }) {
   // ← On utilise les props directement, pas useState figé
   const events = initialEvents || []
   const ordonnances = initialOrdonnances || []
   const [notes, setNotes] = useState(initialNotes || [])
   const [totalNotes, setTotalNotes] = useState(initialTotalNotes || 0)
   const [alertes, setAlertes] = useState(initialAlertes || [])
+  const [derniereNoteIntervenant, setDerniereNoteIntervenant] = useState(initialDerniereNoteIntervenant || null)
   // Les alertes « ordonnance » sont recalculées à chaque visite : leur lecture est mémorisée sur l'appareil
   const [ordonnancesLues, setOrdonnancesLues] = useState(() => {
     try { return JSON.parse(localStorage.getItem('holiris_ordonnances_lues') || '[]') } catch { return [] }
@@ -37,15 +38,25 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
     setAlertes(initialAlertes || [])
   }, [initialAlertes])
 
+  useEffect(() => {
+    setDerniereNoteIntervenant(initialDerniereNoteIntervenant || null)
+  }, [initialDerniereNoteIntervenant])
+
   const now = new Date()
 
   const prochainEvent = events
     .filter(e => new Date(e.scheduled_at) >= now)
     .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0]
 
-  const dernierPassage = events
+  const dernierRdvPasse = events
     .filter(e => new Date(e.scheduled_at) < now)
     .sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at))[0]
+
+  // Le planning est facultatif : la note d'un intervenant compte comme un passage
+  const dernierPassage = derniereNoteIntervenant
+    && (!dernierRdvPasse || new Date(derniereNoteIntervenant.created_at) > new Date(dernierRdvPasse.scheduled_at))
+    ? { note: true, scheduled_at: derniereNoteIntervenant.created_at, label: derniereNoteIntervenant.intervenant_name?.split(' · ')[0] || 'Intervenant', role: derniereNoteIntervenant.intervenant_name?.split(' · ')[1] }
+    : dernierRdvPasse
 
   const derniereNote = notes[0]
 
@@ -73,6 +84,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
       }, (p) => {
         setNotes(prev => [p.new, ...prev].slice(0, 3))
         setTotalNotes(prev => prev + 1)
+        if (p.new.intervenant_id) setDerniereNoteIntervenant(p.new)
       })
       .subscribe()
 
@@ -254,7 +266,13 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                   {' · '}
                   {new Date(dernierPassage.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                   {dernierPassage.intervenants && <span> · {dernierPassage.intervenants.name}{autresIntervenants(dernierPassage)}</span>}
+                  {dernierPassage.note && <span> · note laissée</span>}
                 </div>
+                {dernierPassage.role && (
+                  <div style={{ marginTop: 4 }}>
+                    <Tag color="#8B6FAA" bg="#F3EDF7">{dernierPassage.role}</Tag>
+                  </div>
+                )}
                 {dernierPassage.type && (
                   <div style={{ marginTop: 4 }}>
                     <Tag color="#8B6FAA" bg="#F3EDF7">{typeLabel[dernierPassage.type] || dernierPassage.type}</Tag>

@@ -14,6 +14,7 @@ export default function App() {
   const [totalNotes, setTotalNotes] = useState(0)
   const [alertes, setAlertes] = useState([])
   const [ordonnances, setOrdonnances] = useState([])
+  const [derniereNoteIntervenant, setDerniereNoteIntervenant] = useState(null)
   const [loading, setLoading] = useState(true)
   const [aContacter, setAContacter] = useState([])
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
@@ -84,7 +85,7 @@ export default function App() {
       finPeriode.setMonth(finPeriode.getMonth() + 3)
       finPeriode.setHours(23, 59, 59, 999)
 
-      const [eventsRes, notesRes, notesCountRes, alertesRes, ordonnancesRes] = await Promise.all([
+      const [eventsRes, notesRes, notesCountRes, alertesRes, ordonnancesRes, noteIntervRes] = await Promise.all([
         supabase.from('events').select('*, intervenants(*)')
           .eq('senior_id', selectedSeniorId)
           .gte('scheduled_at', debutPeriode.toISOString())
@@ -101,13 +102,18 @@ export default function App() {
           .order('created_at', { ascending: false }),
         supabase.from('ordonnances').select('*')
           .eq('senior_id', selectedSeniorId)
-          .order('date_renouvellement', { ascending: true })
+          .order('date_renouvellement', { ascending: true }),
+        // Dernière note d'un intervenant : un passage, même sans planning
+        supabase.from('notes').select('id, intervenant_name, created_at')
+          .eq('senior_id', selectedSeniorId).not('intervenant_id', 'is', null)
+          .order('created_at', { ascending: false }).limit(1)
       ])
 
       setEvents(eventsRes.data || [])
       setNotes(notesRes.data || [])
       setTotalNotes(notesCountRes.count || 0)
       setOrdonnances(ordonnancesRes.data || [])
+      setDerniereNoteIntervenant(noteIntervRes.data?.[0] || null)
 
       const aujourd_hui = new Date()
       const alertesOrdonnances = (ordonnancesRes.data || []).filter(o => {
@@ -182,6 +188,7 @@ export default function App() {
         initialTotalNotes={totalNotes}
         initialAlertes={alertes}
         initialOrdonnances={ordonnances}
+        initialDerniereNoteIntervenant={derniereNoteIntervenant}
         supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL}
         supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}
       />

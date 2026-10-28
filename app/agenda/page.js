@@ -229,6 +229,10 @@ export default function Agenda() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 'bold', color: '#12201a', marginBottom: 4 }}>📅 Agenda</h1>
           <p style={{ color: '#888', fontSize: 13 }}>{events.length} événement{events.length > 1 ? 's' : ''} · {selectedSenior?.name}</p>
+          <p style={{ color: '#9BB5AA', fontSize: 12, marginTop: 4, maxWidth: 520, lineHeight: 1.5 }}>
+            Facultatif : Holiris fonctionne sans planning, chaque note d&apos;un intervenant compte comme un passage.
+            L&apos;agenda sert aux rappels envoyés aux intervenants et au compte rendu au médecin avant une consultation.
+          </p>
         </div>
         <button onClick={() => setShowForm(!showForm)}
           style={{ background: '#12201a', color: '#2ecc71', border: 'none', borderRadius: 10, padding: '10px 20px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>

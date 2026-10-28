@@ -133,6 +133,34 @@ export async function POST(request) {
       return NextResponse.json({ success: true })
     }
 
+    // Import d'une liste de salariés (copiée depuis Excel ou exportée du logiciel métier).
+    // Aucune invitation à ce stade : elle part quand le salarié est affecté à un client.
+    if (body.action === 'importer_salaries') {
+      const lignes = Array.isArray(body.lignes) ? body.lignes.slice(0, 500) : []
+      const { data: existants } = await supabaseAdmin.from('salaries').select('email').eq('structure_id', structureId).is('archived_at', null)
+      const emails = new Set((existants || []).map(s => s.email.toLowerCase()))
+      const aCreer = [], ignores = []
+      lignes.forEach((l, i) => {
+        const salarie = {
+          structure_id: structureId,
+          prenom: champ(l.prenom, 60),
+          nom: champ(l.nom, 60),
+          role: champ(l.role, 60) || null,
+          telephone: champ(l.telephone, 30) || null,
+          email: champ(l.email, 200).toLowerCase(),
+        }
+        if (!salarie.prenom || !salarie.nom) ignores.push({ ligne: i + 1, nom: (salarie.prenom + ' ' + salarie.nom).trim(), raison: 'prénom ou nom manquant' })
+        else if (!EMAIL_VALIDE.test(salarie.email)) ignores.push({ ligne: i + 1, nom: (salarie.prenom + ' ' + salarie.nom).trim(), raison: 'email manquant ou invalide' })
+        else if (emails.has(salarie.email)) ignores.push({ ligne: i + 1, nom: (salarie.prenom + ' ' + salarie.nom).trim(), raison: 'déjà dans vos salariés' })
+        else { emails.add(salarie.email); aCreer.push(salarie) }
+      })
+      if (aCreer.length) {
+        const { error } = await supabaseAdmin.from('salaries').insert(aCreer)
+        if (error) throw error
+      }
+      return NextResponse.json({ success: true, ajoutes: aCreer.length, ignores })
+    }
+
     if (body.action === 'affecter') {
       const { data: salarie } = await supabaseAdmin.from('salaries').select('*').eq('id', body.salarieId).eq('structure_id', structureId).maybeSingle()
       const senior = await seniorDeLaStructure(body.seniorId, structureId)
