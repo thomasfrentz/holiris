@@ -127,7 +127,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
 
   // Événement avec plusieurs intervenants : le premier est affiché, puis « +1 », « +2 »…
   const autresIntervenants = (e) => (e.intervenant_ids?.length > 1 ? ' +' + (e.intervenant_ids.length - 1) : '')
-  const noteSourceLabel = (s) => s === 'whatsapp_audio' ? 'Note vocale' : s === 'whatsapp_text' ? 'WhatsApp' : 'Note'
+  const noteSourceLabel = (s) => s === 'whatsapp_audio' ? 'Note vocale' : s === 'whatsapp_text' ? 'WhatsApp' : s === 'qr' ? 'QR code' : 'Note'
   const noteSourceColor = (s) => {
     if (s === 'whatsapp_audio') return { color: '#BC84C6', bg: '#F3EDF7' }
     if (s === 'whatsapp_text') return { color: '#7FAF9B', bg: '#EAF4EF' }

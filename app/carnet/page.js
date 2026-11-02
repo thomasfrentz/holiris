@@ -84,6 +84,7 @@ export default function Carnet() {
     if (source === 'whatsapp_audio') return { icon: '🎤', label: 'Note vocale', color: '#9b59b6' }
     if (source === 'whatsapp_text') return { icon: '💬', label: 'WhatsApp', color: '#25D366' }
     if (source === 'famille') return { icon: '👨‍👩‍👧', label: 'Note famille', color: '#3498db' }
+    if (source === 'qr') return { icon: '📱', label: 'QR code', color: '#4A8870' }
     return { icon: '📝', label: 'Note', color: '#3498db' }
   }
 

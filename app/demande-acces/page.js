@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const LIENS = ['Fils / Fille', 'Petit-fils / Petite-fille', 'Frère / Sœur', 'Neveu / Nièce', 'Conjoint(e)', 'Ami(e) proche', 'Professionnel(le)', 'Autre']
 
@@ -7,6 +7,14 @@ export default function DemandeAcces() {
   const [form, setForm] = useState({ prenom: '', nom: '', email: '', telephone: '', seniorNom: '', seniorVille: '', lien: '', message: '', site_web: '' })
   const [etat, setEtat] = useState('saisie') // saisie | envoi | envoyee
   const [error, setError] = useState('')
+
+  // Arrivée depuis la page du QR code : ce que la personne a déjà indiqué est repris
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    const repris = { prenom: p.get('prenom'), nom: p.get('nom'), telephone: p.get('telephone'), seniorNom: p.get('senior'), lien: LIENS.includes(p.get('lien')) ? p.get('lien') : '' }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique de l'adresse au montage
+    setForm(prev => ({ ...prev, ...Object.fromEntries(Object.entries(repris).filter(([, v]) => v)) }))
+  }, [])
 
   const maj = champ => e => setForm(prev => ({ ...prev, [champ]: e.target.value }))
   const complet = form.prenom.trim() && form.nom.trim() && form.email.trim()

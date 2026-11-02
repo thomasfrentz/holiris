@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 import AucunDossier from '../components/AucunDossier'
+import CodeNoteQr from '../components/CodeNoteQr'
 
 export default function Intervenants() {
   const [intervenants, setIntervenants] = useState([])
@@ -234,6 +235,8 @@ export default function Intervenants() {
           {emailSent}
         </div>
       )}
+
+      <CodeNoteQr seniorId={selectedSeniorId} seniorName={selectedSenior?.name} />
 
       {showForm && (
         <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: 24, marginBottom: 24 }}>
