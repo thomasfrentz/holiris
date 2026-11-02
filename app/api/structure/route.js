@@ -62,13 +62,21 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   if (!structureId) return NextResponse.json({ error: 'Réservé aux gestionnaires de structure' }, { status: 403 })
 
-  const [structure, seniors, salaries, gestionnaires, demandes] = await Promise.all([
+  const { data: idsClients } = await supabaseAdmin.from('seniors').select('id').eq('structure_id', structureId)
+  const ids = (idsClients || []).map(s => s.id)
+  const [structure, seniors, salaries, gestionnaires, demandes, reclamations] = await Promise.all([
     supabaseAdmin.from('structures').select('id, nom, adresse, adresse_facturation').eq('id', structureId).single(),
     supabaseAdmin.from('seniors').select('id, name, city, age, date_naissance').eq('structure_id', structureId).order('name'),
     supabaseAdmin.from('salaries').select('*').eq('structure_id', structureId).is('archived_at', null).order('nom'),
     supabaseAdmin.from('structure_membres').select('id, nom, email, user_id, created_at').eq('structure_id', structureId).order('created_at'),
     supabaseAdmin.from('demandes_rattachement').select('id, senior_nom, email_proche, statut, created_at')
       .eq('structure_id', structureId).order('created_at', { ascending: false }).limit(20),
+    // Réclamations à traiter, et celles traitées ces 30 derniers jours
+    ids.length
+      ? supabaseAdmin.from('reclamations').select('id, senior_id, auteur, resume, created_at, traitee_at, notes(content)')
+        .in('senior_id', ids).or('traitee_at.is.null,traitee_at.gte.' + new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
+        .order('created_at', { ascending: false }).limit(100)
+      : { data: [] },
   ])
 
   // Affectations actives de chaque salarié
@@ -86,6 +94,7 @@ export async function GET() {
       compteActif: (affectations || []).some(a => a.salarie_id === s.id && a.user_id),
     })),
     demandes: demandes.data || [],
+    reclamations: (reclamations.data || []).map(r => ({ id: r.id, seniorId: r.senior_id, auteur: r.auteur, resume: r.resume, createdAt: r.created_at, traiteeAt: r.traitee_at, note: r.notes?.content || null })),
     gestionnaires: (gestionnaires.data || []).map(g => ({ id: g.id, nom: g.nom, email: g.email, compteActif: !!g.user_id, moi: g.user_id === user.id })),
   })
 }
@@ -97,6 +106,16 @@ export async function POST(request) {
     if (!structureId) return NextResponse.json({ success: false, error: 'Réservé aux gestionnaires de structure' }, { status: 403 })
 
     const body = await request.json()
+
+    // Réclamation marquée traitée (ou de nouveau à traiter)
+    if (body.action === 'traiter_reclamation') {
+      const { data: r } = await supabaseAdmin.from('reclamations').select('id, seniors(structure_id)').eq('id', body.id).maybeSingle()
+      if (!r || r.seniors?.structure_id !== structureId) return NextResponse.json({ success: false, error: 'Réclamation introuvable' }, { status: 404 })
+      const { error } = await supabaseAdmin.from('reclamations')
+        .update(body.traitee ? { traitee_at: new Date().toISOString(), traitee_par: user.id } : { traitee_at: null, traitee_par: null }).eq('id', r.id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
 
     if (body.action === 'creer_senior') {
       const prenom = champ(body.prenom, 60), nom = champ(body.nom, 60), ville = champ(body.ville, 80)

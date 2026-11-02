@@ -88,6 +88,8 @@ export default function MaStructure() {
   const [rattachement, setRattachement] = useState({ seniorNom: '', emailProche: '' })
   const [importTexte, setImportTexte] = useState('')
   const [importResultat, setImportResultat] = useState(null) // résultat du dernier import : ajoutés et lignes ignorées
+  const [voirTraitees, setVoirTraitees] = useState(false)
+  const [noteOuverte, setNoteOuverte] = useState(null) // réclamation dont la note d'origine est affichée
 
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin } = useSenior()
   const router = useRouter()
@@ -182,7 +184,10 @@ export default function MaStructure() {
     </div>
   )
 
-  const { structure, seniors: clients, salaries, gestionnaires, demandes = [] } = donnees
+  const { structure, seniors: clients, salaries, gestionnaires, demandes = [], reclamations = [] } = donnees
+  const aTraiter = reclamations.filter(r => !r.traiteeAt)
+  const traitees = reclamations.filter(r => r.traiteeAt)
+  const nomClient = id => clients.find(c => c.id === id)?.name || ''
   const STATUTS = { en_attente: ['En attente de la famille', '#C4844A'], acceptee: ['Acceptée', '#4A8870'], refusee: ['Refusée', '#C4606A'] }
 
   return (
@@ -194,6 +199,44 @@ export default function MaStructure() {
           {clients.length} client{clients.length > 1 ? 's' : ''} · {salaries.length} salarié{salaries.length > 1 ? 's' : ''} · {gestionnaires.length} gestionnaire{gestionnaires.length > 1 ? 's' : ''}
         </p>
       </div>
+
+      {/* ── Réclamations relevées dans les notes (visibles des seuls gestionnaires) ── */}
+      {(aTraiter.length > 0 || traitees.length > 0) && (
+        <div style={{ background: aTraiter.length ? '#FDF3E7' : '#fff', border: '1px solid ' + (aTraiter.length ? '#F0D9B5' : '#E8EFEB'), borderRadius: 12, padding: '16px 20px', marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: aTraiter.length ? '#C4844A' : '#6F7C75' }}>
+              📣 {aTraiter.length ? aTraiter.length + ' réclamation' + (aTraiter.length > 1 ? 's' : '') + ' à traiter' : 'Aucune réclamation à traiter'}
+            </div>
+            {traitees.length > 0 && (
+              <button onClick={() => setVoirTraitees(!voirTraitees)} style={{ background: 'none', border: 'none', color: '#9BB5AA', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>
+                {voirTraitees ? 'Masquer' : 'Voir'} les traitées ({traitees.length})
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 4 }}>Relevées automatiquement dans les notes. Ni la famille ni les intervenants ne voient cette liste.</div>
+          {[...aTraiter, ...(voirTraitees ? traitees : [])].map(r => (
+            <div key={r.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 10, padding: '12px 14px', marginTop: 10, opacity: r.traiteeAt ? 0.65 : 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2A24' }}>
+                  {nomClient(r.seniorId)}
+                  <span style={{ fontWeight: 400, color: '#9BB5AA' }}> · {new Date(r.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <button onClick={() => action({ action: 'traiter_reclamation', id: r.id, traitee: !r.traiteeAt }, r.traiteeAt ? 'Réclamation remise à traiter' : 'Réclamation traitée ✓')} disabled={envoi}
+                  style={{ fontSize: 12, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid ' + (r.traiteeAt ? '#E8EFEB' : '#7FAF9B'), background: r.traiteeAt ? '#fff' : '#EAF4EF', color: r.traiteeAt ? '#9BB5AA' : '#4A8870' }}>
+                  {r.traiteeAt ? '↺ Remettre à traiter' : '✓ Traitée'}
+                </button>
+              </div>
+              <div style={{ fontSize: 13, color: '#1F2A24', marginTop: 6, lineHeight: 1.5 }}>{r.resume}</div>
+              {r.auteur && <div style={{ fontSize: 12, color: '#6F7C75', marginTop: 4 }}>Signalé par {r.auteur}</div>}
+              {r.note && (
+                noteOuverte === r.id
+                  ? <div style={{ fontSize: 12, color: '#6F7C75', background: '#FAFCFC', borderRadius: 8, padding: '8px 10px', marginTop: 8, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{r.note}</div>
+                  : <button onClick={() => setNoteOuverte(r.id)} style={{ background: 'none', border: 'none', padding: 0, marginTop: 6, color: '#7FAF9B', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Voir la note</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #E8EFEB', marginBottom: 20, overflowX: 'auto' }}>
         {[['clients', 'Clients'], ['salaries', 'Salariés intervenants'], ['gestionnaires', 'Gestionnaires']].map(([cle, libelle]) => (
