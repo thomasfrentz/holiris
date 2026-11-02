@@ -61,6 +61,7 @@ export default function QrNote() {
   const [signalement, setSignalement] = useState(null)
   const [reponseMedicale, setReponseMedicale] = useState('')
   const [compte, setCompte] = useState(null) // null | 'envoi' | { etat: 'envoye' | 'compte', email }
+  const [pourCompte, setPourCompte] = useState(false) // venu depuis « Créer mon compte » de l'accueil, sans note à laisser
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
@@ -104,7 +105,8 @@ export default function QrNote() {
   function choisir(p) {
     setAuteur(p)
     memoire.ecrire(memoire.lire().map(v => v.code === code ? { ...v, personne: p.id ? { id: p.id } : null } : v))
-    commencer()
+    if (pourCompte) { setStep('compte'); creerCompte(p) }
+    else commencer()
   }
 
   function commencer() {
@@ -123,6 +125,7 @@ export default function QrNote() {
     setSignalement(null)
     setReponseMedicale('')
     setCompte(null)
+    setPourCompte(false)
     setSaisie('')
     setError('')
     setStep('code')
@@ -231,21 +234,21 @@ export default function QrNote() {
   }
 
   // Demande d'accès pré-remplie : personne hors dossier, ou fiche sans email
-  function demandeAcces() {
-    const [prenom, ...nom] = String(auteur?.nom || '').split(' ')
-    const params = new URLSearchParams({ prenom: auteur?.id ? '' : prenom, nom: auteur?.id ? '' : nom.join(' '), telephone: auteur?.telephone || '', senior: dossier?.senior || '', lien: auteur?.type === 'famille' ? '' : 'Professionnel(le)' })
+  function demandeAcces(a = auteur) {
+    const [prenom, ...nom] = String(a?.nom || '').split(' ')
+    const params = new URLSearchParams({ prenom: a?.id ? '' : prenom, nom: a?.id ? '' : nom.join(' '), telephone: a?.telephone || '', senior: dossier?.senior || '', lien: a?.type === 'famille' ? '' : 'Professionnel(le)' })
     window.location.href = '/demande-acces?' + params.toString()
   }
 
-  async function creerCompte() {
-    if (!auteur?.id) return demandeAcces()
+  async function creerCompte(a = auteur) {
+    if (!a?.id) return demandeAcces(a)
     setCompte('envoi')
     try {
       const result = await (await fetch('/api/qr-note', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'compte', code, personneId: auteur.id, personneType: auteur.type }),
+        body: JSON.stringify({ action: 'compte', code, personneId: a.id, personneType: a.type }),
       })).json()
-      if (result.success && result.etat === 'demande') return demandeAcces()
+      if (result.success && result.etat === 'demande') return demandeAcces(a)
       if (result.success) { setCompte(result); return }
       setError(result.error || 'Une erreur est survenue.')
     } catch {
@@ -311,7 +314,11 @@ export default function QrNote() {
         {surtitre(visites.length ? 'Autre domicile' : 'Code du domicile')}
         <form onSubmit={e => { e.preventDefault(); if (c.length === 8) ouvrir(c) }}
           style={{ background: C.carte, borderRadius: 22, padding: '20px 18px', boxShadow: OMBRE }}>
-          <p style={{ fontSize: 15, color: C.gris, lineHeight: 1.5, margin: '0 0 14px' }}>Tapez le code inscrit sous le QR code, sur l’affiche Holiris du domicile.</p>
+          <p style={{ fontSize: 15, color: C.gris, lineHeight: 1.5, margin: '0 0 14px' }}>
+            {pourCompte
+              ? 'Pour créer votre compte, tapez le code domicile d’une personne que vous suivez, puis choisissez votre nom.'
+              : 'Tapez le code inscrit sous le QR code, sur l’affiche Holiris du domicile.'}
+          </p>
           <input value={afficherCode(c)} onChange={e => setSaisie(e.target.value)} placeholder="XXXX-XXXX" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
             style={{ ...champStyle, fontSize: 26, letterSpacing: '0.18em', textAlign: 'center', fontWeight: 600, marginBottom: 14 }} />
           <button type="submit" disabled={sending || c.length !== 8} className="qr-bouton"
@@ -319,6 +326,22 @@ export default function QrNote() {
             {sending ? 'Recherche…' : 'Continuer'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: 22, fontSize: 14, color: C.gris, lineHeight: 1.7 }}>
+          {pourCompte ? (
+            <button onClick={() => setPourCompte(false)} style={{ background: 'none', border: 'none', color: C.saugeFonce, fontSize: 14, cursor: 'pointer', fontFamily: TEXTE, textDecoration: 'underline' }}>
+              Laisser une note plutôt
+            </button>
+          ) : (
+            <>
+              Vous venez régulièrement ?{' '}
+              <button onClick={() => { setPourCompte(true); setError('') }} style={{ background: 'none', border: 'none', padding: 0, color: C.saugeFonce, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: TEXTE, textDecoration: 'underline' }}>
+                Créer mon compte Holiris
+              </button>
+            </>
+          )}
+          <br />Déjà un compte ? <a href="/login" style={{ color: C.saugeFonce }}>Se connecter</a>
+        </div>
 
         <p style={{ fontSize: 13, color: C.grisClair, textAlign: 'center', marginTop: 'auto', paddingTop: 30, lineHeight: 1.6 }}>
           Vos notes sont transmises à la famille et aux professionnels qui suivent la personne.<br />Urgence vitale : appelez le 15 ou le 112.
@@ -354,7 +377,14 @@ export default function QrNote() {
       {retour('Retour', () => setStep('qui'))}
       {surtitre('Note pour ' + dossier?.senior)}
       <h2 style={{ fontFamily: TITRE, fontSize: 32, fontWeight: 500, margin: '0 0 16px' }}>Présentez-vous</h2>
-      <form onSubmit={e => { e.preventDefault(); if (autre.nom.trim() && autre.role) { setAuteur({ nom: autre.nom.trim(), role: autre.role, telephone: autre.telephone.trim() }); commencer() } }}
+      <form onSubmit={e => {
+        e.preventDefault()
+        if (!autre.nom.trim() || !autre.role) return
+        const a = { nom: autre.nom.trim(), role: autre.role, telephone: autre.telephone.trim() }
+        setAuteur(a)
+        if (pourCompte) demandeAcces(a)
+        else commencer()
+      }}
         style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <input value={autre.nom} onChange={e => setAutre({ ...autre, nom: e.target.value })} placeholder="Prénom et nom *" autoComplete="name" style={champStyle} />
         <select value={autre.role} onChange={e => setAutre({ ...autre, role: e.target.value })} style={{ ...champStyle, color: autre.role ? C.encre : C.grisClair }}>
@@ -451,6 +481,33 @@ export default function QrNote() {
     </div>
   )
 
+  // Création de compte demandée depuis l'accueil
+  if (step === 'compte') return page(
+    <>
+      {retour('Retour', recommencer)}
+      <div style={{ background: C.carte, borderRadius: 22, padding: '26px 22px', boxShadow: OMBRE, marginTop: '10vh', textAlign: 'center' }}>
+        <Logo />
+        {compte === 'envoi' ? (
+          <p style={{ fontSize: 17, color: C.gris, marginTop: 14 }}>Envoi en cours…</p>
+        ) : compte?.etat === 'envoye' ? (
+          <p style={{ fontSize: 17, color: C.saugeFonce, lineHeight: 1.6, marginTop: 14 }}>
+            ✉️ Un lien pour créer votre compte a été envoyé à <strong>{compte.email}</strong>.<br />
+            <span style={{ fontSize: 15, color: C.gris }}>Pensez à regarder dans les courriers indésirables.</span>
+          </p>
+        ) : compte?.etat === 'compte' ? (
+          <p style={{ fontSize: 17, color: C.gris, lineHeight: 1.6, marginTop: 14 }}>
+            Vous avez déjà un compte Holiris.<br /><a href="/login" style={{ color: C.saugeFonce, fontWeight: 600 }}>Se connecter</a>
+          </p>
+        ) : (
+          <div style={{ marginTop: 14 }}>
+            {erreurBloc}
+            <button onClick={() => creerCompte()} className="qr-bouton" style={bouton(C.sauge, '#fff', { width: '100%' })}>Réessayer</button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+
   if (step === 'confirmation') return page(
     <div style={{ textAlign: 'center', marginTop: '20vh' }}>
       <div style={{ width: 92, height: 92, borderRadius: '50%', background: C.saugeClair, color: C.saugeFonce, fontSize: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>✓</div>
@@ -475,7 +532,7 @@ export default function QrNote() {
               Retrouvez vos notes, l’agenda et les messages de la famille, pour {dossier?.senior} et les autres personnes que vous suivez.
             </p>
             {erreurBloc}
-            <button onClick={creerCompte} disabled={compte === 'envoi'} className="qr-bouton" style={bouton(C.sauge, '#fff', { width: '100%', padding: '15px 20px', fontSize: 16 })}>
+            <button onClick={() => creerCompte()} disabled={compte === 'envoi'} className="qr-bouton" style={bouton(C.sauge, '#fff', { width: '100%', padding: '15px 20px', fontSize: 16 })}>
               {compte === 'envoi' ? 'Envoi…' : 'Créer mon compte'}
             </button>
             <p style={{ fontSize: 13, color: C.grisClair, textAlign: 'center', margin: '10px 0 0' }}>
