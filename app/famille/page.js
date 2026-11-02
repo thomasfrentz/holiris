@@ -139,6 +139,15 @@ export default function Famille() {
     } catch (e) { alert('Erreur réseau') }
   }
 
+  // Lien d'accès renvoyé par WhatsApp (seule invitation d'un proche sans email)
+  async function renvoyerWhatsapp(m) {
+    const r = await (await fetch('/api/whatsapp-bienvenue', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'famille', id: m.id }),
+    })).json().catch(() => ({}))
+    if (r.success) { setInviteSent(m.name + ' par WhatsApp'); setTimeout(() => setInviteSent(null), 5000) }
+    else alert('Envoi WhatsApp impossible' + (r.erreur ? ' : ' + r.erreur : ''))
+  }
+
   const personneConfianceId = selectedSeniorId in pdcModifiee
     ? pdcModifiee[selectedSeniorId]
     : selectedSenior?.personne_confiance_id
@@ -247,6 +256,22 @@ export default function Famille() {
                 Modifier
               </button>
             )}
+            {!archivé && !m.user_id && (
+              <>
+                {m.email && (
+                  <button onClick={() => renvoyerEmail(m)}
+                    style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                    Renvoyer email
+                  </button>
+                )}
+                {(m.whatsapp || m.phone) && (
+                  <button onClick={() => renvoyerWhatsapp(m)}
+                    style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
+                    Renvoyer le lien WhatsApp
+                  </button>
+                )}
+              </>
+            )}
             {!isAdmin ? null : archivé ? (
               <>
                 <button onClick={() => restaurerMembre(m.id)}
@@ -260,16 +285,6 @@ export default function Famille() {
               </>
             ) : (
               <>
-                {!m.user_id && (
-                  <>
-                    {m.email && (
-                      <button onClick={() => renvoyerEmail(m)}
-                        style={{ background: '#EAF4EF', color: '#4A8870', border: '1px solid #C8DDD4', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>
-                        Renvoyer email
-                      </button>
-                    )}
-                  </>
-                )}
                 {m.user_id && (m.id === personneConfianceId ? (
                   <button onClick={() => designerPersonneConfiance(null)}
                     style={{ background: '#F4F5F5', color: '#6F7C75', border: '1px solid #E8EFEB', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
