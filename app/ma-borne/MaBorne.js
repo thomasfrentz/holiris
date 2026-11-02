@@ -170,6 +170,7 @@ export default function MaBorne() {
       const formData = new FormData()
       formData.append('audio', blob, blob.type.includes('mp4') ? 'note.m4a' : 'note.webm')
       if (dossier?.seniorId) formData.append('seniorId', dossier.seniorId)
+      formData.append('jeton', jeton)
       const result = await (await fetch('/api/borne-transcribe', { method: 'POST', body: formData })).json()
       if (result.success) {
         setNoteProposee(result.note)

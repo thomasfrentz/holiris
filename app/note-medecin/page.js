@@ -40,7 +40,7 @@ function NoteMedecinContenu() {
         setEnregistrement(false); setTranscription(true)
         try {
           const blob = new Blob(morceaux, { type: recorder.mimeType || format || 'audio/webm' })
-          const fd = new FormData(); fd.append('audio', blob, 'note.' + (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'))
+          const fd = new FormData(); fd.append('audio', blob, 'note.' + (blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm')); fd.append('t', t)
           const r = await (await fetch('/api/borne-transcribe', { method: 'POST', body: fd })).json()
           if (r.success && r.note) setTexte(prev => (prev ? prev + '\n' : '') + r.note)
           else setErreur(r.rienEntendu ? r.error : 'La dictée n\'a pas pu être retranscrite. Vous pouvez écrire votre note.')
