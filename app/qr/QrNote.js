@@ -287,23 +287,26 @@ export default function QrNote() {
     const c = normaliser(saisie)
     return page(
       <>
+        {pourCompte && retour('Retour', () => { setPourCompte(false); setError('') })}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
           <Logo taille={44} />
           <div>
-            <h1 style={{ fontFamily: TITRE, fontSize: 30, fontWeight: 500, margin: 0, lineHeight: 1.1 }}>Laisser une note</h1>
-            <p style={{ fontSize: 14, color: C.gris, margin: '2px 0 0' }}>Holiris, le carnet de liaison à domicile</p>
+            <h1 style={{ fontFamily: TITRE, fontSize: 30, fontWeight: 500, margin: 0, lineHeight: 1.1 }}>{pourCompte ? 'Créer mon compte' : 'Laisser une note'}</h1>
+            <p style={{ fontSize: 14, color: C.gris, margin: '2px 0 0' }}>
+              {pourCompte ? 'Vos notes, l’agenda et les messages de la famille' : 'Holiris, le carnet de liaison à domicile'}
+            </p>
           </div>
         </div>
         {erreurBloc}
 
         {visites.length > 0 && (
           <>
-            {surtitre('Vos dernières visites')}
+            {surtitre(pourCompte ? 'Choisissez un domicile' : 'Vos dernières visites')}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 26 }}>
               {visites.map(v => (
                 <button key={v.code} onClick={() => ouvrir(v.code)} disabled={sending} className="qr-bouton"
                   style={bouton(C.sauge, '#fff', { display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', padding: '18px 20px', boxShadow: '0 10px 24px rgba(74,136,112,0.25)' })}>
-                  <span style={{ fontSize: 24 }}>🎙</span>
+                  <span style={{ fontSize: 24 }}>{pourCompte ? '🏠' : '🎙'}</span>
                   <span style={{ fontSize: 18, fontWeight: 600 }}>Chez {v.senior}</span>
                 </button>
               ))}
@@ -319,7 +322,7 @@ export default function QrNote() {
               ? 'Pour créer votre compte, tapez le code domicile d’une personne que vous suivez, puis choisissez votre nom.'
               : 'Tapez le code inscrit sous le QR code, sur l’affiche Holiris du domicile.'}
           </p>
-          <input value={afficherCode(c)} onChange={e => setSaisie(e.target.value)} placeholder="XXXX-XXXX" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
+          <input key={pourCompte ? 'compte' : 'note'} autoFocus={pourCompte} value={afficherCode(c)} onChange={e => setSaisie(e.target.value)} placeholder="XXXX-XXXX" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
             style={{ ...champStyle, fontSize: 26, letterSpacing: '0.18em', textAlign: 'center', fontWeight: 600, marginBottom: 14 }} />
           <button type="submit" disabled={sending || c.length !== 8} className="qr-bouton"
             style={bouton(C.sauge, '#fff', { width: '100%', opacity: c.length === 8 ? 1 : 0.5 })}>
@@ -327,21 +330,19 @@ export default function QrNote() {
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: 22, fontSize: 14, color: C.gris, lineHeight: 1.7 }}>
-          {pourCompte ? (
-            <button onClick={() => setPourCompte(false)} style={{ background: 'none', border: 'none', color: C.saugeFonce, fontSize: 14, cursor: 'pointer', fontFamily: TEXTE, textDecoration: 'underline' }}>
-              Laisser une note plutôt
-            </button>
-          ) : (
-            <>
-              Vous venez régulièrement ?{' '}
-              <button onClick={() => { setPourCompte(true); setError('') }} style={{ background: 'none', border: 'none', padding: 0, color: C.saugeFonce, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: TEXTE, textDecoration: 'underline' }}>
-                Créer mon compte Holiris
-              </button>
-            </>
-          )}
-          <br />Déjà un compte ? <a href="/login" style={{ color: C.saugeFonce }}>Se connecter</a>
-        </div>
+        {!pourCompte && (
+          <button onClick={() => { setPourCompte(true); setError(''); window.scrollTo(0, 0) }} className="qr-bouton"
+            style={bouton(C.carte, C.saugeFonce, { border: `1.5px solid ${C.sauge}`, marginTop: 18, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: '15px 18px' })}>
+            <span style={{ fontSize: 22 }}>👤</span>
+            <span>
+              <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>Créer mon compte Holiris</span>
+              <span style={{ fontSize: 13, color: C.gris, fontWeight: 400 }}>Vous venez régulièrement ? Suivez vos notes et les messages de la famille</span>
+            </span>
+          </button>
+        )}
+        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: C.gris }}>
+          Déjà un compte ? <a href="/login" style={{ color: C.saugeFonce }}>Se connecter</a>
+        </p>
 
         <p style={{ fontSize: 13, color: C.grisClair, textAlign: 'center', marginTop: 'auto', paddingTop: 30, lineHeight: 1.6 }}>
           Vos notes sont transmises à la famille et aux professionnels qui suivent la personne.<br />Urgence vitale : appelez le 15 ou le 112.
