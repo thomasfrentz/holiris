@@ -104,6 +104,17 @@ export default function Borne() {
   const derniereActionRef = useRef(0)
   const versionRef = useRef(null)
   const [miseAJour, setMiseAJour] = useState(false)
+  // Correction de la note : tant que le clavier est ouvert, seule la note s'affiche, à la hauteur laissée libre par le clavier
+  const [correction, setCorrection] = useState(false)
+  const [hauteurVisible, setHauteurVisible] = useState(null)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const suivre = () => setHauteurVisible(vv.height)
+    vv.addEventListener('resize', suivre)
+    return () => vv.removeEventListener('resize', suivre)
+  }, [])
 
   useEffect(() => {
     window.__holirisBorne = true // la page a bien démarré (voir le diagnostic de layout.js)
@@ -1120,26 +1131,44 @@ export default function Borne() {
   )
 
   if (step === 'revision') return page(
-    <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column' }}>
-      {retour('Accueil', retourAccueil)}
-      <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'center' }}>Note de {selectedPersonne?.name}</p>
-      <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, textAlign: 'center', margin: '6px 0 20px' }}>Votre note est prête</h2>
-      {erreurBloc}
-      <div style={{ background: C.carte, borderRadius: 24, padding: 22, boxShadow: OMBRE, marginBottom: 18 }}>
+    <div style={{ width: '100%', maxWidth: 680, display: 'flex', flexDirection: 'column',
+      // Pendant la correction, la note occupe la hauteur laissée libre par le clavier
+      ...(correction ? { gap: 10, height: `calc(${hauteurVisible ? hauteurVisible + 'px' : '50dvh'} - 32px)` } : {}) }}>
+      {correction ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <p style={{ fontSize: 15, color: C.gris }}>✏️ Corrigez votre note</p>
+          {/* onPointerDown : le bouton agit avant que la fermeture du clavier ne déplace l'écran */}
+          <button onPointerDown={e => { e.preventDefault(); document.activeElement?.blur() }} className="borne-bouton"
+            style={bouton(C.sauge, '#fff', { padding: '10px 22px', fontSize: 17 })}>✓ Terminé</button>
+        </div>
+      ) : (
+        <>
+          {retour('Accueil', retourAccueil)}
+          <p style={{ fontSize: 13, color: C.grisClair, letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'center' }}>Note de {selectedPersonne?.name}</p>
+          <h2 style={{ fontFamily: TITRE, fontSize: 40, fontWeight: 500, textAlign: 'center', margin: '6px 0 20px' }}>Votre note est prête</h2>
+          {erreurBloc}
+        </>
+      )}
+      <div style={{ background: C.carte, borderRadius: 24, padding: correction ? 18 : 22, boxShadow: OMBRE, marginBottom: correction ? 0 : 18,
+        ...(correction ? { flex: 1, minHeight: 0, display: 'flex' } : {}) }}>
         <textarea value={noteProposee} onChange={e => setNoteProposee(e.target.value)} rows={5}
-          style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', fontFamily: TEXTE, fontSize: 20, lineHeight: 1.6, color: C.encre, background: 'transparent', boxSizing: 'border-box' }} />
-        <p style={{ fontSize: 14, color: C.grisClair, marginTop: 6 }}>✏️ Touchez le texte pour le corriger si besoin.</p>
+          onFocus={() => { setCorrection(true); setTimeout(() => window.scrollTo(0, 0), 300) }} onBlur={() => setCorrection(false)}
+          style={{ width: '100%', border: 'none', outline: 'none', resize: correction ? 'none' : 'vertical', fontFamily: TEXTE, fontSize: 20, lineHeight: 1.6, color: C.encre, background: 'transparent', boxSizing: 'border-box',
+            ...(correction ? { height: '100%' } : {}) }} />
+        {!correction && <p style={{ fontSize: 14, color: C.grisClair, marginTop: 6 }}>✏️ Touchez le texte pour le corriger si besoin.</p>}
       </div>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-        <button onClick={envoyerNote} disabled={sending || !noteProposee.trim()} className="borne-bouton"
-          style={bouton(C.sauge, '#fff', { flex: '2 1 260px', fontSize: 21, padding: '22px', boxShadow: '0 12px 28px rgba(74,136,112,0.28)', opacity: noteProposee.trim() ? 1 : 0.5 })}>
-          {sending ? 'Envoi…' : 'Envoyer la note'}
-        </button>
-        <button onClick={reenregistrer} disabled={sending} className="borne-bouton"
-          style={bouton(C.carte, C.saugeFonce, { flex: '1 1 200px', border: `1.5px solid ${C.sauge}` })}>
-          🎙 Réenregistrer
-        </button>
-      </div>
+      {!correction && (
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <button onClick={envoyerNote} disabled={sending || !noteProposee.trim()} className="borne-bouton"
+            style={bouton(C.sauge, '#fff', { flex: '2 1 260px', fontSize: 21, padding: '22px', boxShadow: '0 12px 28px rgba(74,136,112,0.28)', opacity: noteProposee.trim() ? 1 : 0.5 })}>
+            {sending ? 'Envoi…' : 'Envoyer la note'}
+          </button>
+          <button onClick={reenregistrer} disabled={sending} className="borne-bouton"
+            style={bouton(C.carte, C.saugeFonce, { flex: '1 1 200px', border: `1.5px solid ${C.sauge}` })}>
+            🎙 Réenregistrer
+          </button>
+        </div>
+      )}
     </div>,
     { haut: true }
   )
