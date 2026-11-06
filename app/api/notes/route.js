@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin, clientUtilisateur, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
 import { enregistrerNote } from '@/lib/notesMedicales'
+import { lireTraduction } from '@/lib/transcription'
 
 // Ajout d'une note depuis le web (espace intervenant ou carnet famille), avec filtre médical
 export async function POST(request) {
   try {
-    const { seniorId, texte, source } = await request.json()
+    const { seniorId, texte, source, traduction } = await request.json()
     if (!seniorId || !texte?.trim() || !['intervenant', 'famille'].includes(source)) {
       return NextResponse.json({ success: false, error: 'Paramètres invalides' }, { status: 400 })
     }
@@ -37,6 +38,7 @@ export async function POST(request) {
       seniorId,
       texte: texte.trim(),
       source: sourceNote,
+      traduction: lireTraduction(traduction),
       auteur: {
         type: sourceNote,
         id: ligne.id,
@@ -117,7 +119,7 @@ export async function DELETE(request) {
 
     const supprimee = {
       id: note.id, senior_id: note.senior_id, intervenant_id: note.intervenant_id, intervenant_name: note.intervenant_name,
-      content: note.content, source: note.source, audio_url: note.audio_url, note_created_at: note.created_at,
+      content: note.content, source: note.source, audio_url: note.audio_url, note_created_at: note.created_at, langue_originale: note.langue_originale,
       supprimee_par: user.id, supprimee_par_nom: await nomUtilisateur(user, note.senior_id),
     }
     const { error: e1 } = await supabaseAdmin.from('notes_supprimees').upsert(supprimee)
@@ -133,13 +135,21 @@ export async function DELETE(request) {
 
 // ?noteId= : historique des modifications d'une note, pour qui peut la lire (ou, si elle est supprimée, gérer son dossier)
 // ?seniorId= : notes supprimées du dossier, pour qui peut le gérer
+// ?original= : texte d'origine d'une note traduite, pour qui peut gérer son dossier
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const noteId = searchParams.get('noteId')
     const seniorId = searchParams.get('seniorId')
+    const original = searchParams.get('original')
     const user = await utilisateurCourant()
     if (!user) return NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 })
+
+    if (original) {
+      const { data } = await supabaseAdmin.from('notes_traductions').select('senior_id, langue, texte_original').eq('note_id', original).maybeSingle()
+      if (data && !await peutGererSenior(user.id, data.senior_id)) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
+      return NextResponse.json({ success: true, original: data ? { langue: data.langue, texte: data.texte_original } : null })
+    }
 
     if (noteId) {
       const supabase = await clientUtilisateur()

@@ -3,6 +3,7 @@ import { randomInt } from 'crypto'
 import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
 import { enregistrerNote } from '@/lib/notesMedicales'
 import { inviterMembre } from '@/lib/invitations'
+import { lireTraduction } from '@/lib/transcription'
 
 // QR code Holiris (le même partout) : n'importe qui peut laisser une note, sans compte,
 // en tapant le code du senior affiché chez lui. Le code ne donne accès qu'au prénom du senior
@@ -62,7 +63,7 @@ export async function POST(request) {
         auteur = { type: 'intervenant', id: null, nom, role: champ(body.role, 60) || null, telephone: champ(body.telephone, 30) || null }
       }
 
-      const result = await enregistrerNote({ seniorId: senior.id, texte, source: 'qr', auteur })
+      const result = await enregistrerNote({ seniorId: senior.id, texte, source: 'qr', auteur, traduction: lireTraduction(body.traduction) })
       return NextResponse.json({ success: true, medical: result.medical, signalementId: result.signalementId, notePartielle: !!result.note })
     }
 

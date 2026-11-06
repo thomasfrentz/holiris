@@ -7,6 +7,7 @@ import QuestionMedicale from '../components/QuestionMedicale'
 import NoteVocale from '../components/NoteVocale'
 import { useSenior } from '../lib/useSenior'
 import AucunDossier from '../components/AucunDossier'
+import { traduitDe } from '../lib/langues'
 
 export default function Carnet() {
   const [notes, setNotes] = useState([])
@@ -19,6 +20,7 @@ export default function Carnet() {
   const [historiques, setHistoriques] = useState({}) // noteId → modifications, pour les notes dont on affiche l'original
   const [supprimees, setSupprimees] = useState([])
   const [voirSupprimees, setVoirSupprimees] = useState(false)
+  const [originaux, setOriginaux] = useState({}) // noteId → texte d'origine d'une note traduite (ou null s'il n'a pas été conservé)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
 
@@ -43,6 +45,7 @@ export default function Carnet() {
         .order('created_at', { ascending: false })
       setNotes(notesData || [])
       setHistoriques({})
+      setOriginaux({})
 
       // Notes supprimées : visibles par qui peut gérer le dossier (admin, gestionnaire de structure)
       setSupprimees([])
@@ -107,6 +110,34 @@ export default function Carnet() {
     const result = await res.json().catch(() => ({}))
     if (result.success) setHistoriques(prev => ({ ...prev, [id]: result.modifications }))
   }
+
+  // Texte d'origine d'une note traduite, réservé à qui peut gérer le dossier
+  async function basculerOriginal(id) {
+    if (id in originaux) { setOriginaux(prev => { const { [id]: _, ...reste } = prev; return reste }); return }
+    const res = await fetch('/api/notes?original=' + id)
+    const result = await res.json().catch(() => ({}))
+    if (result.success) setOriginaux(prev => ({ ...prev, [id]: result.original }))
+  }
+
+  const blocLangue = n => n.langue_originale && (
+    <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+      🌐 {traduitDe(n.langue_originale)}
+      {isAdmin && (
+        <>
+          {' · '}
+          <button onClick={() => basculerOriginal(n.id)}
+            style={{ background: 'none', border: 'none', padding: 0, color: '#3498db', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+            {n.id in originaux ? 'Masquer le texte d’origine' : 'Voir le texte d’origine'}
+          </button>
+          {n.id in originaux && (
+            <div style={{ marginTop: 8, background: '#f7f5f1', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: '#555', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              {originaux[n.id]?.texte || 'Le texte d’origine n’a pas été conservé : il contenait une information médicale.'}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 
   const dateCourte = d => new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
@@ -234,6 +265,7 @@ export default function Carnet() {
                 </div>
               )}
               {blocHistorique(n.id, n.intervenant_name, n.created_at)}
+              {blocLangue(n)}
             </div>
           )
         })}
@@ -272,6 +304,7 @@ export default function Carnet() {
                       </button>
                     </div>
                     {blocHistorique(n.id, n.intervenant_name, n.note_created_at)}
+                    {blocLangue(n)}
                   </div>
                 ))}
               </div>

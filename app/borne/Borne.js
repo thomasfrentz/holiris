@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { demarrerVisio } from '../lib/visioRtc'
+import { traduitDe } from '../lib/langues'
 
 // Charte Holiris, version douce et chaleureuse pour la tablette du domicile
 const C = {
@@ -64,6 +65,7 @@ export default function Borne() {
   const [inviteNom, setInviteNom] = useState('')
   const [inviteRole, setInviteRole] = useState('')
   const [noteProposee, setNoteProposee] = useState('')
+  const [traduction, setTraduction] = useState(null) // { langue, jeton } : note dite dans une autre langue, traduite en français
   const [signalement, setSignalement] = useState(null) // { id, notePartielle }
   const [reponseMedicale, setReponseMedicale] = useState('')
   const [alertesAccueil, setAlertesAccueil] = useState([])
@@ -501,6 +503,7 @@ export default function Borne() {
       const result = await res.json()
       if (result.success) {
         setNoteProposee(result.note)
+        setTraduction(result.traduction ? { langue: result.langue, jeton: result.traduction } : null)
         setStep('revision')
         return
       }
@@ -537,7 +540,8 @@ export default function Borne() {
           intervenantName: selectedPersonne.name,
           intervenantRole: selectedPersonne.role || '',
           seniorId: borneInfo.senior_id,
-          code: borneInfo.code
+          code: borneInfo.code,
+          traduction: traduction?.jeton,
         })
       })
       const result = await res.json()
@@ -1156,6 +1160,7 @@ export default function Borne() {
           style={{ width: '100%', border: 'none', outline: 'none', resize: correction ? 'none' : 'vertical', fontFamily: TEXTE, fontSize: 20, lineHeight: 1.6, color: C.encre, background: 'transparent', boxSizing: 'border-box',
             ...(correction ? { height: '100%' } : {}) }} />
         {!correction && <p style={{ fontSize: 14, color: C.grisClair, marginTop: 6 }}>✏️ Touchez le texte pour le corriger si besoin.</p>}
+        {!correction && traduction && <p style={{ fontSize: 14, color: C.saugeFonce, marginTop: 6 }}>🌐 {traduitDe(traduction.langue)} · relisez-la avant d’envoyer.</p>}
       </div>
       {!correction && (
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>

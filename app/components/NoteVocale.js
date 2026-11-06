@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
+import { traduitDe } from '../lib/langues'
 import QuestionMedicale from './QuestionMedicale'
 
 // Format d'enregistrement accepté par le navigateur (Safari iPhone : mp4, Chrome/Android : webm)
@@ -14,6 +15,7 @@ export default function NoteVocale({ seniorId, source, onNoteAjoutee, grand = fa
   const [etape, setEtape] = useState('pret') // pret | enregistrement | transcription | revision | envoi | envoyee
   const [duree, setDuree] = useState(0)
   const [note, setNote] = useState('')
+  const [traduction, setTraduction] = useState(null) // { langue, jeton } : note dite dans une autre langue, traduite en français
   const [erreur, setErreur] = useState('')
   const [questionMedicale, setQuestionMedicale] = useState(null)
   const recorderRef = useRef(null)
@@ -59,6 +61,7 @@ export default function NoteVocale({ seniorId, source, onNoteAjoutee, grand = fa
       const result = await res.json()
       if (!result.success || !result.note) throw new Error(result.rienEntendu ? result.error : '')
       setNote(result.note)
+      setTraduction(result.traduction ? { langue: result.langue, jeton: result.traduction } : null)
       setEtape('revision')
     } catch (e) {
       setErreur(e.message || 'La transcription a échoué. Réessayez.')
@@ -73,7 +76,7 @@ export default function NoteVocale({ seniorId, source, onNoteAjoutee, grand = fa
       const res = await fetch('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seniorId, texte: note, source })
+        body: JSON.stringify({ seniorId, texte: note, source, traduction: traduction?.jeton })
       })
       const result = await res.json()
       if (!result.success) throw new Error(result.error)
@@ -134,6 +137,7 @@ export default function NoteVocale({ seniorId, source, onNoteAjoutee, grand = fa
           <div style={{ fontSize: 11, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>Note proposée — relisez avant d&apos;envoyer</div>
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={4}
             style={{ width: '100%', padding: '12px 14px', border: '1px solid #C8DDD4', borderRadius: 10, fontSize: 15, lineHeight: 1.6, outline: 'none', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', background: '#FAFCFC', marginBottom: 12 }} />
+          {traduction && <p style={{ fontSize: 13, color: '#4A8870', marginTop: -4, marginBottom: 12 }}>🌐 {traduitDe(traduction.langue)} · relisez-la avant d’envoyer.</p>}
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={envoyer} disabled={etape === 'envoi' || !note.trim()} style={{ ...bouton, background: '#7FAF9B', color: '#fff' }}>
               {etape === 'envoi' ? 'Envoi…' : 'Envoyer la note'}

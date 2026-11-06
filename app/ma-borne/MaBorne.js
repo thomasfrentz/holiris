@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { traduitDe } from '../lib/langues'
 import ActiverNotifications from '../components/ActiverNotifications'
 
 // Borne sur téléphone : un intervenant sans compte laisse ses notes depuis son téléphone,
@@ -54,6 +55,7 @@ export default function MaBorne() {
   const [audioBlob, setAudioBlob] = useState(null)
   const [duration, setDuration] = useState(0)
   const [noteProposee, setNoteProposee] = useState('')
+  const [traduction, setTraduction] = useState(null) // { langue, jeton } : note dite dans une autre langue, traduite en français
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [signalement, setSignalement] = useState(null)
@@ -174,6 +176,7 @@ export default function MaBorne() {
       const result = await (await fetch('/api/borne-transcribe', { method: 'POST', body: formData })).json()
       if (result.success) {
         setNoteProposee(result.note)
+        setTraduction(result.traduction ? { langue: result.langue, jeton: result.traduction } : null)
         setStep('revision')
         return
       }
@@ -208,6 +211,7 @@ export default function MaBorne() {
           intervenantRole: dossier.role || '',
           seniorId: dossier.seniorId,
           jeton,
+          traduction: traduction?.jeton,
         }),
       })).json()
       if (result.success && result.signalementId) {
@@ -434,6 +438,7 @@ export default function MaBorne() {
         <textarea value={noteProposee} onChange={e => setNoteProposee(e.target.value)} rows={6}
           style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', fontFamily: TEXTE, fontSize: 17, lineHeight: 1.6, color: C.encre, background: 'transparent', boxSizing: 'border-box' }} />
         <p style={{ fontSize: 13, color: C.grisClair, marginTop: 6 }}>✏️ Touchez le texte pour le corriger si besoin.</p>
+        {traduction && <p style={{ fontSize: 13, color: C.saugeFonce, marginTop: 6 }}>🌐 {traduitDe(traduction.langue)} · relisez-la avant d’envoyer.</p>}
       </div>
       <button onClick={envoyerNote} disabled={sending || !noteProposee.trim()} className="mb-bouton"
         style={bouton(C.sauge, '#fff', { fontSize: 18, marginBottom: 10, opacity: noteProposee.trim() ? 1 : 0.5 })}>

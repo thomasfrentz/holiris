@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { supabaseAdmin as supabase } from '@/lib/serveur'
 import { analyserNote, enregistrerNote, repondreSignalement } from '@/lib/notesMedicales'
-import { mettreAuPropre } from '@/lib/transcription'
+import { mettreAuPropre, preparerNote } from '@/lib/transcription'
+import { traduitDe } from '@/app/lib/langues'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -83,21 +84,31 @@ export async function POST(request) {
     let noteContent = ''
     let source = 'whatsapp_text'
     let rawText = ''
+    let traduction = null // { langue, original } : message dans une autre langue, traduit en français
 
     if (messageType === 'text') {
       rawText = message.text.body
-      noteContent = await synthesizeNote(rawText)
+      // Mis au propre, et traduit s'il est écrit dans une autre langue
+      const prete = await preparerNote({ ecrit: rawText })
+      noteContent = prete.note
+      if (prete.langue) traduction = prete
       source = 'whatsapp_text'
     } else if (messageType === 'audio') {
-      rawText = await transcribeMetaAudio(message.audio.id)
-      noteContent = await synthesizeNote(rawText)
+      const t = await transcribeMetaAudio(message.audio.id)
+      rawText = t.francais
+      if (t.libre?.trim() && !['french', 'fr'].includes(t.langue)) {
+        // Autre langue détectée : l'IA garde la version qui a du sens (français avec accent, ou autre langue) et traduit
+        const prete = await preparerNote({ francais: t.francais, libre: t.libre, langueDetectee: t.langue })
+        noteContent = prete.note
+        if (prete.langue) traduction = prete
+      } else noteContent = await synthesizeNote(rawText)
       source = 'whatsapp_audio'
     }
 
     console.log('Note à créer:', noteContent)
 
     if (noteContent) {
-      const finalSeniorId = await findSeniorByName(rawText, seniorId, seniorIds)
+      const finalSeniorId = await findSeniorByName(traduction ? noteContent : rawText, seniorId, seniorIds)
       // Pour ce senior, le rôle d'intervenant prime si la personne est aussi un proche
       const auteur = expediteurs.find(e => e.senior_id === finalSeniorId && e.type === 'intervenant')
         || expediteurs.find(e => e.senior_id === finalSeniorId)
@@ -117,7 +128,7 @@ export async function POST(request) {
 
       if (!analyse.note) {
         // Rien à publier : seul le signalement médical est créé
-        const result = await enregistrerNote({ seniorId: finalSeniorId, texte: noteContent, source, auteur: auteurNote, analyse })
+        const result = await enregistrerNote({ seniorId: finalSeniorId, texte: noteContent, source, auteur: auteurNote, analyse, traduction })
         if (result.signalementId) await demanderSiEssentiel(from, result.signalementId, false)
         return NextResponse.json({ status: 'ok' })
       }
@@ -130,6 +141,9 @@ export async function POST(request) {
         source,
         texte: analyse.note,
         medical: analyse.medical,
+        // Le texte d'origine n'est pas filtré : il n'est gardé que si la note ne contenait aucune information médicale
+        langue: traduction?.langue || null,
+        texte_original: traduction && !analyse.medical ? traduction.original : null,
       }).select().single()
       if (error) throw error
       console.log('Note à valider pour senior:', finalSeniorId, analyse.medical ? '(information médicale retirée)' : '')
@@ -167,12 +181,13 @@ async function transcribeMetaAudio(audioId) {
   })
   const audioBuffer = await audioResponse.arrayBuffer()
   const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' })
-  const transcription = await groq.audio.transcriptions.create({
-    file: audioFile,
-    model: 'whisper-large-v3',
-    language: 'fr'
-  })
-  return transcription.text
+  // En français (un fort accent fait sinon croire à une autre langue) et dans la langue détectée
+  const [francais, libre] = await Promise.all([
+    groq.audio.transcriptions.create({ file: audioFile, model: 'whisper-large-v3', language: 'fr' }),
+    groq.audio.transcriptions.create({ file: new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' }), model: 'whisper-large-v3', response_format: 'verbose_json' })
+      .catch(() => null),
+  ])
+  return { francais: francais.text, libre: libre?.text || '', langue: String(libre?.language || '').toLowerCase() }
 }
 
 // Texte fidèle à ce qui a été dit ou écrit (mis au propre, sans résumé ni interprétation)
@@ -261,6 +276,7 @@ async function proposerNote(to, enAttente) {
       type: 'button',
       body: {
         text: 'Voici la note qui sera ajoutée au carnet' + (senior?.name ? ' de ' + senior.name : '') + ' :\n\n« ' + texte + ' »'
+          + (enAttente.langue ? '\n\n🌐 ' + traduitDe(enAttente.langue) + '.' : '')
           + (enAttente.medical ? '\n\nUne information médicale a été retirée : pour protéger la personne suivie, elle n\'est jamais enregistrée sur Holiris.' : '')
           + '\n\nLa validez-vous ?'
       },
@@ -325,6 +341,7 @@ async function publierNote(from, enAttente, analyse) {
       source: enAttente.source,
       auteur: enAttente.auteur,
       analyse,
+      traduction: enAttente.langue ? { langue: enAttente.langue, original: enAttente.texte_original } : null,
     })
   } catch (error) {
     // La note reste en attente : l'auteur peut appuyer de nouveau sur « Valider » ou renvoyer sa correction

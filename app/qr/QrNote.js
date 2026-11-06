@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { traduitDe } from '../lib/langues'
 
 // Page ouverte par le QR code Holiris (le même partout) : n'importe qui laisse une note chez un senior,
 // sans compte, en tapant le code affiché chez lui. Rien du dossier n'y est lisible.
@@ -56,6 +57,7 @@ export default function QrNote() {
   const [audioBlob, setAudioBlob] = useState(null)
   const [duration, setDuration] = useState(0)
   const [note, setNote] = useState('')
+  const [traduction, setTraduction] = useState(null) // { langue, jeton } : note dite dans une autre langue, traduite en français
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [signalement, setSignalement] = useState(null)
@@ -177,6 +179,7 @@ export default function QrNote() {
       const result = await (await fetch('/api/borne-transcribe', { method: 'POST', body: formData })).json()
       if (result.success) {
         setNote(result.note)
+        setTraduction(result.traduction ? { langue: result.langue, jeton: result.traduction } : null)
         setStep('revision')
         return
       }
@@ -197,7 +200,7 @@ export default function QrNote() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'note', code, note,
+          action: 'note', code, note, traduction: traduction?.jeton,
           ...(auteur?.id ? { personneId: auteur.id, personneType: auteur.type } : { nom: auteur?.nom, role: auteur?.role, telephone: auteur?.telephone }),
         }),
       })).json()
@@ -433,7 +436,7 @@ export default function QrNote() {
               {recording ? 'Je vous écoute… touchez à nouveau quand vous avez fini' : 'Touchez le micro et racontez votre visite'}
             </p>
             {!recording && (
-              <button onClick={() => { setError(''); setStep('revision') }} className="qr-bouton"
+              <button onClick={() => { setError(''); setTraduction(null); setStep('revision') }} className="qr-bouton"
                 style={{ background: 'none', border: 'none', color: C.saugeFonce, fontSize: 16, fontWeight: 500, cursor: 'pointer', fontFamily: TEXTE, textDecoration: 'underline' }}>
                 ✏️ Écrire plutôt
               </button>
@@ -454,6 +457,7 @@ export default function QrNote() {
           placeholder={'Comment s’est passée votre visite chez ' + dossier?.senior + ' ?'}
           style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', fontFamily: TEXTE, fontSize: 17, lineHeight: 1.6, color: C.encre, background: 'transparent', boxSizing: 'border-box' }} />
         {audioBlob && <p style={{ fontSize: 13, color: C.grisClair, marginTop: 6 }}>✏️ Touchez le texte pour le corriger si besoin.</p>}
+        {traduction && <p style={{ fontSize: 13, color: C.saugeFonce, marginTop: 6 }}>🌐 {traduitDe(traduction.langue)} · relisez-la avant d’envoyer.</p>}
       </div>
       <button onClick={envoyer} disabled={sending || !note.trim()} className="qr-bouton"
         style={bouton(C.sauge, '#fff', { fontSize: 18, marginBottom: 10, opacity: note.trim() ? 1 : 0.5 })}>

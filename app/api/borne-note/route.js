@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { enregistrerNote } from '@/lib/notesMedicales'
 import { ficheAutorisee } from '@/lib/accesMobile'
+import { lireTraduction } from '@/lib/transcription'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -10,7 +11,7 @@ const supabase = createClient(
 
 export async function POST(request) {
   try {
-    const { note, intervenantId, personneType, intervenantName, intervenantRole, seniorId, code, jeton } = await request.json()
+    const { note, intervenantId, personneType, intervenantName, intervenantRole, seniorId, code, jeton, traduction } = await request.json()
 
     // La note doit venir de la borne du senior (son code) ou de la borne sur téléphone de l'intervenant (son jeton)
     let autorise = false
@@ -33,7 +34,7 @@ export async function POST(request) {
       : { type: 'intervenant', id: null, nom: intervenantName, role: intervenantRole }
 
     // Filtre médical : seule la partie non médicale est enregistrée
-    const result = await enregistrerNote({ seniorId, texte: note, source: 'borne', auteur })
+    const result = await enregistrerNote({ seniorId, texte: note, source: 'borne', auteur, traduction: lireTraduction(traduction) })
 
     return NextResponse.json({ success: true, medical: result.medical, signalementId: result.signalementId, notePartielle: !!result.note })
   } catch (err) {
