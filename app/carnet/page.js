@@ -16,6 +16,9 @@ export default function Carnet() {
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [questionMedicale, setQuestionMedicale] = useState(null)
+  const [historiques, setHistoriques] = useState({}) // noteId → modifications, pour les notes dont on affiche l'original
+  const [supprimees, setSupprimees] = useState([])
+  const [voirSupprimees, setVoirSupprimees] = useState(false)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
 
@@ -39,11 +42,20 @@ export default function Carnet() {
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
       setNotes(notesData || [])
+      setHistoriques({})
+
+      // Notes supprimées : visibles par qui peut gérer le dossier (admin, gestionnaire de structure)
+      setSupprimees([])
+      if (isAdmin) {
+        const res = await fetch('/api/notes?seniorId=' + selectedSeniorId)
+        const result = await res.json().catch(() => ({}))
+        if (result.success) setSupprimees(result.supprimees)
+      }
 
       setLoading(false)
     }
     loadData()
-  }, [selectedSeniorId])
+  }, [selectedSeniorId, isAdmin])
 
   async function addNote() {
     if (!newNote.trim()) return
@@ -66,19 +78,55 @@ export default function Carnet() {
     setSaving(false)
   }
 
+  // Suppression et modification passent par le serveur, qui garde la note supprimée et les textes précédents
   async function deleteNote(id) {
     if (!isAdmin) return
-    await supabase.from('notes').delete().eq('id', id)
+    if (!confirm('Supprimer cette note ? Elle restera visible dans « Notes supprimées », mais ne sera plus prise en compte.')) return
+    const res = await fetch('/api/notes', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ noteId: id }) })
+    const result = await res.json().catch(() => ({}))
+    if (!result.success) { alert(result.error || 'La note n’a pas pu être supprimée.'); return }
     setNotes(prev => prev.filter(n => n.id !== id))
+    setSupprimees(prev => [result.supprimee, ...prev])
   }
 
   async function editNote(id, content) {
     if (!isAdmin) return
     const newContent = prompt('Modifier la note :', content)
-    if (!newContent || newContent === content) return
-    await supabase.from('notes').update({ content: newContent }).eq('id', id)
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, content: newContent } : n))
+    if (!newContent?.trim() || newContent.trim() === content) return
+    const res = await fetch('/api/notes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ noteId: id, texte: newContent }) })
+    const result = await res.json().catch(() => ({}))
+    if (!result.success) { alert(result.error || 'La note n’a pas pu être modifiée.'); return }
+    setNotes(prev => prev.map(n => n.id === id ? result.note : n))
+    setHistoriques(prev => { const { [id]: _, ...reste } = prev; return reste })
   }
+
+  // Affiche ou masque le texte d'origine et la liste des modifications d'une note
+  async function basculerHistorique(id) {
+    if (historiques[id]) { setHistoriques(prev => { const { [id]: _, ...reste } = prev; return reste }); return }
+    const res = await fetch('/api/notes?noteId=' + id)
+    const result = await res.json().catch(() => ({}))
+    if (result.success) setHistoriques(prev => ({ ...prev, [id]: result.modifications }))
+  }
+
+  const dateCourte = d => new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+  const blocHistorique = (id, auteurNote, dateNote) => historiques[id] && (
+    <div style={{ marginTop: 10, background: '#f7f5f1', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: '#555', lineHeight: 1.6 }}>
+      {historiques[id].length === 0 ? <div>Aucune modification enregistrée.</div> : (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 'bold', color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Texte d’origine</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>{auteurNote ? auteurNote + ' · ' : ''}{dateCourte(dateNote)}</div>
+          <p style={{ margin: '0 0 8px', whiteSpace: 'pre-wrap' }}>{historiques[id][0].ancien_contenu}</p>
+          {historiques[id].map(m => (
+            <div key={m.id} style={{ borderTop: '1px solid #ebe6dd', paddingTop: 6, marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: '#aaa' }}>Modifiée le {dateCourte(m.created_at)} par {m.modifiee_par_nom || 'inconnu'}</div>
+              {historiques[id].length > 1 && <p style={{ margin: '2px 0 0', whiteSpace: 'pre-wrap' }}>{m.nouveau_contenu}</p>}
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  )
 
   const sourceLabel = (source) => {
     if (source === 'whatsapp_audio') return { icon: '🎤', label: 'Note vocale', color: '#9b59b6' }
@@ -176,6 +224,16 @@ export default function Carnet() {
                 </div>
               </div>
               <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>{n.content}</p>
+              {n.modifiee_at && (
+                <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
+                  ✏️ Modifiée le {dateCourte(n.modifiee_at)}{n.modifiee_par_nom ? ' par ' + n.modifiee_par_nom : ''} ·{' '}
+                  <button onClick={() => basculerHistorique(n.id)}
+                    style={{ background: 'none', border: 'none', padding: 0, color: '#3498db', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                    {historiques[n.id] ? 'Masquer l’original' : 'Voir l’original'}
+                  </button>
+                </div>
+              )}
+              {blocHistorique(n.id, n.intervenant_name, n.created_at)}
             </div>
           )
         })}
@@ -186,6 +244,41 @@ export default function Carnet() {
           </div>
         )}
       </div>
+
+      {isAdmin && supprimees.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <button onClick={() => setVoirSupprimees(v => !v)}
+            style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 'bold' }}>
+            🗑️ Notes supprimées ({supprimees.length}) {voirSupprimees ? '▲' : '▼'}
+          </button>
+          {voirSupprimees && (
+            <>
+              <p style={{ fontSize: 12, color: '#999', margin: '10px 0 12px' }}>
+                Ces notes ne sont plus prises en compte : ni dans les comptes rendus et résumés, ni par les alertes et l’assistant.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {supprimees.map(n => (
+                  <div key={n.id} style={{ background: '#faf9f7', borderRadius: 12, padding: 16, border: '1px dashed #ddd', opacity: 0.85 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: '#666', fontWeight: 600 }}>{n.intervenant_name ? '👤 ' + n.intervenant_name : 'Note'}</span>
+                      <span style={{ fontSize: 11, color: '#aaa', flexShrink: 0 }}>{dateCourte(n.note_created_at)}</span>
+                    </div>
+                    <p style={{ fontSize: 14, color: '#777', lineHeight: 1.7, margin: 0, textDecoration: 'line-through', textDecorationColor: '#ccc' }}>{n.content}</p>
+                    <div style={{ fontSize: 12, color: '#c0392b', marginTop: 8 }}>
+                      Supprimée le {dateCourte(n.supprimee_at)}{n.supprimee_par_nom ? ' par ' + n.supprimee_par_nom : ''} ·{' '}
+                      <button onClick={() => basculerHistorique(n.id)}
+                        style={{ background: 'none', border: 'none', padding: 0, color: '#3498db', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                        {historiques[n.id] ? 'Masquer les modifications' : 'Voir les modifications'}
+                      </button>
+                    </div>
+                    {blocHistorique(n.id, n.intervenant_name, n.note_created_at)}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </Layout>
   )
 }
