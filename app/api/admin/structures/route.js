@@ -12,7 +12,7 @@ export async function GET() {
 
   const [structures, membres, seniors] = await Promise.all([
     supabaseAdmin.from('structures').select('id, nom, created_at').order('nom'),
-    supabaseAdmin.from('structure_membres').select('structure_id, nom, email, user_id'),
+    supabaseAdmin.from('structure_membres').select('id, structure_id, nom, email, user_id'),
     supabaseAdmin.from('seniors').select('id, structure_id'),
   ])
   if (structures.error) return NextResponse.json({ error: structures.error.message }, { status: 500 })
@@ -20,13 +20,14 @@ export async function GET() {
   return NextResponse.json({
     structures: structures.data.map(s => ({
       ...s,
-      gestionnaires: (membres.data || []).filter(m => m.structure_id === s.id).map(m => ({ nom: m.nom, email: m.email, compteActif: !!m.user_id })),
+      gestionnaires: (membres.data || []).filter(m => m.structure_id === s.id).map(m => ({ id: m.id, nom: m.nom, email: m.email, compteActif: !!m.user_id })),
       nbSeniors: (seniors.data || []).filter(x => x.structure_id === s.id).length,
     })),
   })
 }
 
-// action : 'creer' (structure + invitation du responsable) | 'rattacher' (senior existant ↔ structure)
+// action : 'creer' (structure + invitation du responsable) | 'renvoyer' (invitation d'un gestionnaire, même lien)
+//        | 'rattacher' (senior existant ↔ structure)
 export async function POST(request) {
   try {
     const { admin } = await verifierAdmin()
@@ -47,6 +48,15 @@ export async function POST(request) {
 
       const result = await inviterGestionnaire(gestionnaire, structure.nom)
       return NextResponse.json({ success: result.success, linked: result.linked })
+    }
+
+    if (body.action === 'renvoyer') {
+      const { data: gestionnaire } = await supabaseAdmin.from('structure_membres')
+        .select('*, structures(nom)').eq('id', body.membreId).maybeSingle()
+      if (!gestionnaire) return NextResponse.json({ success: false, error: 'Gestionnaire introuvable' }, { status: 404 })
+      const result = await inviterGestionnaire(gestionnaire, gestionnaire.structures?.nom || 'Holiris')
+      if (!result.success) return NextResponse.json({ success: false, error: 'L’email n’a pas pu être envoyé' }, { status: 502 })
+      return NextResponse.json({ success: true, linked: result.linked })
     }
 
     if (body.action === 'rattacher') {

@@ -111,6 +111,11 @@ export default function Admin() {
     }
   }
 
+  async function renvoyerInvitation(g, structureNom) {
+    if (!confirm('Renvoyer l’invitation de ' + structureNom + ' à ' + g.email + ' ?')) return
+    if (await actionStructure({ action: 'renvoyer', membreId: g.id })) alert('Invitation renvoyée ✓ — ' + g.email + ' a reçu un nouvel email.')
+  }
+
   async function actionUtilisateur(u, action) {
     if (action === 'supprimer' && !confirm('Supprimer définitivement ' + (u.name || 'cet utilisateur') + ' ?\n\nSa fiche et son accès au dossier seront effacés. S\'il ne suit aucun autre senior, son compte de connexion sera aussi supprimé.')) return
     const res = await fetch('/api/admin/utilisateurs', {
@@ -369,8 +374,14 @@ export default function Admin() {
                   <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>{st.nbSeniors} client{st.nbSeniors > 1 ? 's' : ''}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                     {st.gestionnaires.map(g => (
-                      <span key={g.email} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: g.compteActif ? '#EAF4EF' : '#FDF3E7', color: g.compteActif ? '#4A8870' : '#C4844A' }}>
+                      <span key={g.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, padding: g.compteActif ? '3px 10px' : '3px 4px 3px 10px', borderRadius: 20, background: g.compteActif ? '#EAF4EF' : '#FDF3E7', color: g.compteActif ? '#4A8870' : '#C4844A' }}>
                         {g.nom || g.email} · {g.compteActif ? 'compte actif' : 'invitation envoyée'}
+                        {!g.compteActif && (
+                          <button onClick={() => renvoyerInvitation(g, st.nom)} disabled={structureEnvoi}
+                            style={{ background: '#fff', color: '#C4844A', border: '1px solid #F0D6B8', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            ↻ Renvoyer
+                          </button>
+                        )}
                       </span>
                     ))}
                   </div>
