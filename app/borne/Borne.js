@@ -120,9 +120,12 @@ export default function Borne() {
 
   useEffect(() => {
     window.__holirisBorne = true // la page a bien démarré (voir le diagnostic de layout.js)
-    const codeAdresse = new URLSearchParams(window.location.search).get('code')
-    if (codeAdresse) memoire.ecrire('holiris_borne_code', codeAdresse.trim().toUpperCase())
-    loadBorne(codeAdresse || memoire.lire('holiris_borne_code'))
+    // Le code en mémoire l'emporte : l'icône de l'écran d'accueil garde l'adresse du jour où elle a été ajoutée,
+    // et ne doit pas ramener la tablette sur une autre borne. Pour changer de borne : « Changer de borne ».
+    const codeAdresse = new URLSearchParams(window.location.search).get('code')?.trim().toUpperCase()
+    const codeMemoire = memoire.lire('holiris_borne_code')
+    if (codeAdresse && !codeMemoire) memoire.ecrire('holiris_borne_code', codeAdresse)
+    loadBorne(codeMemoire || codeAdresse)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chargement unique au montage
   }, [])
 
@@ -159,7 +162,7 @@ export default function Borne() {
     // Retour de la page de signature : afficher la liste des documents
     if (new URLSearchParams(window.location.search).get('documents')) { setStep('documents'); window.history.replaceState(null, '', '/borne') }
     // Application « Ma Borne Holiris » : l'adresse et le manifeste portent le code, pour que l'icône rouvre cette borne
-    if (!new URLSearchParams(window.location.search).get('code')) window.history.replaceState(null, '', '/borne?code=' + encodeURIComponent(borne.code))
+    if (new URLSearchParams(window.location.search).get('code')?.trim().toUpperCase() !== borne.code) window.history.replaceState(null, '', '/borne?code=' + encodeURIComponent(borne.code))
     document.querySelectorAll('link[rel="manifest"]').forEach(l => { l.href = '/api/borne/manifest?code=' + encodeURIComponent(borne.code) })
     // Borne rechargée juste après un SOS : reprendre la surveillance des demandes de visio
     fetch('/api/borne-visio?code=' + encodeURIComponent(borne.code))
