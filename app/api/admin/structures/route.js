@@ -27,7 +27,7 @@ export async function GET() {
 }
 
 // action : 'creer' (structure + invitation du responsable) | 'renvoyer' (invitation d'un gestionnaire, même lien)
-//        | 'rattacher' (senior existant ↔ structure)
+//        | 'modifier' (nom de la structure, noms et emails des gestionnaires) | 'rattacher' (senior existant ↔ structure)
 export async function POST(request) {
   try {
     const { admin } = await verifierAdmin()
@@ -57,6 +57,30 @@ export async function POST(request) {
       const result = await inviterGestionnaire(gestionnaire, gestionnaire.structures?.nom || 'Holiris')
       if (!result.success) return NextResponse.json({ success: false, error: 'L’email n’a pas pu être envoyé' }, { status: 502 })
       return NextResponse.json({ success: true, linked: result.linked })
+    }
+
+    // Nom de la structure, nom et email de ses gestionnaires. L'email d'un compte déjà actif ne change pas ici :
+    // c'est son identifiant de connexion
+    if (body.action === 'modifier') {
+      const nom = String(body.nom || '').trim().slice(0, 120)
+      if (!nom) return NextResponse.json({ success: false, error: 'Nom de structure requis' }, { status: 400 })
+      const { data: membres } = await supabaseAdmin.from('structure_membres').select('id, email, user_id').eq('structure_id', body.structureId)
+      const modifs = []
+      for (const g of body.gestionnaires || []) {
+        const membre = (membres || []).find(m => m.id === g.id)
+        if (!membre) return NextResponse.json({ success: false, error: 'Gestionnaire introuvable' }, { status: 404 })
+        const email = String(g.email || '').trim().toLowerCase()
+        if (email !== membre.email && membre.user_id) return NextResponse.json({ success: false, error: 'L’email d’un compte déjà actif ne peut pas être changé ici' }, { status: 400 })
+        if (!EMAIL_VALIDE.test(email)) return NextResponse.json({ success: false, error: 'Email invalide : ' + email }, { status: 400 })
+        modifs.push({ id: membre.id, nom: String(g.nom || '').trim().slice(0, 80) || null, email })
+      }
+      const { error } = await supabaseAdmin.from('structures').update({ nom }).eq('id', body.structureId)
+      if (error) throw error
+      for (const m of modifs) {
+        const { error: e } = await supabaseAdmin.from('structure_membres').update({ nom: m.nom, email: m.email }).eq('id', m.id)
+        if (e) throw e
+      }
+      return NextResponse.json({ success: true })
     }
 
     if (body.action === 'rattacher') {

@@ -18,6 +18,7 @@ export default function Admin() {
   const [structures, setStructures] = useState([])
   const [nouvelleStructure, setNouvelleStructure] = useState({ nom: '', nomResponsable: '', email: '' })
   const [structureEnvoi, setStructureEnvoi] = useState(false)
+  const [structureEdition, setStructureEdition] = useState(null) // { id, nom, gestionnaires: [{ id, nom, email, compteActif }] }
   const [bornes, setBornes] = useState([])
   const [versionEnLigne, setVersionEnLigne] = useState(null)
   const [borneSenior, setBorneSenior] = useState('')
@@ -138,6 +139,11 @@ export default function Admin() {
       alert('Structure créée ✓ — ' + (nouvelleStructure.email) + ' a reçu son invitation par email.')
       setNouvelleStructure({ nom: '', nomResponsable: '', email: '' })
     }
+  }
+
+  async function enregistrerStructure() {
+    const { id, nom, gestionnaires } = structureEdition
+    if (await actionStructure({ action: 'modifier', structureId: id, nom, gestionnaires })) setStructureEdition(null)
   }
 
   async function renvoyerInvitation(g, structureNom) {
@@ -397,9 +403,50 @@ export default function Admin() {
               {structures.length === 0 && (
                 <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '36px 20px', textAlign: 'center', fontSize: 14, color: '#9BB5AA' }}>Aucune structure pour le moment.</div>
               )}
-              {structures.map(st => (
+              {structures.map(st => structureEdition?.id === st.id ? (
+                <div key={st.id} style={{ background: '#fff', border: '1px solid #7FAF9B', borderRadius: 12, padding: '16px 20px' }}>
+                  <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Nom de la structure</label>
+                  <input value={structureEdition.nom} onChange={e => setStructureEdition({ ...structureEdition, nom: e.target.value })} style={{ ...inputStyle, marginBottom: 14 }} />
+                  {structureEdition.gestionnaires.length > 0 && (
+                    <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Gestionnaires</label>
+                  )}
+                  {structureEdition.gestionnaires.map((g, i) => {
+                    const changer = champ => e => setStructureEdition({
+                      ...structureEdition,
+                      gestionnaires: structureEdition.gestionnaires.map((x, j) => j === i ? { ...x, [champ]: e.target.value } : x),
+                    })
+                    return (
+                      <div key={g.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 8 }}>
+                        <input placeholder="Nom" value={g.nom || ''} onChange={changer('nom')} style={inputStyle} />
+                        <input type="email" placeholder="Email" value={g.email || ''} onChange={changer('email')} disabled={g.compteActif}
+                          title={g.compteActif ? 'Compte actif : l’email est son identifiant de connexion' : undefined}
+                          style={{ ...inputStyle, opacity: g.compteActif ? 0.6 : 1 }} />
+                      </div>
+                    )
+                  })}
+                  {structureEdition.gestionnaires.some(g => g.compteActif) && (
+                    <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 8 }}>L’email d’un compte actif ne se change pas : c’est son identifiant de connexion.</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <button onClick={enregistrerStructure} disabled={structureEnvoi || !structureEdition.nom.trim()}
+                      style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: !structureEdition.nom.trim() ? 0.5 : 1 }}>
+                      {structureEnvoi ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                    <button onClick={() => setStructureEdition(null)}
+                      style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              ) : (
                 <div key={st.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 20px' }}>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24' }}>{st.nom}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24' }}>{st.nom}</div>
+                    <button onClick={() => setStructureEdition({ id: st.id, nom: st.nom, gestionnaires: st.gestionnaires.map(g => ({ ...g })) })}
+                      style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                      ✏️ Modifier
+                    </button>
+                  </div>
                   <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>{st.nbSeniors} client{st.nbSeniors > 1 ? 's' : ''}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                     {st.gestionnaires.map(g => (
