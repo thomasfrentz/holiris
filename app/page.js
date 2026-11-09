@@ -21,6 +21,7 @@ export default async function Home() {
         url: 'https://holiris.fr',
         logo: 'https://holiris.fr/icons/icon-512.png',
         email: 'thomas.frentz@holiris.fr',
+        sameAs: ['https://www.instagram.com/holiris_app/'],
         founder: { '@type': 'Person', name: 'Thomas Frentz' },
         areaServed: { '@type': 'AdministrativeArea', name: 'Pyrénées-Orientales' },
         description: 'Coordination du maintien à domicile des seniors : une borne chez la personne âgée et une application pour sa famille et ses intervenants.',
