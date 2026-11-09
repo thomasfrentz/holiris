@@ -1,15 +1,12 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { auteurAvecLien } from '@/lib/contexteIA'
 import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 import AucunDossier from '../components/AucunDossier'
 
 export default function Assistant() {
-  const [notes, setNotes] = useState([])
-  const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [messages, setMessages] = useState([
     { role: 'assistant', text: 'Bonjour ! Je suis l\'assistant IA Holiris. Je connais toute la situation de votre proche et peux répondre à vos questions, résumer la semaine, ou vous conseiller sur les aides disponibles.' }
@@ -30,19 +27,6 @@ export default function Assistant() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       if (!selectedSeniorId) return
-
-      const { data: notesData } = await supabase
-        .from('notes').select('*')
-        .eq('senior_id', selectedSeniorId)
-        .order('created_at', { ascending: false }).limit(10)
-      setNotes(notesData || [])
-
-      const { data: eventsData } = await supabase
-        .from('events').select('*, intervenants(*)')
-        .eq('senior_id', selectedSeniorId)
-        .order('scheduled_at', { ascending: false }).limit(10)
-      setEvents(eventsData || [])
-
       setLoading(false)
     }
     loadData()
@@ -59,13 +43,13 @@ export default function Assistant() {
     setMessages(prev => [...prev, { role: 'user', text: userMsg }])
     setAiLoading(true)
 
-    const context = 'Tu es l\'assistant IA de Holiris, plateforme de suivi des personnes âgées dans les Pyrénées-Orientales.\n\nPersonne suivie : ' + (selectedSenior?.name || '') + ', ' + (selectedSenior?.age || '') + ' ans, ' + (selectedSenior?.city || '') + '\n\nDernières notes :\n' + notes.slice(0, 5).map(n => '- ' + new Date(n.created_at).toLocaleDateString('fr-FR') + ' · ' + auteurAvecLien(n.intervenant_name || 'Proche') + ' : ' + n.content).join('\n') + '\n\nProchains événements :\n' + events.slice(0, 5).map(e => '- ' + new Date(e.scheduled_at).toLocaleDateString('fr-FR') + ' : ' + e.label).join('\n') + '\n\nRéponds de façon bienveillante et concise (3-5 phrases max).'
+    // Contexte (notes, agenda) construit par le serveur : l'IA lit toutes les notes, même celles réservées à un autre métier
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context, messages: [{ role: 'user', content: userMsg }] })
+        body: JSON.stringify({ seniorId: selectedSeniorId, messages: [{ role: 'user', content: userMsg }] })
       })
       const data = await res.json()
       setMessages(prev => [...prev, { role: 'assistant', text: data.text }])

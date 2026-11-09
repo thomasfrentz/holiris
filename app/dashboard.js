@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import TexteNote from './components/TexteNote'
 
 const Tag = ({ children, color = '#7FAF9B', bg = '#EAF4EF' }) => (
   <span style={{ fontSize: 11, fontWeight: 500, color, background: bg, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.04em' }}>
@@ -354,7 +355,7 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
                     {new Date(n.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p style={{ fontSize: 15, color: '#3A4A40', lineHeight: 1.75, fontWeight: 400 }}>{n.content}</p>
+                <TexteNote note={n} style={{ fontSize: 15, color: '#3A4A40', lineHeight: 1.75, fontWeight: 400 }} />
               </div>
             )
           })}

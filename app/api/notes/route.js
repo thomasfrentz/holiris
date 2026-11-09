@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin, clientUtilisateur, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
+import { supabaseAdmin, clientUtilisateur, utilisateurCourant, peutGererSenior, peutLireNote } from '@/lib/serveur'
 import { enregistrerNote } from '@/lib/notesMedicales'
 import { lireTraduction } from '@/lib/transcription'
 
@@ -72,13 +72,16 @@ async function nomUtilisateur(user, seniorId) {
   return g?.nom || user.email?.split('@')[0] || 'Inconnu'
 }
 
-// Note modifiable ou supprimable par l'utilisateur : admin Holiris ou gestionnaire de la structure du senior
+// Note modifiable ou supprimable par l'utilisateur : admin Holiris ou gestionnaire de la structure du senior,
+// à condition de pouvoir en lire le texte (pas une note réservée à un autre corps de métier)
 async function noteGeree(noteId) {
   const user = await utilisateurCourant()
   if (!user) return { erreur: NextResponse.json({ success: false, error: 'Non authentifié' }, { status: 401 }) }
   const { data: note } = await supabaseAdmin.from('notes').select('*').eq('id', noteId).maybeSingle()
   if (!note) return { erreur: NextResponse.json({ success: false, error: 'Note introuvable' }, { status: 404 }) }
-  if (!await peutGererSenior(user.id, note.senior_id)) return { erreur: NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 }) }
+  if (!await peutGererSenior(user.id, note.senior_id) || !await peutLireNote(note.senior_id, note.metier)) {
+    return { erreur: NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 }) }
+  }
   return { user, note }
 }
 
@@ -119,7 +122,7 @@ export async function DELETE(request) {
 
     const supprimee = {
       id: note.id, senior_id: note.senior_id, intervenant_id: note.intervenant_id, intervenant_name: note.intervenant_name,
-      content: note.content, source: note.source, audio_url: note.audio_url, note_created_at: note.created_at, langue_originale: note.langue_originale,
+      content: note.content, source: note.source, audio_url: note.audio_url, note_created_at: note.created_at, langue_originale: note.langue_originale, metier: note.metier,
       supprimee_par: user.id, supprimee_par_nom: await nomUtilisateur(user, note.senior_id),
     }
     const { error: e1 } = await supabaseAdmin.from('notes_supprimees').upsert(supprimee)
@@ -136,6 +139,7 @@ export async function DELETE(request) {
 // ?noteId= : historique des modifications d'une note, pour qui peut la lire (ou, si elle est supprimée, gérer son dossier)
 // ?seniorId= : notes supprimées du dossier, pour qui peut le gérer
 // ?original= : texte d'origine d'une note traduite, pour qui peut gérer son dossier
+// Dans tous les cas, le texte d'une note réservée à un autre corps de métier n'est pas renvoyé
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -147,7 +151,13 @@ export async function GET(request) {
 
     if (original) {
       const { data } = await supabaseAdmin.from('notes_traductions').select('senior_id, langue, texte_original').eq('note_id', original).maybeSingle()
-      if (data && !await peutGererSenior(user.id, data.senior_id)) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
+      if (data) {
+        const { data: n } = await supabaseAdmin.from('notes').select('metier').eq('id', original).maybeSingle()
+        const { data: ns } = n ? { data: null } : await supabaseAdmin.from('notes_supprimees').select('metier').eq('id', original).maybeSingle()
+        if (!await peutGererSenior(user.id, data.senior_id) || !await peutLireNote(data.senior_id, (n || ns)?.metier)) {
+          return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
+        }
+      }
       return NextResponse.json({ success: true, original: data ? { langue: data.langue, texte: data.texte_original } : null })
     }
 
@@ -155,8 +165,8 @@ export async function GET(request) {
       const supabase = await clientUtilisateur()
       const { data: lisible } = await supabase.from('notes').select('id').eq('id', noteId).maybeSingle()
       if (!lisible) {
-        const { data: s } = await supabaseAdmin.from('notes_supprimees').select('senior_id').eq('id', noteId).maybeSingle()
-        if (!s || !await peutGererSenior(user.id, s.senior_id)) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
+        const { data: s } = await supabaseAdmin.from('notes_supprimees').select('senior_id, metier').eq('id', noteId).maybeSingle()
+        if (!s || !await peutGererSenior(user.id, s.senior_id) || !await peutLireNote(s.senior_id, s.metier)) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
       }
       const { data } = await supabaseAdmin.from('notes_modifications')
         .select('id, ancien_contenu, nouveau_contenu, modifiee_par_nom, created_at').eq('note_id', noteId).order('created_at')
@@ -165,7 +175,10 @@ export async function GET(request) {
 
     if (!seniorId || !await peutGererSenior(user.id, seniorId)) return NextResponse.json({ success: false, error: 'Accès refusé' }, { status: 403 })
     const { data } = await supabaseAdmin.from('notes_supprimees').select('*').eq('senior_id', seniorId).order('supprimee_at', { ascending: false })
-    return NextResponse.json({ success: true, supprimees: data || [] })
+    const lisibles = {}
+    for (const m of new Set((data || []).map(n => n.metier).filter(Boolean))) lisibles[m] = await peutLireNote(seniorId, m)
+    const supprimees = (data || []).map(n => !n.metier || lisibles[n.metier] ? n : { ...n, content: null, audio_url: null, lisible: false })
+    return NextResponse.json({ success: true, supprimees })
   } catch (error) {
     console.error('Erreur historique notes:', error.message)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })

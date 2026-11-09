@@ -8,6 +8,7 @@ import QuestionMedicale from '../components/QuestionMedicale'
 import NoteVocale from '../components/NoteVocale'
 import BandeauMessages from '../components/BandeauMessages'
 import { useNonLus } from '../lib/useNonLus'
+import TexteNote from '../components/TexteNote'
 
 export default function IntervenantDashboard() {
   const [notes, setNotes] = useState([])
@@ -54,7 +55,7 @@ export default function IntervenantDashboard() {
 
       const [eventsRes, notesRes, alertesRes] = await Promise.all([
         supabase.from('events').select('*, intervenants(*)').eq('senior_id', selectedSeniorId).gte('scheduled_at', debutSemaine.toISOString()).lte('scheduled_at', finSemaine.toISOString()).order('scheduled_at', { ascending: true }),
-        supabase.from('notes').select('*').eq('senior_id', selectedSeniorId).gte('created_at', unMoisAvant.toISOString()).order('created_at', { ascending: false }),
+        supabase.from('notes_dossier').select('*').eq('senior_id', selectedSeniorId).gte('created_at', unMoisAvant.toISOString()).order('created_at', { ascending: false }),
         supabase.from('alertes').select('*').eq('senior_id', selectedSeniorId).eq('lu', false).order('created_at', { ascending: false })
       ])
 
@@ -64,15 +65,16 @@ export default function IntervenantDashboard() {
       setNotes(notesData)
       setAlertes(alertesData)
       setDataLoading(false)
-      if (notesData.length > 0) generateResumeWith(notesData, alertesData, selectedSenior)
+      if (notesData.length > 0) generateResumeWith(selectedSeniorId)
     }
     loadData()
   }, [selectedSeniorId, selectedSenior])
 
-  async function generateResumeWith(notesData, alertesData, senior) {
+  // Le serveur lit toutes les notes du mois, y compris celles réservées à un autre métier
+  async function generateResumeWith(seniorId) {
     setResumeLoading(true)
     try {
-      const response = await fetch('/api/resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: notesData, alertes: alertesData, senior }) })
+      const response = await fetch('/api/resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId }) })
       const data = await response.json()
       setResume(data.resume || '')
     } catch (e) { console.error('Erreur résumé:', e) }
@@ -81,7 +83,7 @@ export default function IntervenantDashboard() {
 
   async function generateResume() {
     if (notes.length === 0 || !selectedSenior) return
-    generateResumeWith(notes, alertes, selectedSenior)
+    generateResumeWith(selectedSeniorId)
   }
 
   async function addNote() {
@@ -100,7 +102,7 @@ export default function IntervenantDashboard() {
     setNewNote(''); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
     const unMoisAvant = new Date(); unMoisAvant.setMonth(unMoisAvant.getMonth() - 1)
-    const { data } = await supabase.from('notes').select('*').eq('senior_id', selectedSeniorId).gte('created_at', unMoisAvant.toISOString()).order('created_at', { ascending: false })
+    const { data } = await supabase.from('notes_dossier').select('*').eq('senior_id', selectedSeniorId).gte('created_at', unMoisAvant.toISOString()).order('created_at', { ascending: false })
     setNotes(data || [])
     setSaving(false)
   }
@@ -342,7 +344,7 @@ export default function IntervenantDashboard() {
                       {new Date(n.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p style={{ fontSize: 14, color: '#3A4A40', lineHeight: 1.7, margin: 0, fontWeight: 300 }}>{n.content}</p>
+                  <TexteNote note={n} style={{ fontSize: 14, color: '#3A4A40', lineHeight: 1.7, margin: 0, fontWeight: 300 }} />
                 </div>
               ))}
             </div>

@@ -1,18 +1,27 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { SURNOMS, auteurAvecLien } from '@/lib/contexteIA'
+import { supabaseAdmin, seniorAccessible } from '@/lib/serveur'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 export async function POST(request) {
   try {
-    const { notes, alertes, senior } = await request.json()
+    // Accès vérifié avec les droits de l'utilisateur ; le résumé porte sur toutes les notes du mois, quel que soit le métier de leur auteur
+    const senior = await seniorAccessible((await request.json()).seniorId)
+    if (!senior) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+    const unMoisAvant = new Date(); unMoisAvant.setMonth(unMoisAvant.getMonth() - 1)
+    const [{ data: notes }, { data: alertes }] = await Promise.all([
+      supabaseAdmin.from('notes').select('content, intervenant_name, source, created_at').eq('senior_id', senior.id)
+        .gte('created_at', unMoisAvant.toISOString()).order('created_at', { ascending: false }),
+      supabaseAdmin.from('alertes').select('niveau, message').eq('senior_id', senior.id).eq('lu', false).order('created_at', { ascending: false }),
+    ])
 
-    const notesText = notes.map(n =>
+    const notesText = (notes || []).map(n =>
       `[${new Date(n.created_at).toLocaleDateString('fr-FR')}] ${auteurAvecLien(n.intervenant_name || n.source || 'Inconnu')} : ${n.content}`
     ).join('\n')
 
-    const alertesText = alertes.length > 0
+    const alertesText = alertes?.length > 0
       ? alertes.map(a => `- [${a.niveau?.toUpperCase() || 'INFO'}] ${a.message}`).join('\n')
       : 'Aucune alerte active.'
 

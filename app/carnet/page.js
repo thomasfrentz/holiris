@@ -8,6 +8,7 @@ import NoteVocale from '../components/NoteVocale'
 import { useSenior } from '../lib/useSenior'
 import AucunDossier from '../components/AucunDossier'
 import { traduitDe } from '../lib/langues'
+import TexteNote from '../components/TexteNote'
 
 export default function Carnet() {
   const [notes, setNotes] = useState([])
@@ -40,7 +41,7 @@ export default function Carnet() {
       setFamille(familleData?.[0])
 
       const { data: notesData } = await supabase
-        .from('notes').select('*')
+        .from('notes_dossier').select('*')
         .eq('senior_id', selectedSeniorId)
         .order('created_at', { ascending: false })
       setNotes(notesData || [])
@@ -244,7 +245,7 @@ export default function Carnet() {
                   <span style={{ fontSize: 11, color: '#aaa' }}>
                     {new Date(n.created_at).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </span>
-                  {isAdmin && (
+                  {isAdmin && n.lisible !== false && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={() => editNote(n.id, n.content)}
                         style={{ background: '#f0f9ff', color: '#3498db', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 'bold' }}>✏️</button>
@@ -254,8 +255,8 @@ export default function Carnet() {
                   )}
                 </div>
               </div>
-              <p style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }}>{n.content}</p>
-              {n.modifiee_at && (
+              <TexteNote note={n} style={{ fontSize: 14, color: '#333', lineHeight: 1.7, margin: 0 }} />
+              {n.modifiee_at && n.lisible !== false && (
                 <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>
                   ✏️ Modifiée le {dateCourte(n.modifiee_at)}{n.modifiee_par_nom ? ' par ' + n.modifiee_par_nom : ''} ·{' '}
                   <button onClick={() => basculerHistorique(n.id)}
@@ -265,7 +266,7 @@ export default function Carnet() {
                 </div>
               )}
               {blocHistorique(n.id, n.intervenant_name, n.created_at)}
-              {blocLangue(n)}
+              {n.lisible !== false && blocLangue(n)}
             </div>
           )
         })}
@@ -295,16 +296,18 @@ export default function Carnet() {
                       <span style={{ fontSize: 13, color: '#666', fontWeight: 600 }}>{n.intervenant_name ? '👤 ' + n.intervenant_name : 'Note'}</span>
                       <span style={{ fontSize: 11, color: '#aaa', flexShrink: 0 }}>{dateCourte(n.note_created_at)}</span>
                     </div>
-                    <p style={{ fontSize: 14, color: '#777', lineHeight: 1.7, margin: 0, textDecoration: 'line-through', textDecorationColor: '#ccc' }}>{n.content}</p>
+                    <TexteNote note={n} style={{ fontSize: 14, color: '#777', lineHeight: 1.7, margin: 0, textDecoration: n.lisible === false ? 'none' : 'line-through', textDecorationColor: '#ccc' }} />
                     <div style={{ fontSize: 12, color: '#c0392b', marginTop: 8 }}>
-                      Supprimée le {dateCourte(n.supprimee_at)}{n.supprimee_par_nom ? ' par ' + n.supprimee_par_nom : ''} ·{' '}
-                      <button onClick={() => basculerHistorique(n.id)}
-                        style={{ background: 'none', border: 'none', padding: 0, color: '#3498db', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
-                        {historiques[n.id] ? 'Masquer les modifications' : 'Voir les modifications'}
-                      </button>
+                      Supprimée le {dateCourte(n.supprimee_at)}{n.supprimee_par_nom ? ' par ' + n.supprimee_par_nom : ''}
+                      {n.lisible !== false && <>{' · '}
+                        <button onClick={() => basculerHistorique(n.id)}
+                          style={{ background: 'none', border: 'none', padding: 0, color: '#3498db', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>
+                          {historiques[n.id] ? 'Masquer les modifications' : 'Voir les modifications'}
+                        </button>
+                      </>}
                     </div>
                     {blocHistorique(n.id, n.intervenant_name, n.note_created_at)}
-                    {blocLangue(n)}
+                    {n.lisible !== false && blocLangue(n)}
                   </div>
                 ))}
               </div>

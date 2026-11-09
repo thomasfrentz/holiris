@@ -91,10 +91,10 @@ export default function App() {
           .gte('scheduled_at', debutPeriode.toISOString())
           .lte('scheduled_at', finPeriode.toISOString())
           .order('scheduled_at', { ascending: true }),
-        supabase.from('notes').select('*')
+        supabase.from('notes_dossier').select('*')
           .eq('senior_id', selectedSeniorId)
           .order('created_at', { ascending: false }).limit(3),
-        supabase.from('notes').select('*', { count: 'exact', head: true })
+        supabase.from('notes_dossier').select('*', { count: 'exact', head: true })
           .eq('senior_id', selectedSeniorId),
         supabase.from('alertes').select('*')
           .eq('senior_id', selectedSeniorId)
@@ -104,7 +104,7 @@ export default function App() {
           .eq('senior_id', selectedSeniorId)
           .order('date_renouvellement', { ascending: true }),
         // Dernière note d'un intervenant : un passage, même sans planning
-        supabase.from('notes').select('id, intervenant_name, created_at')
+        supabase.from('notes_dossier').select('id, intervenant_name, created_at')
           .eq('senior_id', selectedSeniorId).not('intervenant_id', 'is', null)
           .order('created_at', { ascending: false }).limit(1)
       ])
