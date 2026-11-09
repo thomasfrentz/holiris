@@ -484,7 +484,7 @@ export default function Landing() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {FAQ.map(({ q, r }) => (
             <details key={q} className="faq-item" style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '18px 22px' }}>
-              <summary style={{ cursor: 'pointer', fontSize: 16, fontWeight: 500, color: '#1F2A24' }}>{q}</summary>
+              <summary style={{ cursor: 'pointer', fontSize: 16, fontWeight: 500, color: '#1F2A24', listStyle: 'none' }}>{q}</summary>
               <p style={{ fontSize: 14.5, color: '#6F7C75', lineHeight: 1.75, marginTop: 12, fontWeight: 300 }}>{r}</p>
             </details>
           ))}
