@@ -189,7 +189,8 @@ export default function Carnet() {
     return { icon: '📝', label: 'Note', color: '#3498db' }
   }
 
-  const notesAffichees = salariesIds && mesSalaries ? notes.filter(n => salariesIds.has(n.intervenant_id)) : notes
+  // Filtre « mes salariés » : ses salariés, et toutes les aides à domicile et auxiliaires de vie (notes.metier 'aide'), même ajoutées par d'autres
+  const notesAffichees = salariesIds && mesSalaries ? notes.filter(n => salariesIds.has(n.intervenant_id) || n.metier === 'aide') : notes
 
   // Aucun dossier (ex. structure sans client) : message au lieu d'un chargement sans fin
   if (!seniorsLoading && !seniors.length) return <AucunDossier isAdmin={isAdmin} />
@@ -223,7 +224,7 @@ export default function Carnet() {
       {salariesIds && (
         <button onClick={basculerMesSalaries}
           style={{ background: mesSalaries ? '#12201a' : '#fff', color: mesSalaries ? '#2ecc71' : '#555', border: '1px solid ' + (mesSalaries ? '#12201a' : '#ddd'), borderRadius: 20, padding: '7px 14px', fontSize: 13, cursor: 'pointer', marginBottom: 20, fontWeight: mesSalaries ? 'bold' : 'normal' }}>
-          {mesSalaries ? '✓ Notes de mes salariés uniquement' : 'Afficher seulement les notes de mes salariés'}
+          {mesSalaries ? '✓ Notes de mes salariés et des aides à domicile' : 'Afficher seulement les notes de mes salariés et des aides à domicile'}
         </button>
       )}
 
@@ -302,7 +303,7 @@ export default function Carnet() {
         {notesAffichees.length === 0 && (
           <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
-            <div>{notes.length ? 'Aucune note de vos salariés sur ce dossier' : 'Aucune note pour le moment'}</div>
+            <div>{notes.length ? 'Aucune note de vos salariés ni des aides à domicile sur ce dossier' : 'Aucune note pour le moment'}</div>
           </div>
         )}
       </div>
