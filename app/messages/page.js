@@ -416,10 +416,12 @@ export default function Messages() {
         .msg-dicter-mot { display: inline; }
         @media (max-width: 768px) {
           /* Téléphone : la page défile, la zone de saisie reste au-dessus de la barre du bas */
+          .hl-main { overflow: visible !important; }
           .msg-cadre { height: auto; min-height: 0; }
           .msg-liste { width: 100%; }
-          .msg-liste-defile { flex: none !important; }
-          .msg-fil { flex: none !important; min-height: 50dvh; }
+          /* Pas de zone défilante imbriquée : sur iPhone elle capte le geste et bloque le défilement de la page */
+          .msg-liste-defile { flex: none !important; overflow: visible !important; }
+          .msg-fil { flex: none !important; min-height: 50dvh; overflow: visible !important; }
           .msg-saisie { position: sticky; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); background: #F7F9F8; padding: 6px 0 8px; z-index: 5; }
           .msg-cadre[data-ouverte="true"] .msg-liste { display: none; }
           .msg-cadre[data-ouverte="false"] .msg-conv { display: none; }
