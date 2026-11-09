@@ -3,7 +3,7 @@ import Groq from 'groq-sdk'
 import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
 import { fichesDuJeton } from '@/lib/accesMobile'
 import { lireJetonMedecin } from '@/lib/emails'
-import { transcriptionVide, RIEN_ENTENDU, mettreAuPropre, contexteTranscription, recopieContexte, preparerNote, jetonTraduction } from '@/lib/transcription'
+import { transcriptionVide, RIEN_ENTENDU, mettreAuPropre, contexteTranscription, recopieContexte, preparerNote, jetonTraduction, corrigerNoms } from '@/lib/transcription'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -56,7 +56,7 @@ export async function POST(request) {
     const fichier = () => new File([buffer], 'note.' + extension, { type })
 
     // Noms du dossier concerné : ils aident la transcription
-    const { contexte, noms } = await contexteTranscription(autorise.seniorId).catch(() => ({ contexte: '', noms: '' }))
+    const { contexte, noms, dossier } = await contexteTranscription(autorise.seniorId).catch(() => ({ contexte: '', noms: '', dossier: null }))
 
     // Deux transcriptions en parallèle : en français (un fort accent fait sinon croire à une autre langue)
     // et dans la langue détectée, pour un intervenant qui parle sa propre langue
@@ -84,7 +84,7 @@ export async function POST(request) {
     if (!etrangere) {
       if (francaisVide) return NextResponse.json({ success: false, rienEntendu: true, error: RIEN_ENTENDU })
       // Texte fidèle à ce qui a été dit (mis au propre, sans résumé ni interprétation)
-      const note = await mettreAuPropre(rawText, contexte)
+      const note = corrigerNoms(await mettreAuPropre(rawText, contexte), dossier)
       return NextResponse.json({ success: true, note, rawText })
     }
 
@@ -92,7 +92,7 @@ export async function POST(request) {
     const prete = await preparerNote({ francais: francaisVide ? '' : rawText, libre: libre.text, langueDetectee: langue }, contexte)
     return NextResponse.json({
       success: true,
-      note: prete.note,
+      note: corrigerNoms(prete.note, dossier),
       rawText,
       langue: prete.langue,
       traduction: prete.langue ? jetonTraduction(prete) : null,

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { supabaseAdmin as supabase } from '@/lib/serveur'
 import { analyserNote, enregistrerNote, repondreSignalement } from '@/lib/notesMedicales'
-import { mettreAuPropre, preparerNote } from '@/lib/transcription'
+import { mettreAuPropre, preparerNote, contexteTranscription, nomsDossier, nomAffiche, corrigerNoms } from '@/lib/transcription'
 import { traduitDe } from '@/app/lib/langues'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -82,6 +82,8 @@ export async function POST(request) {
     if (!seniorId) return NextResponse.json({ status: 'no senior' })
 
     let noteContent = ''
+    // Noms du ou des dossiers suivis par l'auteur : la mise au propre reconnaît un nom mal entendu
+    const contexte = await contexteAuteur(seniorIds, seniorId)
     let source = 'whatsapp_text'
     let rawText = ''
     let traduction = null // { langue, original } : message dans une autre langue, traduit en français
@@ -89,7 +91,7 @@ export async function POST(request) {
     if (messageType === 'text') {
       rawText = message.text.body
       // Mis au propre, et traduit s'il est écrit dans une autre langue
-      const prete = await preparerNote({ ecrit: rawText })
+      const prete = await preparerNote({ ecrit: rawText }, contexte)
       noteContent = prete.note
       if (prete.langue) traduction = prete
       source = 'whatsapp_text'
@@ -98,10 +100,10 @@ export async function POST(request) {
       rawText = t.francais
       if (t.libre?.trim() && !['french', 'fr'].includes(t.langue)) {
         // Autre langue détectée : l'IA garde la version qui a du sens (français avec accent, ou autre langue) et traduit
-        const prete = await preparerNote({ francais: t.francais, libre: t.libre, langueDetectee: t.langue })
+        const prete = await preparerNote({ francais: t.francais, libre: t.libre, langueDetectee: t.langue }, contexte)
         noteContent = prete.note
         if (prete.langue) traduction = prete
-      } else noteContent = await synthesizeNote(rawText)
+      } else noteContent = await synthesizeNote(rawText, contexte)
       source = 'whatsapp_audio'
     }
 
@@ -109,6 +111,8 @@ export async function POST(request) {
 
     if (noteContent) {
       const finalSeniorId = await findSeniorByName(traduction ? noteContent : rawText, seniorId, seniorIds)
+      // Orthographe exacte des noms du dossier, avant la relecture par l'auteur
+      noteContent = corrigerNoms(noteContent, await nomsDossier(finalSeniorId))
       // Pour ce senior, le rôle d'intervenant prime si la personne est aussi un proche
       const auteur = expediteurs.find(e => e.senior_id === finalSeniorId && e.type === 'intervenant')
         || expediteurs.find(e => e.senior_id === finalSeniorId)
@@ -192,6 +196,15 @@ async function transcribeMetaAudio(audioId) {
 
 // Texte fidèle à ce qui a été dit ou écrit (mis au propre, sans résumé ni interprétation)
 const synthesizeNote = mettreAuPropre
+
+// Contexte de la mise au propre : le dossier de l'auteur, ou la liste des personnes qu'il suit (le dossier est trouvé ensuite).
+// Pas donné à la transcription : sur un vocal sans parole, elle le recopierait
+async function contexteAuteur(seniorIds, seniorId) {
+  if (seniorIds.length <= 1) return (await contexteTranscription(seniorId).catch(() => ({ contexte: '' }))).contexte
+  const { data } = await supabase.from('seniors').select('name').in('id', seniorIds)
+  const noms = (data || []).map(s => nomAffiche(s.name)).filter(Boolean)
+  return noms.length ? `Note de suivi pour l'une de ces personnes : ${noms.join(', ')}.` : ''
+}
 
 // Cherche le senior cité dans le message, parmi ceux suivis par cet intervenant uniquement
 async function findSeniorByName(text, fallbackSeniorId, seniorIds) {
