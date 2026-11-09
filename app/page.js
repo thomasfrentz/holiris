@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { utilisateurCourant } from '@/lib/serveur'
 import Landing from './landing/page'
 import RedirectionSiConnecte from './components/RedirectionSiConnecte'
+import { FAQ } from './landing/faq'
 
 export const metadata = { alternates: { canonical: '/' } }
 
@@ -33,6 +34,11 @@ export default async function Home() {
         url: 'https://holiris.fr',
         inLanguage: 'fr-FR',
         publisher: { '@id': 'https://holiris.fr/#organisation' },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://holiris.fr/#faq',
+        mainEntity: FAQ.map(({ q, r }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: r } })),
       },
     ],
   }

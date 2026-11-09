@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { FAQ } from './faq'
 
 const Logo = ({ size = 28 }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -472,6 +473,21 @@ export default function Landing() {
             Pendant la phase pilote, Holiris est <strong style={{ color: '#4A8870', fontWeight: 500 }}>gratuit pendant 2 mois</strong>, avec un accompagnement pour la mise en place.
             Le tarif sera communiqué à l&apos;issue du pilote, sans aucun engagement de votre part.
           </p>
+        </div>
+      </div>
+
+      {/* ── FAQ ── */}
+      <div id="faq" className="section-pad" style={{ padding: '96px 48px', maxWidth: 820, margin: '0 auto' }}>
+        <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(34px, 4vw, 50px)', fontWeight: 400, color: '#1F2A24', lineHeight: 1.1, marginBottom: 36, textAlign: 'center' }}>
+          Questions <span style={{ fontStyle: 'italic', color: '#7FAF9B' }}>fréquentes</span>
+        </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {FAQ.map(({ q, r }) => (
+            <details key={q} className="faq-item" style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '18px 22px' }}>
+              <summary style={{ cursor: 'pointer', fontSize: 16, fontWeight: 500, color: '#1F2A24' }}>{q}</summary>
+              <p style={{ fontSize: 14.5, color: '#6F7C75', lineHeight: 1.75, marginTop: 12, fontWeight: 300 }}>{r}</p>
+            </details>
+          ))}
         </div>
       </div>
 
