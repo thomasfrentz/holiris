@@ -22,6 +22,9 @@ export default function Carnet() {
   const [supprimees, setSupprimees] = useState([])
   const [voirSupprimees, setVoirSupprimees] = useState(false)
   const [originaux, setOriginaux] = useState({}) // noteId → texte d'origine d'une note traduite (ou null s'il n'a pas été conservé)
+  // Gestionnaire de la structure du senior : filtre « mes salariés » (gardé sur sa fiche jusqu'à désactivation)
+  const [salariesIds, setSalariesIds] = useState(null) // fiches intervenant de ses salariés sur ce dossier ; null : pas gestionnaire
+  const [mesSalaries, setMesSalaries] = useState(false)
   const { seniors, selectedSenior, selectedSeniorId, switchSenior, isAdmin, loading: seniorsLoading } = useSenior()
   const router = useRouter()
 
@@ -48,6 +51,17 @@ export default function Carnet() {
       setHistoriques({})
       setOriginaux({})
 
+      const { data: gestion } = await supabase.from('structure_membres').select('structure_id, carnet_mes_salaries').eq('user_id', user.id)
+      const fiche = (gestion || []).find(g => g.structure_id && g.structure_id === selectedSenior?.structure_id)
+      if (fiche) {
+        const { data: salaries } = await supabase.from('intervenants').select('id')
+          .eq('senior_id', selectedSeniorId).not('salarie_id', 'is', null)
+        setSalariesIds(new Set((salaries || []).map(i => i.id)))
+        setMesSalaries(!!fiche.carnet_mes_salaries)
+      } else {
+        setSalariesIds(null)
+      }
+
       // Notes supprimées : visibles par qui peut gérer le dossier (admin, gestionnaire de structure)
       setSupprimees([])
       if (isAdmin) {
@@ -59,7 +73,14 @@ export default function Carnet() {
       setLoading(false)
     }
     loadData()
-  }, [selectedSeniorId, isAdmin])
+  }, [selectedSeniorId, selectedSenior?.structure_id, isAdmin])
+
+  async function basculerMesSalaries() {
+    const actif = !mesSalaries
+    setMesSalaries(actif)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) await supabase.from('structure_membres').update({ carnet_mes_salaries: actif }).eq('user_id', user.id)
+  }
 
   async function addNote() {
     if (!newNote.trim()) return
@@ -168,6 +189,8 @@ export default function Carnet() {
     return { icon: '📝', label: 'Note', color: '#3498db' }
   }
 
+  const notesAffichees = salariesIds && mesSalaries ? notes.filter(n => salariesIds.has(n.intervenant_id)) : notes
+
   // Aucun dossier (ex. structure sans client) : message au lieu d'un chargement sans fin
   if (!seniorsLoading && !seniors.length) return <AucunDossier isAdmin={isAdmin} />
 
@@ -196,7 +219,13 @@ export default function Carnet() {
           + Ajouter une note
         </button>
       </div>
-      <p style={{ color: '#888', marginBottom: 24, fontSize: 13 }}>{notes.length} notes · {selectedSenior?.name}</p>
+      <p style={{ color: '#888', marginBottom: salariesIds ? 12 : 24, fontSize: 13 }}>{notesAffichees.length} notes · {selectedSenior?.name}</p>
+      {salariesIds && (
+        <button onClick={basculerMesSalaries}
+          style={{ background: mesSalaries ? '#12201a' : '#fff', color: mesSalaries ? '#2ecc71' : '#555', border: '1px solid ' + (mesSalaries ? '#12201a' : '#ddd'), borderRadius: 20, padding: '7px 14px', fontSize: 13, cursor: 'pointer', marginBottom: 20, fontWeight: mesSalaries ? 'bold' : 'normal' }}>
+          {mesSalaries ? '✓ Notes de mes salariés uniquement' : 'Afficher seulement les notes de mes salariés'}
+        </button>
+      )}
 
       {showForm && (
         <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
@@ -225,7 +254,7 @@ export default function Carnet() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {notes.map((n, index) => {
+        {notesAffichees.map((n, index) => {
           const src = sourceLabel(n.source)
           return (
             <div key={n.id || index} style={{ background: '#fff', borderRadius: 12, padding: 18, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', borderLeft: '4px solid ' + src.color }}>
@@ -270,10 +299,10 @@ export default function Carnet() {
             </div>
           )
         })}
-        {notes.length === 0 && (
+        {notesAffichees.length === 0 && (
           <div style={{ textAlign: 'center', color: '#aaa', padding: 40, background: '#fff', borderRadius: 12 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
-            <div>Aucune note pour le moment</div>
+            <div>{notes.length ? 'Aucune note de vos salariés sur ce dossier' : 'Aucune note pour le moment'}</div>
           </div>
         )}
       </div>

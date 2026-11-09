@@ -73,7 +73,7 @@ export async function GET() {
       .eq('structure_id', structureId).order('created_at', { ascending: false }).limit(20),
     // Réclamations à traiter, et celles traitées ces 30 derniers jours
     ids.length
-      ? supabaseAdmin.from('reclamations').select('id, senior_id, auteur, resume, created_at, traitee_at, notes(content, metier)')
+      ? supabaseAdmin.from('reclamations').select('id, senior_id, auteur, resume, created_at, traitee_at, notes(content)')
         .in('senior_id', ids).or('traitee_at.is.null,traitee_at.gte.' + new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
         .order('created_at', { ascending: false }).limit(100)
       : { data: [] },
@@ -94,7 +94,7 @@ export async function GET() {
       compteActif: (affectations || []).some(a => a.salarie_id === s.id && a.user_id),
     })),
     demandes: demandes.data || [],
-    reclamations: (reclamations.data || []).map(r => ({ id: r.id, seniorId: r.senior_id, auteur: r.auteur, resume: r.resume, createdAt: r.created_at, traiteeAt: r.traitee_at, note: r.notes && !r.notes.metier ? r.notes.content : null })),
+    reclamations: (reclamations.data || []).map(r => ({ id: r.id, seniorId: r.senior_id, auteur: r.auteur, resume: r.resume, createdAt: r.created_at, traiteeAt: r.traitee_at, note: r.notes?.content || null })),
     gestionnaires: (gestionnaires.data || []).map(g => ({ id: g.id, nom: g.nom, email: g.email, compteActif: !!g.user_id, moi: g.user_id === user.id })),
   })
 }
