@@ -98,6 +98,8 @@ export default function Layout({ children, senior, seniors, selectedSeniorId, sw
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        /* iPhone : empêche Safari d'agrandir le texte tout seul (ajustement automatique de la taille) */
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         body { background: #FCFDFC; }
 
         .hl-wrap { display: flex; height: 100vh; font-family: 'Inter', system-ui, sans-serif; background: #FCFDFC; color: #1F2A24; }
