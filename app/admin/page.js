@@ -18,6 +18,7 @@ export default function Admin() {
   const [structures, setStructures] = useState([])
   const [nouvelleStructure, setNouvelleStructure] = useState({ nom: '', nomResponsable: '', email: '' })
   const [structureEnvoi, setStructureEnvoi] = useState(false)
+  const [seniorEdition, setSeniorEdition] = useState(null) // { id, name, date_naissance, city }
   const [structureEdition, setStructureEdition] = useState(null) // { id, nom, gestionnaires: [{ id, nom, email, compteActif }] }
   const [bornes, setBornes] = useState([])
   const [versionEnLigne, setVersionEnLigne] = useState(null)
@@ -205,6 +206,20 @@ export default function Admin() {
     setShowForm(false)
     loadData()
     setLoading(false)
+  }
+
+  async function enregistrerSenior() {
+    const name = seniorEdition.name.trim().replace(/\s+/g, ' ')
+    const city = seniorEdition.city.trim()
+    if (!name || !city || !seniorEdition.date_naissance) return
+    setLoading(true)
+    const { error } = await supabase.from('seniors').update({
+      name, city, date_naissance: seniorEdition.date_naissance, age: calculerAge(seniorEdition.date_naissance),
+    }).eq('id', seniorEdition.id)
+    setLoading(false)
+    if (error) { alert('Erreur : ' + error.message); return }
+    setSeniorEdition(null)
+    loadData()
   }
 
   async function creerBorne() {
@@ -518,10 +533,47 @@ export default function Admin() {
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {seniors.map((s) => (
+              {seniors.map((s) => seniorEdition?.id === s.id ? (
+                <div key={s.id} style={{ background: '#fff', border: '1px solid #7FAF9B', borderRadius: 12, padding: '18px 22px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Prénom et nom</label>
+                      <input value={seniorEdition.name} onChange={e => setSeniorEdition({ ...seniorEdition, name: e.target.value })} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Date de naissance</label>
+                      <input type="date" value={seniorEdition.date_naissance} onChange={e => setSeniorEdition({ ...seniorEdition, date_naissance: e.target.value })} style={inputStyle} />
+                      {seniorEdition.date_naissance && <div style={{ fontSize: 11, color: '#7FAF9B', marginTop: 4 }}>{calculerAge(seniorEdition.date_naissance)} ans</div>}
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Ville</label>
+                      <input value={seniorEdition.city} onChange={e => setSeniorEdition({ ...seniorEdition, city: e.target.value })} style={inputStyle} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 12 }}>
+                    Le nom s’écrit tel qu’il doit apparaître dans les notes, avec ses accents (ex. « Marie Labbé ») : les notes s’alignent sur cette orthographe.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={enregistrerSenior} disabled={loading || !seniorEdition.name.trim() || !seniorEdition.city.trim() || !seniorEdition.date_naissance}
+                      style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!seniorEdition.name.trim() || !seniorEdition.city.trim() || !seniorEdition.date_naissance) ? 0.5 : 1 }}>
+                      {loading ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                    <button onClick={() => setSeniorEdition(null)}
+                      style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              ) : (
                 <div key={s.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24' }}>{s.name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 500, color: '#1F2A24' }}>{s.name}</div>
+                      <button onClick={() => setSeniorEdition({ id: s.id, name: s.name || '', date_naissance: s.date_naissance || '', city: s.city || '' })}
+                        style={{ background: '#F4F5F5', color: '#6F7C75', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                        ✏️ Modifier
+                      </button>
+                    </div>
                     <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>
                       {s.age} ans · {s.city}
                       {s.date_naissance && <span> · Né(e) le {new Date(s.date_naissance).toLocaleDateString('fr-FR')}</span>}
