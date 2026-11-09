@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Documents de prospection (contacts, business plan) : ne pas publier sur GitHub
+/Prospection/

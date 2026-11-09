@@ -1,3 +1,9 @@
+export const metadata = {
+  title: 'Politique de confidentialité — Holiris',
+  description: 'Données collectées par Holiris, plateforme de coordination autour des seniors à domicile, et comment nous contacter.',
+  alternates: { canonical: '/privacy' },
+}
+
 export default function Privacy() {
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 40, fontFamily: 'Georgia, serif', color: '#333' }}>
@@ -16,7 +22,7 @@ export default function Privacy() {
       </ul>
 
       <h2 style={{ marginTop: 28 }}>Contact</h2>
-      <p>contact@holiris.vercel.app</p>
+      <p>thomas.frentz@holiris.fr</p>
     </div>
   )
 }

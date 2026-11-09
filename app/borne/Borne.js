@@ -239,7 +239,8 @@ export default function Borne() {
     if (step !== 'accueil' || !borneInfo?.code) return
     const code = encodeURIComponent(borneInfo.code)
     const actualiser = () => {
-      fetch('/api/borne?alertes=1&code=' + code).then(r => r.ok ? r.json() : null)
+      // Avec la version chargée : l'espace admin voit si la tablette est allumée et à jour
+      fetch('/api/borne?alertes=1&code=' + code + '&version=' + encodeURIComponent(versionRef.current || '')).then(r => r.ok ? r.json() : null)
         .then(d => { if (d) setAlertesAccueil(d.alertes || []) }).catch(() => {})
       fetch('/api/borne?nonlus=tous&code=' + code).then(r => r.ok ? r.json() : null)
         .then(d => { if (d) setMessagesAccueil(d.messages || []) }).catch(() => {})

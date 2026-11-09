@@ -47,12 +47,17 @@ export async function GET(request) {
 
   // Alertes non lues, affichées sur l'accueil de la borne
   if (new URL(request.url).searchParams.get('alertes')) {
+    // Appel fait toutes les 2 minutes sur l'accueil : sert aussi de signe de vie, affiché sur l'espace admin
+    const version = new URL(request.url).searchParams.get('version')?.slice(0, 64)
+    const signeDeVie = supabaseAdmin.from('bornes')
+      .update({ vue_at: new Date().toISOString(), ...(version ? { version_vue: version } : {}) }).eq('id', borne.id)
+      .then(({ error }) => { if (error) console.error('Signe de vie borne:', error.message) })
     const depuis = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-    const { data: alertes } = await supabaseAdmin.from('alertes')
+    const [{ data: alertes }] = await Promise.all([supabaseAdmin.from('alertes')
       .select('id, niveau, message, created_at')
       .eq('senior_id', borne.senior_id).eq('lu', false).gte('created_at', depuis)
       .or('type.is.null,type.neq.sans_passage') // « aucun passage » : pour la famille, pas pour l'écran du senior
-      .order('created_at', { ascending: false }).limit(5)
+      .order('created_at', { ascending: false }).limit(5), signeDeVie])
     // Les urgentes d'abord, puis les alertes, puis les points à surveiller
     const ordre = { danger: 0, warning: 1, surveiller: 2 }
     return NextResponse.json({ alertes: (alertes || []).sort((a, b) => (ordre[a.niveau] ?? 1) - (ordre[b.niveau] ?? 1)) })

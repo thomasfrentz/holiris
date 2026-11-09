@@ -19,6 +19,7 @@ export default function Admin() {
   const [nouvelleStructure, setNouvelleStructure] = useState({ nom: '', nomResponsable: '', email: '' })
   const [structureEnvoi, setStructureEnvoi] = useState(false)
   const [bornes, setBornes] = useState([])
+  const [versionEnLigne, setVersionEnLigne] = useState(null)
   const [borneSenior, setBorneSenior] = useState('')
   const [borneCreating, setBorneCreating] = useState(false)
   const [seniors, setSeniors] = useState([])
@@ -42,6 +43,14 @@ export default function Admin() {
   )
 
   useEffect(() => { loadData() }, [])
+
+  // Onglet Bornes : état des tablettes actualisé chaque minute
+  useEffect(() => {
+    if (onglet !== 'bornes') return
+    const t = setInterval(chargerBornes, 60 * 1000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chargerBornes ne dépend que du client Supabase
+  }, [onglet])
 
   async function loadData() {
     // Accès réservé au compte admin connecté (vérifié côté serveur)
@@ -69,11 +78,31 @@ export default function Admin() {
     const resStructures = await fetch('/api/admin/structures')
     if (resStructures.ok) setStructures((await resStructures.json()).structures || [])
 
-    const { data: bornesData } = await supabase
-      .from('bornes')
-      .select('*, seniors(name)')
-      .order('created_at', { ascending: false })
+    await chargerBornes()
+  }
+
+  async function chargerBornes() {
+    const [{ data: bornesData }, version] = await Promise.all([
+      supabase.from('bornes').select('*, seniors(name)').order('created_at', { ascending: false }),
+      fetch('/api/version', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ])
     setBornes(bornesData || [])
+    if (version?.version) setVersionEnLigne(version.version)
+  }
+
+  // Signe de vie envoyé par la tablette toutes les 2 minutes quand elle est sur l'accueil
+  function etatBorne(b) {
+    if (!b.vue_at) return { couleur: '#9BB5AA', fond: '#F2F5F3', texte: 'Aucun signe de vie reçu' }
+    const minutes = Math.floor((Date.now() - new Date(b.vue_at)) / 60000)
+    const depuis = minutes < 1 ? 'à l’instant' : minutes < 60 ? `il y a ${minutes} min` : 'le ' + new Date(b.vue_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    if (minutes <= 10) {
+      const aJour = !b.version_vue || !versionEnLigne || b.version_vue === versionEnLigne
+      return aJour
+        ? { couleur: '#4A8870', fond: '#EAF4EF', texte: `Active · vue ${depuis}` }
+        : { couleur: '#B07A2A', fond: '#FBF3E4', texte: `Active · vue ${depuis} · mise à jour en attente` }
+    }
+    if (minutes <= 60) return { couleur: '#B07A2A', fond: '#FBF3E4', texte: `Vue ${depuis} : écran hors accueil, en veille ou hors connexion ?` }
+    return { couleur: '#C4606A', fond: '#FBECED', texte: `Éteinte ou hors connexion · vue ${depuis}` }
   }
 
   async function traiterDemande(id, action) {
@@ -652,6 +681,10 @@ export default function Admin() {
                     <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>
                       Créée le {new Date(b.created_at).toLocaleDateString('fr-FR')}
                     </div>
+                    {(() => {
+                      const e = etatBorne(b)
+                      return <div style={{ display: 'inline-block', marginTop: 6, background: e.fond, color: e.couleur, borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 500 }}>● {e.texte}</div>
+                    })()}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ background: '#EAF4EF', borderRadius: 6, padding: '6px 14px', fontSize: 14, fontWeight: 700, color: '#4A8870', letterSpacing: '0.1em', fontFamily: 'monospace' }}>
