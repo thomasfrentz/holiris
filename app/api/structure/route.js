@@ -7,6 +7,9 @@ import { empreinte } from '@/lib/documents'
 import { inviterMembre, inviterGestionnaire } from '@/lib/invitations'
 import { envoyerBienvenue } from '@/lib/whatsapp'
 
+// Import d'un planning : une affectation par nouveau couple salarié → client
+export const maxDuration = 60
+
 const resend = new Resend(process.env.RESEND_API_KEY)
 const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const champ = (v, max = 120) => String(v ?? '').trim().slice(0, max)
@@ -27,8 +30,10 @@ async function seniorDeLaStructure(seniorId, structureId) {
   return data
 }
 
-// Affecte un salarié au dossier d'un senior (une ligne intervenants par senior)
-async function affecterSalarie(salarie, seniorId) {
+// Affecte un salarié au dossier d'un senior (une ligne intervenants par senior).
+// prevenir: false (import du planning) : le salarié a déjà été prévenu pour un autre client du même import,
+// son compte est rattaché sans nouvel email ni WhatsApp.
+async function affecterSalarie(salarie, seniorId, { prevenir = true } = {}) {
   const { data: existante } = await supabaseAdmin.from('intervenants')
     .select('id, archived_at').eq('salarie_id', salarie.id).eq('senior_id', seniorId).maybeSingle()
   if (existante) {
@@ -48,12 +53,21 @@ async function affecterSalarie(salarie, seniorId) {
   }).select('*, seniors!intervenants_senior_id_fkey(name)').single()
   if (error) throw error
 
+  if (!prevenir) {
+    const { data: compte } = await supabaseAdmin.from('intervenants')
+      .select('user_id').eq('salarie_id', salarie.id).not('user_id', 'is', null).limit(1)
+    if (compte?.length) {
+      await supabaseAdmin.from('intervenants').update({ user_id: compte[0].user_id, invite_token: null }).eq('id', ligne.id)
+      return
+    }
+  }
+
   // Une invitation est déjà en attente pour ce salarié : à la création de son compte,
   // tous ses dossiers sont rattachés d'un coup (même email). Pas de nouvel email.
   const { data: enAttente } = await supabaseAdmin.from('intervenants')
     .select('id').eq('salarie_id', salarie.id).is('user_id', null).not('invite_token', 'is', null).neq('id', ligne.id).limit(1)
   if (!enAttente?.length) await inviterMembre({ table: 'intervenants', type: 'intervenant', membre: ligne })
-  if (telephone) await envoyerBienvenue('intervenants', ligne.id)
+  if (telephone && prevenir) await envoyerBienvenue('intervenants', ligne.id)
 }
 
 // Données de l'espace « Ma structure »
@@ -178,6 +192,98 @@ export async function POST(request) {
         if (error) throw error
       }
       return NextResponse.json({ success: true, ajoutes: aCreer.length, ignores })
+    }
+
+    // Import d'une liste de clients exportée du logiciel métier. Un client déjà présent (même nom,
+    // même date de naissance) n'est pas recréé.
+    if (body.action === 'importer_clients') {
+      const lignes = Array.isArray(body.lignes) ? body.lignes.slice(0, 1000) : []
+      const { data: existants } = await supabaseAdmin.from('seniors').select('name, date_naissance').eq('structure_id', structureId)
+      const connus = (existants || []).map(s => ({ name: s.name, date: s.date_naissance }))
+      const aCreer = [], ignores = []
+      lignes.forEach((l, i) => {
+        const prenom = champ(l.prenom, 60), nom = champ(l.nom, 60), ville = champ(l.ville, 80), date = champ(l.dateNaissance, 10)
+        const complet = prenom + ' ' + nom
+        const raison = !prenom || !nom ? 'prénom ou nom manquant'
+          : !/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date)) || new Date(date) > new Date() ? 'date de naissance invalide'
+          : !ville ? 'ville manquante'
+          : connus.some(c => memeNom(c.name, complet) && (!c.date || c.date === date)) ? 'déjà dans vos clients' : ''
+        if (raison) { ignores.push({ ligne: i + 1, nom: complet.trim(), raison }); return }
+        connus.push({ name: complet, date })
+        aCreer.push({ name: complet, age: calculerAge(date), date_naissance: date, city: ville, status: 'stable', structure_id: structureId })
+      })
+      if (aCreer.length) {
+        const { error } = await supabaseAdmin.from('seniors').insert(aCreer)
+        if (error) throw error
+      }
+      return NextResponse.json({ success: true, ajoutes: aCreer.length, ignores })
+    }
+
+    // Import du planning exporté du logiciel métier : les passages à venir rejoignent l'agenda de chaque client.
+    // Les salariés y sont affectés au besoin. Un passage déjà présent à la même heure n'est pas recréé :
+    // le même planning peut être réimporté à chaque mise à jour.
+    if (body.action === 'importer_planning') {
+      const passages = Array.isArray(body.passages) ? body.passages.slice(0, 3000) : []
+      const [{ data: clients }, { data: equipe }] = await Promise.all([
+        supabaseAdmin.from('seniors').select('id').eq('structure_id', structureId),
+        supabaseAdmin.from('salaries').select('*').eq('structure_id', structureId).is('archived_at', null),
+      ])
+      const idsClients = new Set((clients || []).map(c => c.id))
+      const parId = new Map((equipe || []).map(s => [s.id, s]))
+      const maintenant = Date.now()
+      const valides = passages
+        .map(p => ({
+          seniorId: p.seniorId, quand: new Date(p.scheduledAt), label: champ(p.label, 120) || 'Passage',
+          salaries: [...new Set(Array.isArray(p.salarieIds) ? p.salarieIds : [])].map(id => parId.get(id)).filter(Boolean),
+        }))
+        .filter(p => idsClients.has(p.seniorId) && !isNaN(p.quand) && p.quand.getTime() > maintenant)
+      if (!valides.length) return NextResponse.json({ success: true, ajoutes: 0, doublons: 0, affectations: 0 })
+
+      // Affectations manquantes : chaque salarié n'est prévenu qu'une fois, pour son premier nouveau client
+      const lignesEquipe = async () => parId.size
+        ? (await supabaseAdmin.from('intervenants').select('id, salarie_id, senior_id').in('salarie_id', [...parId.keys()]).is('archived_at', null)).data || []
+        : []
+      const affectes = new Set((await lignesEquipe()).map(a => a.salarie_id + '|' + a.senior_id))
+      const prevenus = new Set()
+      let affectations = 0
+      for (const p of valides) {
+        for (const s of p.salaries) {
+          if (affectes.has(s.id + '|' + p.seniorId)) continue
+          affectes.add(s.id + '|' + p.seniorId)
+          await affecterSalarie(s, p.seniorId, { prevenir: !prevenus.has(s.id) })
+          prevenus.add(s.id)
+          affectations++
+        }
+      }
+      const ligneDe = new Map((await lignesEquipe()).map(a => [a.salarie_id + '|' + a.senior_id, a.id]))
+
+      // Passages déjà dans l'agenda, client par client
+      const seniorsConcernes = [...new Set(valides.map(p => p.seniorId))]
+      const debut = new Date(Math.min(...valides.map(p => p.quand.getTime()))).toISOString()
+      const fin = new Date(Math.max(...valides.map(p => p.quand.getTime()))).toISOString()
+      const existants = await Promise.all(seniorsConcernes.map(id => supabaseAdmin.from('events')
+        .select('senior_id, scheduled_at').eq('senior_id', id).gte('scheduled_at', debut).lte('scheduled_at', fin)))
+      const deja = new Set(existants.flatMap(r => r.data || []).map(e => e.senior_id + '|' + new Date(e.scheduled_at).getTime()))
+
+      const aCreer = []
+      let doublons = 0
+      for (const p of valides) {
+        const cle = p.seniorId + '|' + p.quand.getTime()
+        if (deja.has(cle)) { doublons++; continue }
+        deja.add(cle)
+        const ids = p.salaries.map(s => ligneDe.get(s.id + '|' + p.seniorId)).filter(Boolean)
+        aCreer.push({
+          senior_id: p.seniorId, intervenant_id: ids[0] || null, intervenant_ids: ids, label: p.label,
+          // Jamais « medical » : ce type envoie un compte rendu au médecin traitant la veille
+          type: p.salaries.some(s => /kin/i.test(s.role || '')) ? 'kine' : 'care',
+          scheduled_at: p.quand.toISOString(), status: 'a_venir',
+        })
+      }
+      for (let i = 0; i < aCreer.length; i += 500) {
+        const { error } = await supabaseAdmin.from('events').insert(aCreer.slice(i, i + 500))
+        if (error) throw error
+      }
+      return NextResponse.json({ success: true, ajoutes: aCreer.length, doublons, affectations })
     }
 
     if (body.action === 'affecter') {
