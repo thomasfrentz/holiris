@@ -70,14 +70,72 @@ async function affecterSalarie(salarie, seniorId, { prevenir = true } = {}) {
   if (telephone && prevenir) await envoyerBienvenue('intervenants', ligne.id)
 }
 
-// Données de l'espace « Ma structure »
-export async function GET() {
+// Toutes les lignes d'une requête, par pages de 1000 (limite de Supabase)
+async function toutesLesLignes(requete) {
+  const lignes = []
+  for (let debut = 0; ; debut += 1000) {
+    const { data, error } = await requete().range(debut, debut + 999)
+    if (error) throw error
+    lignes.push(...(data || []))
+    if (!data || data.length < 1000) return lignes
+  }
+}
+
+// Planning global de la structure sur une période : passages de tous ses clients. Un passage écoulé
+// est « note reçue » si l'un de ses intervenants a laissé une note sur ce client dans les 24 h.
+async function planning(ids, debut, fin) {
+  if (!ids.length) return []
+  const events = await toutesLesLignes(() => supabaseAdmin.from('events')
+    .select('id, senior_id, label, type, scheduled_at, intervenant_id, intervenant_ids')
+    .in('senior_id', ids).gte('scheduled_at', debut.toISOString()).lt('scheduled_at', fin.toISOString()).order('scheduled_at'))
+  const idsDe = e => e.intervenant_ids?.length ? e.intervenant_ids : e.intervenant_id ? [e.intervenant_id] : []
+  const idsIntervenants = [...new Set(events.flatMap(idsDe))]
+  const maintenant = new Date()
+  const [fiches, notes] = await Promise.all([
+    idsIntervenants.length ? toutesLesLignes(() => supabaseAdmin.from('intervenants').select('id, name, salarie_id').in('id', idsIntervenants)) : [],
+    events.some(e => new Date(e.scheduled_at) < maintenant)
+      ? toutesLesLignes(() => supabaseAdmin.from('notes').select('senior_id, intervenant_id, created_at').in('senior_id', ids)
+        .gte('created_at', debut.toISOString()).lt('created_at', new Date(Math.min(fin.getTime() + 24 * 3600 * 1000, maintenant.getTime())).toISOString()))
+      : [],
+  ])
+  const parId = new Map(fiches.map(f => [f.id, f]))
+  return events.map(e => {
+    const equipe = idsDe(e).map(id => parId.get(id)).filter(Boolean)
+    const quand = new Date(e.scheduled_at).getTime()
+    const passe = quand < maintenant.getTime()
+    return {
+      id: e.id, seniorId: e.senior_id, label: e.label, type: e.type, scheduledAt: e.scheduled_at,
+      intervenants: equipe.map(f => f.name), salarieIds: equipe.map(f => f.salarie_id).filter(Boolean),
+      noteRecue: passe && equipe.length
+        ? notes.some(n => n.senior_id === e.senior_id && idsDe(e).includes(n.intervenant_id)
+          && new Date(n.created_at).getTime() >= quand && new Date(n.created_at).getTime() < quand + 24 * 3600 * 1000)
+        : null,
+    }
+  })
+}
+
+// Données de l'espace « Ma structure ». Avec ?debut=…&fin=… : le planning de cette période.
+export async function GET(request) {
   const { user, structureId } = await verifierGestionnaire()
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   if (!structureId) return NextResponse.json({ error: 'Réservé aux gestionnaires de structure' }, { status: 403 })
 
   const { data: idsClients } = await supabaseAdmin.from('seniors').select('id').eq('structure_id', structureId)
   const ids = (idsClients || []).map(s => s.id)
+
+  const params = new URL(request.url).searchParams
+  if (params.has('debut')) {
+    const debut = new Date(params.get('debut')), fin = new Date(params.get('fin'))
+    if (isNaN(debut) || isNaN(fin) || fin <= debut || fin - debut > 32 * 24 * 3600 * 1000) {
+      return NextResponse.json({ error: 'Période invalide' }, { status: 400 })
+    }
+    try {
+      return NextResponse.json({ passages: await planning(ids, debut, fin) })
+    } catch (error) {
+      console.error('Erreur planning structure:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+  }
   const [structure, seniors, salaries, gestionnaires, demandes, reclamations, passages] = await Promise.all([
     supabaseAdmin.from('structures').select('id, nom, adresse, adresse_facturation').eq('id', structureId).single(),
     supabaseAdmin.from('seniors').select('id, name, city, age, date_naissance').eq('structure_id', structureId).order('name'),

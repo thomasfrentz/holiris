@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Layout from '../components/Layout'
 import { useSenior } from '../lib/useSenior'
 import Import from './Import'
+import Planning from './Planning'
 
 const ROLES = ['Aide à domicile', 'Auxiliaire de vie', 'Aide-soignant·e', 'Infirmier·ère', 'Kinésithérapeute', 'Coordinateur·rice', 'Autre']
 
@@ -154,7 +155,7 @@ export default function MaStructure() {
       )}
 
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #E8EFEB', marginBottom: 20, overflowX: 'auto' }}>
-        {[['clients', 'Clients'], ['salaries', 'Salariés intervenants'], ['gestionnaires', 'Gestionnaires']].map(([cle, libelle]) => (
+        {[['clients', 'Clients'], ['planning', 'Planning'], ['salaries', 'Salariés intervenants'], ['gestionnaires', 'Gestionnaires']].map(([cle, libelle]) => (
           <button key={cle} onClick={() => { setOnglet(cle); setFormulaire(null); setMessage('') }} style={{
             background: 'none', border: 'none', borderBottom: onglet === cle ? '2px solid #7FAF9B' : '2px solid transparent',
             padding: '10px 16px', fontSize: 14, fontWeight: onglet === cle ? 500 : 400, color: onglet === cle ? '#4A8870' : '#9BB5AA',
@@ -244,6 +245,12 @@ export default function MaStructure() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Planning global de tous les clients ── */}
+      {onglet === 'planning' && (
+        <Planning clients={clients} salaries={salaries} ouvrirDossier={ouvrirDossier}
+          onImporter={() => { setOnglet('clients'); setFormulaire('import') }} />
       )}
 
       {/* ── Salariés ── */}
