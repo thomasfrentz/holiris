@@ -38,14 +38,21 @@ function verifier(lecture, clients, salaries) {
       return { ...l, raison, connu, etat: !connu ? 'nouveau' : connu.city !== l.ville || !connu.date_naissance ? 'maj' : 'a_jour' }
     })
   }
+  // Un planning ne donne que le nom : s'il désigne plusieurs clients (ou salariés), la ligne est écartée
+  // plutôt que rattachée au premier trouvé
   const maintenant = Date.now()
   return lignes.map(l => {
-    const client = l.client && clients.find(c => memeNom(c.name, l.client))
-    const equipe = l.intervenants.map(n => ({ nom: n, salarie: salaries.find(s => memeNom(s.prenom + ' ' + s.nom, n)) }))
+    const homonymesClient = l.client ? clients.filter(c => memeNom(c.name, l.client)) : []
+    const client = homonymesClient.length === 1 && homonymesClient[0]
+    const equipe = l.intervenants.map(n => {
+      const homonymes = salaries.filter(s => memeNom(s.prenom + ' ' + s.nom, n))
+      return { nom: n, salarie: homonymes.length === 1 && homonymes[0], homonymes: homonymes.length > 1 }
+    })
     const inconnu = equipe.find(e => !e.salarie)
     const quand = l.date && l.heure ? new Date(l.date + 'T' + l.heure) : null
-    const raison = !l.client ? 'Client manquant' : !client ? 'Client inconnu' : !l.date ? 'Date illisible' : !l.heure ? 'Heure manquante'
-      : quand.getTime() < maintenant ? 'Déjà passé' : inconnu ? 'Intervenant inconnu' : ''
+    const raison = !l.client ? 'Client manquant' : homonymesClient.length > 1 ? 'Plusieurs clients portent ce nom' : !client ? 'Client inconnu'
+      : !l.date ? 'Date illisible' : !l.heure ? 'Heure manquante' : quand.getTime() < maintenant ? 'Déjà passé'
+        : inconnu?.homonymes ? 'Plusieurs salariés portent ce nom' : inconnu ? 'Intervenant inconnu' : ''
     return { ...l, raison, nomClient: l.client, client, inconnu: inconnu?.nom, salaries: equipe.map(e => e.salarie).filter(Boolean), quand }
   })
 }
@@ -289,6 +296,9 @@ export default function Import({ clients, salaries, passagesAVenir = 0, onImport
               )}
               {lignes.some(l => l.raison === 'Intervenant inconnu') && (
                 <div style={alerte}>Intervenants introuvables dans vos salariés : {compter(lignes.filter(l => l.raison === 'Intervenant inconnu').map(l => l.inconnu))}. Importez d&apos;abord votre liste de salariés, ou vérifiez l&apos;orthographe.</div>
+              )}
+              {lignes.some(l => l.raison.startsWith('Plusieurs')) && (
+                <div style={alerte}>Noms portés par plusieurs personnes dans Holiris : {compter(lignes.filter(l => l.raison.startsWith('Plusieurs')).map(l => l.raison === 'Plusieurs clients portent ce nom' ? l.nomClient : l.inconnu))}. Ces lignes ne sont pas importées : ajoutez-les à la main dans l&apos;agenda du bon dossier.</div>
               )}
               {nouvellesAffectations > 0 && (
                 <div style={note}>
