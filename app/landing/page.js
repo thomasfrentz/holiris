@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { FAQ } from './faq'
 
@@ -24,18 +24,42 @@ function FormulaireContact() {
   const [erreur, setErreur] = useState('')
   const maj = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
+  // Captcha Cloudflare Turnstile (le plus souvent invisible) : affiché dès que la clé du site est configurée
+  const captchaRef = useRef(null)
+  const widgetRef = useRef(null)
+  const [captcha, setCaptcha] = useState('')
+  const CLE_CAPTCHA = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  useEffect(() => {
+    if (!CLE_CAPTCHA) return
+    const afficher = () => {
+      if (!window.turnstile || !captchaRef.current || widgetRef.current !== null) return
+      widgetRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: CLE_CAPTCHA, language: 'fr', theme: 'light',
+        callback: setCaptcha, 'expired-callback': () => setCaptcha(''), 'error-callback': () => setCaptcha(''),
+      })
+    }
+    if (window.turnstile) { afficher(); return }
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.onload = afficher
+    document.head.appendChild(script)
+  }, [CLE_CAPTCHA])
+
   async function envoyer(e) {
     e.preventDefault()
     setErreur('')
     setEtat('envoi')
     try {
-      const r = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      const r = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, captcha }) })
       const d = await r.json()
       if (!d.success) throw new Error(d.error)
       setEtat('envoye')
     } catch (err) {
       setErreur(err.message || 'Envoi impossible, réessayez plus tard.')
       setEtat('')
+      // Un jeton ne sert qu'une fois : nouvelle vérification avant le prochain envoi
+      if (widgetRef.current !== null) { window.turnstile?.reset(widgetRef.current); setCaptcha('') }
     }
   }
 
@@ -70,8 +94,9 @@ function FormulaireContact() {
       {/* Champ piège pour les robots, invisible pour les visiteurs */}
       <input value={form.site_web} onChange={maj('site_web')} tabIndex={-1} autoComplete="off" aria-hidden="true"
         style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
+      {CLE_CAPTCHA && <div ref={captchaRef} />}
       {erreur && <div style={{ fontSize: 13, color: '#C4606A' }}>{erreur}</div>}
-      <button type="submit" className="btn-primary" disabled={etat === 'envoi'} style={{ border: 'none', cursor: 'pointer', alignSelf: 'flex-start' }}>
+      <button type="submit" className="btn-primary" disabled={etat === 'envoi' || (CLE_CAPTCHA && !captcha)} style={{ border: 'none', cursor: 'pointer', alignSelf: 'flex-start', opacity: CLE_CAPTCHA && !captcha ? 0.6 : 1 }}>
         {etat === 'envoi' ? 'Envoi…' : 'Envoyer le message →'}
       </button>
     </form>

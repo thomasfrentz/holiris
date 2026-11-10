@@ -7,6 +7,22 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const DESTINATAIRE = 'thomas.frentz@holiris.fr'
 
+// Lien dans le nom ou le message : refusé (les messages d'hameçonnage renvoient vers une fausse page)
+const LIEN = /(https?:\/\/|www\.|\b[a-z0-9-]+\.[a-z]{2,}\/\S)/i
+
+// Captcha Cloudflare Turnstile : exigé dès que la clé secrète est configurée sur Vercel
+async function captchaValide(jeton, ip) {
+  const secret = process.env.TURNSTILE_SECRET_KEY
+  if (!secret) return true
+  if (!jeton) return false
+  const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    body: new URLSearchParams({ secret, response: String(jeton).slice(0, 2048), ...(ip && { remoteip: ip }) }),
+  }).catch(() => null)
+  const d = await r?.json().catch(() => null)
+  return d?.success === true
+}
+
 // Formulaire de contact de la page d'accueil : le message part par email, avec l'adresse du visiteur en réponse
 export async function POST(request) {
   try {
@@ -25,6 +41,13 @@ export async function POST(request) {
     }
     if (!contact.nom || !EMAIL_VALIDE.test(contact.email) || contact.message.length < 5) {
       return NextResponse.json({ success: false, error: 'Merci de renseigner votre nom, un email valide et votre message.' }, { status: 400 })
+    }
+    if (LIEN.test(contact.nom) || LIEN.test(contact.message)) {
+      return NextResponse.json({ success: false, error: 'Pour des raisons de sécurité, les liens ne sont pas acceptés dans le message.' }, { status: 400 })
+    }
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+    if (!await captchaValide(body.captcha, ip)) {
+      return NextResponse.json({ success: false, captcha: true, error: 'La vérification anti-robot a échoué. Réessayez.' }, { status: 400 })
     }
 
     const e = Object.fromEntries(Object.entries(contact).map(([k, v]) => [k, escapeHtml(v)]))
