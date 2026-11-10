@@ -69,7 +69,7 @@ const COLONNES = {
 }
 const NOMS = { salaries: 'Liste de salariés', clients: 'Liste de clients', planning: 'Planning des passages' }
 
-export default function Import({ clients, salaries, onImporte, onFermer }) {
+export default function Import({ clients, salaries, passagesAVenir = 0, onImporte, onFermer }) {
   const [lecture, setLecture] = useState(null) // { type, lignes } ou { erreur }
   const [texte, setTexte] = useState('')
   const [survol, setSurvol] = useState(false)
@@ -128,7 +128,7 @@ export default function Import({ clients, salaries, onImporte, onFermer }) {
   const ETAPES = [
     ['Vos salariés', 'Nom, prénom, email, téléphone', salaries.length && pluriel(salaries.length, 'salarié')],
     ['Vos clients', 'Nom, prénom, date de naissance, ville', clients.length && pluriel(clients.length, 'client')],
-    ['Votre planning', 'Bénéficiaire, intervenant, date, heure — à réimporter quand il change', null],
+    ['Votre planning', 'Bénéficiaire, intervenant, date, heure — à réimporter quand il change', passagesAVenir && pluriel(passagesAVenir, 'passage à venir', 'passages à venir')],
   ]
 
   return (
@@ -143,7 +143,7 @@ export default function Import({ clients, salaries, onImporte, onFermer }) {
           <div key={titre} style={{ border: '1px solid ' + (fait ? '#CFE3D8' : '#E8EFEB'), background: fait ? '#F3F9F6' : '#FAFCFC', borderRadius: 10, padding: '10px 12px' }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: '#1F2A24' }}>{i + 1}. {titre}</div>
             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 2, lineHeight: 1.4 }}>{detail}</div>
-            {fait ? <div style={{ fontSize: 11, color: '#4A8870', marginTop: 4, fontWeight: 500 }}>✓ {fait} dans Holiris</div> : null}
+            {fait ? <div style={{ fontSize: 11, color: '#4A8870', marginTop: 4, fontWeight: 500 }}>✓ {fait} {i === 2 ? 'dans l\'agenda' : 'dans Holiris'}</div> : null}
           </div>
         ))}
       </div>

@@ -201,7 +201,7 @@ export default function MaStructure() {
               </div>
             </div>
           ) : formulaire === 'import' ? (
-            <Import clients={clients} salaries={salaries} onImporte={charger} onFermer={() => setFormulaire(null)} />
+            <Import clients={clients} salaries={salaries} passagesAVenir={donnees.passagesAVenir} onImporte={charger} onFermer={() => setFormulaire(null)} />
           ) : (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
               <button onClick={() => setFormulaire('client')} style={btn}>+ Nouveau client</button>
@@ -285,7 +285,7 @@ export default function MaStructure() {
               </div>
             </div>
           ) : formulaire === 'import' ? (
-            <Import clients={clients} salaries={salaries} onImporte={charger} onFermer={() => setFormulaire(null)} />
+            <Import clients={clients} salaries={salaries} passagesAVenir={donnees.passagesAVenir} onImporte={charger} onFermer={() => setFormulaire(null)} />
           ) : (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
               <button onClick={() => setFormulaire('salarie')} style={btn}>+ Nouveau salarié</button>

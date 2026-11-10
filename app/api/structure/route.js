@@ -78,7 +78,7 @@ export async function GET() {
 
   const { data: idsClients } = await supabaseAdmin.from('seniors').select('id').eq('structure_id', structureId)
   const ids = (idsClients || []).map(s => s.id)
-  const [structure, seniors, salaries, gestionnaires, demandes, reclamations] = await Promise.all([
+  const [structure, seniors, salaries, gestionnaires, demandes, reclamations, passages] = await Promise.all([
     supabaseAdmin.from('structures').select('id, nom, adresse, adresse_facturation').eq('id', structureId).single(),
     supabaseAdmin.from('seniors').select('id, name, city, age, date_naissance').eq('structure_id', structureId).order('name'),
     supabaseAdmin.from('salaries').select('*').eq('structure_id', structureId).is('archived_at', null).order('nom'),
@@ -91,6 +91,10 @@ export async function GET() {
         .in('senior_id', ids).or('traitee_at.is.null,traitee_at.gte.' + new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
         .order('created_at', { ascending: false }).limit(100)
       : { data: [] },
+    // Passages à venir dans l'agenda des clients (étape « planning » de l'import)
+    ids.length
+      ? supabaseAdmin.from('events').select('id', { count: 'exact', head: true }).in('senior_id', ids).gte('scheduled_at', new Date().toISOString())
+      : { count: 0 },
   ])
 
   // Affectations actives de chaque salarié
@@ -108,6 +112,7 @@ export async function GET() {
       compteActif: (affectations || []).some(a => a.salarie_id === s.id && a.user_id),
     })),
     demandes: demandes.data || [],
+    passagesAVenir: passages.count || 0,
     reclamations: (reclamations.data || []).map(r => ({ id: r.id, seniorId: r.senior_id, auteur: r.auteur, resume: r.resume, createdAt: r.created_at, traiteeAt: r.traitee_at, note: r.notes?.content || null })),
     gestionnaires: (gestionnaires.data || []).map(g => ({ id: g.id, nom: g.nom, email: g.email, compteActif: !!g.user_id, moi: g.user_id === user.id })),
   })
