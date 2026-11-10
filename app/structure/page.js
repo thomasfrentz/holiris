@@ -13,7 +13,7 @@ export default function MaStructure() {
   const [donnees, setDonnees] = useState(null)
   const [erreur, setErreur] = useState('')
   const [onglet, setOnglet] = useState('clients')
-  const [formulaire, setFormulaire] = useState(null) // 'client' | 'rattachement' | 'salarie' | 'import' | 'gestionnaire'
+  const [formulaire, setFormulaire] = useState(null) // 'client' | 'rattachement' | 'salarie' | 'gestionnaire'
   const [envoi, setEnvoi] = useState(false)
   const [message, setMessage] = useState('')
   const [client, setClient] = useState({ prenom: '', nom: '', dateNaissance: '', ville: '' })
@@ -155,7 +155,7 @@ export default function MaStructure() {
       )}
 
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #E8EFEB', marginBottom: 20, overflowX: 'auto' }}>
-        {[['clients', 'Clients'], ['planning', 'Planning'], ['salaries', 'Salariés intervenants'], ['gestionnaires', 'Gestionnaires']].map(([cle, libelle]) => (
+        {[['clients', 'Clients'], ['planning', 'Planning'], ['salaries', 'Salariés intervenants'], ['import', 'Import'], ['gestionnaires', 'Gestionnaires']].map(([cle, libelle]) => (
           <button key={cle} onClick={() => { setOnglet(cle); setFormulaire(null); setMessage('') }} style={{
             background: 'none', border: 'none', borderBottom: onglet === cle ? '2px solid #7FAF9B' : '2px solid transparent',
             padding: '10px 16px', fontSize: 14, fontWeight: onglet === cle ? 500 : 400, color: onglet === cle ? '#4A8870' : '#9BB5AA',
@@ -201,12 +201,9 @@ export default function MaStructure() {
                 <button onClick={() => setFormulaire(null)} style={btnGris}>Annuler</button>
               </div>
             </div>
-          ) : formulaire === 'import' ? (
-            <Import clients={clients} salaries={salaries} passagesAVenir={donnees.passagesAVenir} onImporte={charger} onFermer={() => setFormulaire(null)} />
           ) : (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
               <button onClick={() => setFormulaire('client')} style={btn}>+ Nouveau client</button>
-              <button onClick={() => setFormulaire('import')} style={{ ...btn, background: '#fff', color: '#4A8870', border: '1.5px solid #7FAF9B' }}>Importer depuis votre logiciel</button>
               <button onClick={() => setFormulaire('rattachement')} style={{ ...btn, background: '#fff', color: '#4A8870', border: '1.5px solid #7FAF9B' }}>Rattacher un client existant</button>
             </div>
           )}
@@ -226,7 +223,7 @@ export default function MaStructure() {
           )}
 
           {clients.length === 0 ? (
-            <div style={{ ...carte, textAlign: 'center', padding: '36px 20px', color: '#9BB5AA', fontSize: 14 }}>Créez le dossier de votre premier client, ou importez la liste de vos clients depuis votre logiciel.</div>
+            <div style={{ ...carte, textAlign: 'center', padding: '36px 20px', color: '#9BB5AA', fontSize: 14 }}>Créez le dossier de votre premier client, ou importez la liste de vos clients depuis l&apos;onglet Import.</div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
               {clients.map(c => {
@@ -250,7 +247,12 @@ export default function MaStructure() {
       {/* ── Planning global de tous les clients ── */}
       {onglet === 'planning' && (
         <Planning clients={clients} salaries={salaries} ouvrirDossier={ouvrirDossier}
-          onImporter={() => { setOnglet('clients'); setFormulaire('import') }} />
+          onImporter={() => setOnglet('import')} />
+      )}
+
+      {/* ── Import depuis le logiciel métier : salariés, clients et planning ── */}
+      {onglet === 'import' && (
+        <Import clients={clients} salaries={salaries} passagesAVenir={donnees.passagesAVenir} onImporte={charger} />
       )}
 
       {/* ── Salariés ── */}
@@ -291,12 +293,9 @@ export default function MaStructure() {
                 <button onClick={() => setFormulaire(null)} style={btnGris}>Annuler</button>
               </div>
             </div>
-          ) : formulaire === 'import' ? (
-            <Import clients={clients} salaries={salaries} passagesAVenir={donnees.passagesAVenir} onImporte={charger} onFermer={() => setFormulaire(null)} />
           ) : (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
               <button onClick={() => setFormulaire('salarie')} style={btn}>+ Nouveau salarié</button>
-              <button onClick={() => setFormulaire('import')} style={{ ...btn, background: '#fff', color: '#4A8870', border: '1.5px solid #7FAF9B' }}>Importer depuis votre logiciel</button>
             </div>
           )}
 

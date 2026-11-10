@@ -368,7 +368,7 @@ export default function Import({ clients, salaries, passagesAVenir = 0, onImport
             {envoi ? 'Mise à jour…' : !aEnvoyer ? (lecture.type === 'planning' && !agendaPret ? 'Comparaison…' : 'Tout est déjà à jour') : libelleBouton + ' (' + pluriel(aEnvoyer, 'changement') + ')'}
           </button>
         )}
-        <button onClick={onFermer} style={btnGris}>Fermer</button>
+        {onFermer && <button onClick={onFermer} style={btnGris}>Fermer</button>}
       </div>
     </div>
   )
