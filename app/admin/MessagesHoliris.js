@@ -29,7 +29,7 @@ export default function MessagesHoliris() {
     <>
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Suivi</div>
-        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Messages Holiris</h1>
+        <h1 className="adm-titre" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Messages Holiris</h1>
         <p style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>Messages automatiques envoyés aux intervenants dans leur messagerie, et leurs réponses</p>
       </div>
 

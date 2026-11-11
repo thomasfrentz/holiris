@@ -277,9 +277,21 @@ export default function Admin() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F7F9F8', fontFamily: "'Inter', system-ui, sans-serif", color: '#1F2A24' }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600&display=swap');
+        /* Onglets : défilent horizontalement quand ils ne tiennent pas sur une ligne */
+        .adm-onglets { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .adm-onglets::-webkit-scrollbar { display: none; }
+        @media (max-width: 768px) {
+          .adm-entete { padding: 12px 16px !important; }
+          .adm-stats span { display: none; }
+          .adm-onglets { padding: 0 8px !important; }
+          .adm-onglets button { padding: 12px 12px !important; }
+          .adm-contenu { padding: 22px 14px 40px !important; }
+          .adm-titre { font-size: 28px !important; }
+          .adm-grille2 { grid-template-columns: 1fr !important; }
+        }`}</style>
 
-      <header style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="adm-entete" style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <svg width="30" height="30" viewBox="0 0 64 64" fill="none">
             <ellipse cx="32" cy="32" rx="17" ry="24" transform="rotate(-15 32 32)" stroke="#7FAF9B" strokeWidth="2" fill="none"/>
@@ -292,14 +304,14 @@ export default function Admin() {
             <div style={{ fontSize: 9, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase' }}>Admin</div>
           </div>
         </div>
-        <div style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', gap: 16, alignItems: 'center' }}>
+        <div className="adm-stats" style={{ fontSize: 13, color: '#9BB5AA', display: 'flex', gap: 16, alignItems: 'center' }}>
           <a href="/app" style={{ color: '#4A8870', textDecoration: 'none', fontWeight: 500 }}>← Retour à l&apos;application</a>
           <span>{seniors.length} senior{seniors.length > 1 ? 's' : ''}</span>
           <span>{personnes.length} utilisateur{personnes.length > 1 ? 's' : ''}</span>
         </div>
       </header>
 
-      <div style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '0 32px', display: 'flex' }}>
+      <div className="adm-onglets" style={{ background: '#fff', borderBottom: '1px solid #EBF0EC', padding: '0 32px', display: 'flex' }}>
         {[
           { key: 'demandes', label: 'Demandes d\'accès' + (demandes.filter(d => d.statut === 'en_attente').length ? ' (' + demandes.filter(d => d.statut === 'en_attente').length + ')' : '') },
           { key: 'seniors', label: 'Dossiers seniors' },
@@ -315,19 +327,19 @@ export default function Admin() {
             padding: '14px 20px', fontSize: 13,
             fontWeight: onglet === o.key ? 500 : 400,
             color: onglet === o.key ? '#4A8870' : '#9BB5AA',
-            cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+            cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
           }}>
             {o.label}
           </button>
         ))}
       </div>
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '36px 24px' }}>
+      <div className="adm-contenu" style={{ maxWidth: 900, margin: '0 auto', padding: '36px 24px' }}>
 
         {onglet === 'demandes' && (
           <>
             <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Inscriptions</div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 8 }}>Demandes d&apos;accès</h1>
+            <h1 className="adm-titre" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 8 }}>Demandes d&apos;accès</h1>
             <p style={{ fontSize: 13, color: '#9BB5AA', marginBottom: 24 }}>Valider envoie au demandeur un email pour créer son compte et le dossier de son proche.</p>
 
             {demandesErreur && (
@@ -398,7 +410,7 @@ export default function Admin() {
         {onglet === 'structures' && (
           <>
             <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Professionnels</div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 8 }}>Structures</h1>
+            <h1 className="adm-titre" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 8 }}>Structures</h1>
             <p style={{ fontSize: 13, color: '#9BB5AA', marginBottom: 24 }}>
               Une structure (SAAD, CCAS…) gère ses propres clients et salariés. Ses gestionnaires ont les droits d&apos;admin, uniquement sur les dossiers de la structure.
             </p>
@@ -486,10 +498,10 @@ export default function Admin() {
 
         {onglet === 'seniors' && (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
-                <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Dossiers seniors</h1>
+                <h1 className="adm-titre" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Dossiers seniors</h1>
               </div>
               <button onClick={() => setShowForm(!showForm)}
                 style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 22px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -500,7 +512,7 @@ export default function Admin() {
             {showForm && (
               <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '24px', marginBottom: 24 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Nouveau dossier</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div className="adm-grille2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                   <div>
                     <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Prénom</label>
                     <input placeholder="Marie" value={prenom} onChange={e => setPrenom(e.target.value)} style={inputStyle} />
@@ -510,7 +522,7 @@ export default function Admin() {
                     <input placeholder="Dupont" value={nom} onChange={e => setNom(e.target.value)} style={inputStyle} />
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                <div className="adm-grille2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
                   <div>
                     <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Date de naissance</label>
                     <input type="date" value={dateNaissance} onChange={e => setDateNaissance(e.target.value)} style={inputStyle} />
@@ -613,7 +625,7 @@ export default function Admin() {
           <>
             <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
-              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 20 }}>Utilisateurs & Admins</h1>
+              <h1 className="adm-titre" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 20 }}>Utilisateurs & Admins</h1>
               <input
                 placeholder="Rechercher par nom, email, téléphone ou senior..."
                 value={searchUser} onChange={e => setSearchUser(e.target.value)}
@@ -694,7 +706,7 @@ export default function Admin() {
           <>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>WhatsApp</div>
-              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 12 }}>Relancer les intervenants</h1>
+              <h1 className="adm-titre" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1, marginBottom: 12 }}>Relancer les intervenants</h1>
               <p style={{ fontSize: 13, color: '#6F7C75', lineHeight: 1.6, maxWidth: 640 }}>
                 Intervenants avec un numéro, sans note depuis
                 <select value={relance.jours} onChange={e => chargerRelances(parseInt(e.target.value))}
@@ -750,14 +762,14 @@ export default function Admin() {
           <>
             <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 11, color: '#9BB5AA', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6, fontWeight: 500 }}>Gestion</div>
-              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Bornes</h1>
+              <h1 className="adm-titre" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 36, fontWeight: 400, color: '#1F2A24', lineHeight: 1 }}>Bornes</h1>
               <p style={{ color: '#9BB5AA', fontSize: 13, marginTop: 6 }}>Tablettes placées au domicile du senior</p>
             </div>
 
             <div style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: 24, marginBottom: 24 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: '#7FAF9B', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 16 }}>Créer une borne</div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-                <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
                   <label style={{ fontSize: 11, color: '#9BB5AA', display: 'block', marginBottom: 6, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Senior</label>
                   <select value={borneSenior} onChange={e => setBorneSenior(e.target.value)} style={{ ...inputStyle }}>
                     <option value="">Choisir un senior...</option>
@@ -777,9 +789,9 @@ export default function Admin() {
                   <div style={{ fontSize: 14, color: '#9BB5AA' }}>Aucune borne configurée.</div>
                 </div>
               ) : bornes.map(b => (
-                <div key={b.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div key={b.id} style={{ background: '#fff', border: '1px solid #E8EFEB', borderRadius: 12, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 28 }}>📱</div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
                     <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{b.seniors?.name}</div>
                     <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 2 }}>
                       Créée le {new Date(b.created_at).toLocaleDateString('fr-FR')}
