@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
+import MessagesHoliris from './MessagesHoliris'
 
 function calculerAge(dateNaissance) {
   if (!dateNaissance) return null
@@ -306,6 +307,7 @@ export default function Admin() {
           { key: 'utilisateurs', label: 'Utilisateurs & Admins' },
           { key: 'bornes', label: 'Bornes' },
           { key: 'relances', label: 'Relances' },
+          { key: 'holiris', label: 'Messages Holiris' },
         ].map(o => (
           <button key={o.key} onClick={() => { setOnglet(o.key); if (o.key === 'relances' && !relance.liste) chargerRelances() }} style={{
             background: 'none', border: 'none',
@@ -741,6 +743,8 @@ export default function Admin() {
             )}
           </>
         )}
+
+        {onglet === 'holiris' && <MessagesHoliris />}
 
         {onglet === 'bornes' && (
           <>
