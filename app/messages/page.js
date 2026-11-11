@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Layout from '../components/Layout'
 import AucunDossier from '../components/AucunDossier'
 import QuestionMedicale from '../components/QuestionMedicale'
+import PropositionPassage from './PropositionPassage'
+import { EXPEDITEUR_HOLIRIS } from '@/lib/expediteurHoliris'
 import { useSenior } from '../lib/useSenior'
 import { useIntervenant } from '../lib/useIntervenant'
 
@@ -210,6 +212,7 @@ export default function Messages() {
       if (g) return { titre: g.nom, sousTitre: g.membres.map(nomDe).join(', '), icone: '💬', groupe: g }
     }
     if (cle === SENIOR) return { titre: prenomSenior, sousTitre: 'Sur sa borne', icone: '💌' }
+    if (cle === 'u:' + EXPEDITEUR_HOLIRIS) return { titre: 'Holiris', sousTitre: 'Messages automatiques', icone: '🌿' }
     const p = personnes.find(x => x.cle === cle)
     if (p) return { titre: p.nom, sousTitre: p.role || '', icone: null, personne: p }
     const exemple = (parConv.get(cle) || [])[0]
@@ -553,6 +556,7 @@ export default function Messages() {
                     }}>{m.type === 'vocal'
                       ? (m.audio_url ? <audio controls preload="none" src={m.audio_url} style={{ maxWidth: 240, display: 'block' }} /> : '🎙 Message vocal')
                       : m.contenu}</div>
+                    {m.proposition_id && !moi && <PropositionPassage id={m.proposition_id} />}
                     {m.versSenior && <div style={{ fontSize: 11, color: m.lu_at ? '#4A8870' : '#9BB5AA', margin: '3px 4px 0' }}>{statutBorne(m)}</div>}
                     {moi && !m.versSenior && (() => { const a = accuse(m); return <div style={{ fontSize: 11, color: a.lu ? '#4A8870' : '#9BB5AA', margin: '3px 4px 0', maxWidth: '82%', textAlign: 'right' }}>{a.texte}</div> })()}
                   </div>
@@ -564,7 +568,9 @@ export default function Messages() {
             <div className="msg-saisie">
             {erreur && <div style={{ fontSize: 13, color: '#C4606A', marginTop: 8 }}>{erreur}</div>}
             {!peutRepondre ? (
-              <div style={{ fontSize: 13, color: '#9BB5AA', marginTop: 10 }}>Cette personne ne fait plus partie du dossier : répondez-lui dans « Tous ».</div>
+              <div style={{ fontSize: 13, color: '#9BB5AA', marginTop: 10 }}>{conv === 'u:' + EXPEDITEUR_HOLIRIS
+                ? 'Message automatique de Holiris : il n\'attend pas de réponse.'
+                : 'Cette personne ne fait plus partie du dossier : répondez-lui dans « Tous ».'}</div>
             ) : conv === SENIOR && vocal?.etat === 'pret' ? (
               <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <audio controls src={vocal.url} style={{ flex: 1, minWidth: 200, height: 44 }} />

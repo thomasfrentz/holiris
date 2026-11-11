@@ -12,6 +12,7 @@ async function messagesPour(ficheIds) {
   const { data } = await supabaseAdmin.from('messages')
     .select('id, contenu, auteur_nom, auteur_role, destinataire_id, destinataire_nom, senior_id, created_at')
     .eq('destinataire_type', 'intervenant').in('destinataire_id', ficheIds).is('lu_borne_at', null)
+    .or('auteur_type.is.null,auteur_type.neq.holiris') // messages automatiques de Holiris : messagerie seulement
     .gte('created_at', new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
     .order('created_at', { ascending: true })
   return data || []

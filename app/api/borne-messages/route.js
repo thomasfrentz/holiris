@@ -20,6 +20,7 @@ export async function GET(request) {
   const { data: tous } = await supabaseAdmin.from('messages')
     .select('id, contenu, auteur_nom, auteur_role, auteur_type, auteur_user_id, destinataire_id, destinataire_nom, created_at')
     .eq('senior_id', borne.senior_id).eq('destinataire_type', 'intervenant').is('lu_borne_at', null).is('groupe_id', null)
+    .or('auteur_type.is.null,auteur_type.neq.holiris') // messages automatiques de Holiris : messagerie seulement
     .gte('created_at', new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
     .order('created_at', { ascending: true })
   if (!tous?.length) return NextResponse.json({ messages: [] })
