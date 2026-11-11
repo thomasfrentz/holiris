@@ -86,6 +86,8 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
         setNotes(prev => [p.new, ...prev].slice(0, 3))
         setTotalNotes(prev => prev + 1)
         if (p.new.intervenant_id) setDerniereNoteIntervenant(p.new)
+        // Nouvelle note : l'alerte « aucun passage » est levée (aussi en base, à l'enregistrement de la note)
+        setAlertes(prev => prev.filter(a => a.type !== 'sans_passage'))
       })
       .subscribe()
 
