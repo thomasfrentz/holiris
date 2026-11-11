@@ -49,6 +49,14 @@ const memoire = {
 const initiales = nom => nom.split(' ').filter(Boolean).slice(0, 2).map(m => m[0]).join('').toUpperCase()
 const listePrenoms = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1] : l[0] || ''
 
+// « Je ne suis pas dans la liste » : personnes du dossier dont le nom contient tous les mots tapés,
+// dans n'importe quel ordre, sans accents ni majuscules (« Manuel » → « Manuel Olivera Para »)
+const motsDuNom = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z]+/).filter(Boolean)
+function correspondances(nom, personnes) {
+  const mots = motsDuNom(nom)
+  return mots.length ? personnes.filter(p => { const siens = motsDuNom(p.name); return mots.every(m => siens.includes(m)) }) : []
+}
+
 export default function Borne() {
   const [step, setStep] = useState('loading')
   const [codeInput, setCodeInput] = useState('')
@@ -64,6 +72,7 @@ export default function Borne() {
   const [showInvite, setShowInvite] = useState(false)
   const [inviteNom, setInviteNom] = useState('')
   const [inviteRole, setInviteRole] = useState('')
+  const [suggestions, setSuggestions] = useState(null) // personnes du dossier qui correspondent au nom tapé
   const [noteProposee, setNoteProposee] = useState('')
   const [traduction, setTraduction] = useState(null) // { langue, jeton } : note dite dans une autre langue, traduite en français
   const [signalement, setSignalement] = useState(null) // { id, notePartielle }
@@ -401,6 +410,7 @@ export default function Borne() {
     setSignalement(null)
     setReponseMedicale('')
     setShowInvite(false)
+    setSuggestions(null)
     setError('')
     setStep('accueil')
   }
@@ -444,12 +454,29 @@ export default function Borne() {
       .catch(() => setResumeBorne('erreur'))
   }
 
+  // Le nom tapé correspond à quelqu'un du dossier : on lui demande si c'est lui, pour rattacher la note à sa fiche
   function validerInvite() {
     if (!inviteNom.trim()) return
-    choisirPersonne({ id: null, name: inviteNom.trim(), role: inviteRole.trim() || 'Visiteur', type: 'invite' })
+    const proches = correspondances(inviteNom, personnes)
+    if (proches.length) setSuggestions(proches)
+    else continuerCommeInvite()
+  }
+
+  function fermerInvite() {
     setShowInvite(false)
+    setSuggestions(null)
     setInviteNom('')
     setInviteRole('')
+  }
+
+  function continuerCommeInvite() {
+    choisirPersonne({ id: null, name: inviteNom.trim(), role: inviteRole.trim() || 'Visiteur', type: 'invite' })
+    fermerInvite()
+  }
+
+  function cEstMoi(p) {
+    choisirPersonne(p)
+    fermerInvite()
   }
 
   async function startRecording() {
@@ -961,7 +988,7 @@ export default function Borne() {
         </div>
 
         <div className="borne-actions" style={{ width: '100%', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <button onClick={() => { setShowInvite(false); setStep('choix') }} className="borne-bouton"
+          <button onClick={() => { fermerInvite(); setStep('choix') }} className="borne-bouton"
             style={bouton(C.sauge, '#fff', { flex: '2 1 320px', padding: '30px 28px', fontSize: 24, borderRadius: 24, boxShadow: '0 12px 28px rgba(74,136,112,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 })}>
             <span style={{ fontSize: 30 }}>🎙</span> Enregistrer une note
           </button>
@@ -1065,6 +1092,26 @@ export default function Borne() {
               style={{ width: '100%', background: 'transparent', border: `1.5px dashed ${C.grisClair}`, borderRadius: 20, padding: '18px', cursor: 'pointer', color: C.gris, fontSize: 17, fontFamily: TEXTE }}>
               + Je ne suis pas dans la liste
             </button>
+          ) : suggestions ? (
+            <div style={{ background: C.carte, borderRadius: 20, padding: 22, boxShadow: OMBRE, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontFamily: TITRE, fontSize: 28, fontWeight: 500, textAlign: 'center', margin: '0 0 4px' }}>
+                {suggestions.length > 1 ? 'Êtes-vous l\'une de ces personnes ?' : 'Est-ce vous ?'}
+              </p>
+              {suggestions.map(p => (
+                <button key={p.type + p.id} onClick={() => cEstMoi(p)} className="borne-bouton"
+                  style={{ background: C.saugeClair, border: `1.5px solid ${C.sauge}`, borderRadius: 18, padding: '14px 18px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14, fontFamily: TEXTE }}>
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: 19, fontWeight: 500, color: C.encre }}>{p.name}</span>
+                    {p.role && <span style={{ display: 'block', fontSize: 14, color: C.gris, marginTop: 2 }}>{p.role}</span>}
+                  </span>
+                  <span style={{ fontSize: 16, color: C.saugeFonce, fontWeight: 600 }}>Oui, c&apos;est moi</span>
+                </button>
+              ))}
+              <button onClick={continuerCommeInvite} className="borne-bouton"
+                style={bouton('#F2F4F3', C.gris, { padding: '16px', fontSize: 17 })}>
+                Non, continuer comme {inviteNom.trim()}
+              </button>
+            </div>
           ) : (
             <div style={{ background: C.carte, borderRadius: 20, padding: 22, boxShadow: OMBRE, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <input placeholder="Votre prénom et nom" value={inviteNom} onChange={e => setInviteNom(e.target.value)}
@@ -1075,7 +1122,7 @@ export default function Borne() {
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={validerInvite} disabled={!inviteNom.trim()} className="borne-bouton"
                   style={bouton(C.sauge, '#fff', { flex: 1, padding: '16px', fontSize: 17, opacity: inviteNom.trim() ? 1 : 0.5 })}>Continuer</button>
-                <button onClick={() => { setShowInvite(false); setInviteNom(''); setInviteRole('') }} className="borne-bouton"
+                <button onClick={fermerInvite} className="borne-bouton"
                   style={bouton('#F2F4F3', C.gris, { padding: '16px 22px', fontSize: 17 })}>Annuler</button>
               </div>
             </div>
