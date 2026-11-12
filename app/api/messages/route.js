@@ -5,6 +5,7 @@ import { analyserNote, creerSignalement } from '@/lib/notesMedicales'
 import { marquerLu } from '@/lib/messagesNonLus'
 import { escapeHtml, emailNouveauMessage, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
 import { envoyerPush, comptesDuSenior } from '@/lib/push'
+import { proposerRdv } from '@/lib/rdvMentionnes'
 
 // Fil de discussion d'un senior : envoi d'un message (filtre médical, puis notification par email).
 // La lecture se fait directement depuis le navigateur, protégée par les règles d'accès.
@@ -144,6 +145,8 @@ export async function POST(request) {
       message = data
     }
     const signalementId = medical ? await creerSignalement({ seniorId, auteur, source: 'messages' }) : null
+    // Rendez-vous cité dans le message : proposé sous le message, à l'auteur comme aux lecteurs
+    const rdv = message ? await proposerRdv({ seniorId, texte: contenu, messageId: message.id }) : []
     const notifies = !message ? 0 : membres ? await notifier(senior, user.id, auteur, contenu, membres)
       : dest ? await notifierDestinataire(senior, auteur, contenu, dest) : await notifier(senior, user.id, auteur, contenu)
     if (message) {
@@ -163,7 +166,7 @@ export async function POST(request) {
     }
     await marquerLu(user.id, seniorId)
 
-    return NextResponse.json({ success: true, message, medical, signalementId, notePartielle: !!contenu, notifies })
+    return NextResponse.json({ success: true, message, rdv: rdv.map(r => ({ id: r.id, messageId: r.message_id, auteur: auteur.nom, libelle: r.libelle, type: r.type, date: r.date, heure: r.heure, statut: r.statut })), medical, signalementId, notePartielle: !!contenu, notifies })
   } catch (error) {
     console.error('Erreur message:', error.message)
     return NextResponse.json({ success: false, error: 'Le message n\'a pas pu être envoyé.' }, { status: 500 })

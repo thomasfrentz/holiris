@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import AucunDossier from '../components/AucunDossier'
 import QuestionMedicale from '../components/QuestionMedicale'
 import PropositionPassage from './PropositionPassage'
+import PropositionRdv from '../components/PropositionRdv'
 import { EXPEDITEUR_HOLIRIS } from '@/lib/expediteurHoliris'
 import { useSenior } from '../lib/useSenior'
 import { useIntervenant } from '../lib/useIntervenant'
@@ -27,6 +28,7 @@ export default function Messages() {
   const [supabase] = useState(() => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY))
   const [userId, setUserId] = useState(null)
   const [messages, setMessages] = useState([])
+  const [rdvs, setRdvs] = useState([]) // rendez-vous relevés dans les messages, proposés à l'ajout dans l'agenda
   const [chargement, setChargement] = useState(true)
   const [texte, setTexte] = useState('')
   const [envoi, setEnvoi] = useState(false)
@@ -85,6 +87,17 @@ export default function Messages() {
       .subscribe()
     return () => { actif = false; supabase.removeChannel(canal) }
   }, [seniorId, supabase])
+
+  // Rendez-vous mentionnés : relus quelques secondes après chaque nouveau message (le temps que Holiris l'analyse)
+  useEffect(() => {
+    if (!seniorId) return
+    let actif = true
+    const minuterie = setTimeout(() => {
+      fetch('/api/propositions-rdv?seniorId=' + seniorId).then(r => r.json())
+        .then(d => { if (actif && d.propositions) setRdvs(d.propositions.filter(p => p.messageId)) }).catch(() => {})
+    }, messages.length ? 3000 : 0)
+    return () => { actif = false; clearTimeout(minuterie) }
+  }, [seniorId, messages.length])
 
   // Personnes du dossier
   useEffect(() => {
@@ -269,6 +282,7 @@ export default function Messages() {
       const r = await (await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seniorId, texte, groupeId: groupe?.id || null, destinataire: destinataire ? { type: destinataire.type, id: destinataire.id } : null }) })).json()
       if (!r.success) { setErreur(r.error || 'Le message n\'a pas pu être envoyé.'); setEnvoi(false); return }
       if (r.message) setMessages(prev => prev.some(m => m.id === r.message.id) ? prev : [...prev, r.message])
+      if (r.rdv?.length) setRdvs(prev => [...prev.filter(p => !r.rdv.some(x => x.id === p.id)), ...r.rdv])
       if (r.signalementId) setQuestion({ id: r.signalementId, notePartielle: r.notePartielle })
       setTexte('')
     } catch { setErreur('Erreur réseau, réessayez.') }
@@ -557,6 +571,9 @@ export default function Messages() {
                       ? (m.audio_url ? <audio controls preload="none" src={m.audio_url} style={{ maxWidth: 240, display: 'block' }} /> : '🎙 Message vocal')
                       : m.contenu}</div>
                     {m.proposition_id && !moi && <PropositionPassage id={m.proposition_id} />}
+                    {!m.versSenior && rdvs.filter(p => p.messageId === m.id).map(p => (
+                      <PropositionRdv key={p.id + p.statut} proposition={p} style={{ maxWidth: '82%' }} />
+                    ))}
                     {m.versSenior && <div style={{ fontSize: 11, color: m.lu_at ? '#4A8870' : '#9BB5AA', margin: '3px 4px 0' }}>{statutBorne(m)}</div>}
                     {moi && !m.versSenior && (() => { const a = accuse(m); return <div style={{ fontSize: 11, color: a.lu ? '#4A8870' : '#9BB5AA', margin: '3px 4px 0', maxWidth: '82%', textAlign: 'right' }}>{a.texte}</div> })()}
                   </div>

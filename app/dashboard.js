@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import TexteNote from './components/TexteNote'
+import RdvAAjouter from './components/RdvAAjouter'
 
 const Tag = ({ children, color = '#7FAF9B', bg = '#EAF4EF' }) => (
   <span style={{ fontSize: 11, fontWeight: 500, color, background: bg, padding: '3px 10px', borderRadius: 20, letterSpacing: '0.04em' }}>
@@ -335,6 +336,9 @@ export default function Dashboard({ initialSenior, initialEvents, initialNotes, 
           </div>
         </Section>
       )}
+
+      {/* Rendez-vous cités dans les notes et messages, à ajouter à l'agenda */}
+      <RdvAAjouter seniorId={initialSenior?.id} derniereNote={notes[0]?.id} />
 
       {/* Notes */}
       <Section title="Dernières notes">
