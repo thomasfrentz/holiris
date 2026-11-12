@@ -274,6 +274,18 @@ export default function Agenda() {
                 ))}
               </div>
             )}
+            {type === 'medical' && (() => {
+              const medecin = intervenants.find(i => i.id === selectedSenior?.medecin_traitant_id && !i.archived_at)
+              return (
+                <div style={{ fontSize: 12, color: '#888', marginTop: 8, lineHeight: 1.5 }}>
+                  {medecin
+                    ? (intervenantIds.includes(medecin.id)
+                      ? `${medecin.name}, médecin traitant, recevra la veille un compte rendu des notes.`
+                      : `Choisissez ${medecin.name} si c'est une consultation avec le médecin traitant : il recevra la veille un compte rendu des notes.`)
+                    : 'Désignez un médecin traitant (page Intervenants) pour qu\'il reçoive la veille un compte rendu des notes.'}
+                </div>
+              )
+            })()}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>

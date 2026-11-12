@@ -11,6 +11,18 @@ const reponse = p => ({
   libelle: p.libelle, type: p.type, date: p.date, heure: p.heure, statut: p.statut,
 })
 
+// Médecin traitant du dossier si le libellé le désigne (son nom, « médecin traitant », « généraliste »), sinon null
+async function medecinCite(seniorId, libelle) {
+  const { data: s } = await supabaseAdmin.from('seniors').select('medecin_traitant_id').eq('id', seniorId).maybeSingle()
+  if (!s?.medecin_traitant_id) return null
+  const { data: m } = await supabaseAdmin.from('intervenants').select('id, name, archived_at').eq('id', s.medecin_traitant_id).maybeSingle()
+  if (!m || m.archived_at) return null
+  const sansAccent = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const texte = sansAccent(libelle)
+  const nom = sansAccent(m.name.split(' ').slice(1).join(' ') || m.name)
+  return /traitant|generaliste/.test(texte) || (nom.length > 2 && texte.includes(nom)) ? m.id : null
+}
+
 // Rendez-vous à venir (ou d'aujourd'hui) du dossier
 export async function GET(request) {
   const user = await utilisateurCourant()
@@ -58,9 +70,11 @@ export async function POST(request) {
       .eq('id', p.id).eq('statut', 'proposee').select().maybeSingle()
     if (!reservee) return NextResponse.json({ success: true, proposition: reponse({ ...visible, statut: 'ajoutee' }) })
 
+    // Consultation avec le médecin traitant (nommé, ou « généraliste ») : il en est l'intervenant et reçoit le compte rendu la veille
+    const medecin = type === 'medical' ? await medecinCite(p.senior_id, libelle) : null
     const { data: event, error } = await supabaseAdmin.from('events').insert({
       senior_id: p.senior_id, label: libelle, type, scheduled_at: instantParis(date, heure).toISOString(),
-      status: 'a_venir', intervenant_id: null, intervenant_ids: [],
+      status: 'a_venir', intervenant_id: medecin, intervenant_ids: medecin ? [medecin] : [],
     }).select('id').single()
     if (error) {
       await supabaseAdmin.from('propositions_rdv').update({ statut: 'proposee', repondu_par: null, repondu_at: null }).eq('id', p.id)

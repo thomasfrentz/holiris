@@ -5,8 +5,9 @@ import { supabaseAdmin } from '@/lib/serveur'
 import { escapeHtml, emailCompteRendu, lienNoteMedecin, lienDesinscription, entetesDesinscription, adressesDesinscrites } from '@/lib/emails'
 import { SURNOMS, auteurAvecLien } from '@/lib/contexteIA'
 
-// Chaque matin : compte rendu au médecin traitant la veille de chaque consultation
-// (rendez-vous « Médical » de l'agenda), couvrant la période depuis la consultation précédente.
+// Chaque matin : compte rendu au médecin traitant la veille de chaque consultation avec lui
+// (rendez-vous « Médical » de l'agenda dont il est l'un des intervenants), couvrant la période
+// depuis sa consultation précédente. Un rendez-vous chez un autre médecin ne lui envoie rien.
 
 export const maxDuration = 60
 
@@ -46,13 +47,14 @@ export async function GET(request) {
     const maintenant = Date.now()
     const demain = jourParis(maintenant + JOUR)
 
-    // Consultations de demain (heure de Paris) pas encore annoncées
+    // Consultations de demain (heure de Paris) avec le médecin traitant, pas encore annoncées
     const { data: candidats } = await supabaseAdmin.from('events')
-      .select('id, senior_id, label, scheduled_at, seniors(name, medecin_traitant_id)')
+      .select('id, senior_id, label, scheduled_at, intervenant_id, intervenant_ids, seniors(name, medecin_traitant_id)')
       .eq('type', 'medical').is('compte_rendu_envoye_at', null)
       .gte('scheduled_at', new Date(maintenant).toISOString())
       .lte('scheduled_at', new Date(maintenant + 2 * JOUR).toISOString())
-    const consultations = (candidats || []).filter(e => jourParis(e.scheduled_at) === demain && e.seniors?.medecin_traitant_id)
+    const avecMedecin = e => [...(e.intervenant_ids || []), e.intervenant_id].includes(e.seniors?.medecin_traitant_id)
+    const consultations = (candidats || []).filter(e => jourParis(e.scheduled_at) === demain && e.seniors?.medecin_traitant_id && avecMedecin(e))
     if (!consultations.length) return NextResponse.json({ success: true, envoyes: 0 })
 
     const desinscrits = await adressesDesinscrites(supabaseAdmin)
@@ -66,6 +68,7 @@ export async function GET(request) {
       // Période : depuis la consultation précédente, sinon les 30 derniers jours (60 au plus)
       const { data: precedente } = await supabaseAdmin.from('events').select('scheduled_at')
         .eq('senior_id', rdv.senior_id).eq('type', 'medical').lt('scheduled_at', new Date(maintenant).toISOString())
+        .or(`intervenant_id.eq.${medecin.id},intervenant_ids.cs.{${medecin.id}}`)
         .order('scheduled_at', { ascending: false }).limit(1)
       const debut = precedente?.[0] ? Math.max(new Date(precedente[0].scheduled_at).getTime(), maintenant - 60 * JOUR) : maintenant - 30 * JOUR
       const depuis = precedente?.[0] ? 'depuis la dernière consultation du ' + dateCourte(precedente[0].scheduled_at) : 'ces 30 derniers jours'
