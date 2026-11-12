@@ -18,7 +18,8 @@ export default function MaStructure() {
   const [message, setMessage] = useState('')
   const [client, setClient] = useState({ prenom: '', nom: '', dateNaissance: '', ville: '' })
   const [salarie, setSalarie] = useState({ prenom: '', nom: '', role: '', telephone: '', email: '', seniorIds: [] })
-  const [gestionnaire, setGestionnaire] = useState({ nom: '', email: '' })
+  const [gestionnaire, setGestionnaire] = useState({ nom: '', email: '', telephone: '' })
+  const [monTelephone, setMonTelephone] = useState(null) // en cours de saisie dans l'onglet Gestionnaires
   const [rattachement, setRattachement] = useState({ seniorNom: '', emailProche: '' })
   const [voirTraitees, setVoirTraitees] = useState(false)
   const [noteOuverte, setNoteOuverte] = useState(null) // réclamation dont la note d'origine est affichée
@@ -74,7 +75,7 @@ export default function MaStructure() {
 
   async function inviterGestionnaire() {
     if (await action({ action: 'inviter_gestionnaire', ...gestionnaire }, 'Invitation envoyée ✓')) {
-      setGestionnaire({ nom: '', email: '' }); setFormulaire(null)
+      setGestionnaire({ nom: '', email: '', telephone: '' }); setFormulaire(null)
     }
   }
 
@@ -352,6 +353,7 @@ export default function MaStructure() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 12 }}>
                 <input placeholder="Prénom et nom" value={gestionnaire.nom} onChange={e => setGestionnaire({ ...gestionnaire, nom: e.target.value })} style={input} />
                 <input type="email" placeholder="Email *" value={gestionnaire.email} onChange={e => setGestionnaire({ ...gestionnaire, email: e.target.value })} style={input} />
+                <input type="tel" placeholder="Téléphone" value={gestionnaire.telephone} onChange={e => setGestionnaire({ ...gestionnaire, telephone: e.target.value })} style={input} />
               </div>
               <div style={{ fontSize: 11, color: '#9BB5AA', marginBottom: 14 }}>Un gestionnaire a les mêmes droits que vous sur tous les clients de la structure.</div>
               <div style={{ display: 'flex', gap: 10 }}>
@@ -364,13 +366,25 @@ export default function MaStructure() {
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {gestionnaires.map(g => (
-              <div key={g.id} style={{ ...carte, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1 }}>
+              <div key={g.id} style={{ ...carte, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
                   <div style={{ fontSize: 15, fontWeight: 500, color: '#1F2A24' }}>{g.nom || g.email}{g.moi && <span style={{ fontSize: 12, color: '#9BB5AA', fontWeight: 400 }}> (vous)</span>}</div>
                   <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>
-                    {g.email} · {g.compteActif ? <span style={{ color: '#4A8870', fontWeight: 500 }}>Compte actif</span> : <span style={{ color: '#C4844A' }}>Invitation envoyée</span>}
+                    {g.email}{g.telephone ? ' · ' + g.telephone : ''} · {g.compteActif ? <span style={{ color: '#4A8870', fontWeight: 500 }}>Compte actif</span> : <span style={{ color: '#C4844A' }}>Invitation envoyée</span>}
                   </div>
                 </div>
+                {g.moi && (monTelephone === null ? (
+                  <button onClick={() => setMonTelephone(g.telephone || '')} style={{ ...btnGris, padding: '6px 12px', fontSize: 12 }}>
+                    {g.telephone ? 'Modifier mon téléphone' : '+ Ajouter mon téléphone'}
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input type="tel" placeholder="Votre téléphone" value={monTelephone} onChange={e => setMonTelephone(e.target.value)} style={{ ...input, width: 170, padding: '6px 10px', fontSize: 13 }} />
+                    <button onClick={async () => { if (await action({ action: 'mon_telephone', telephone: monTelephone }, 'Téléphone enregistré ✓')) setMonTelephone(null) }} disabled={envoi}
+                      style={{ ...btn, padding: '6px 12px', fontSize: 12 }}>Enregistrer</button>
+                    <button onClick={() => setMonTelephone(null)} style={{ ...btnGris, padding: '6px 12px', fontSize: 12 }}>Annuler</button>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

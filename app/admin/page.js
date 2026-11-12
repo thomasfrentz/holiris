@@ -17,7 +17,7 @@ export default function Admin() {
   const [demandesErreur, setDemandesErreur] = useState('')
   const [demandeEnCours, setDemandeEnCours] = useState(null)
   const [structures, setStructures] = useState([])
-  const [nouvelleStructure, setNouvelleStructure] = useState({ nom: '', nomResponsable: '', email: '' })
+  const [nouvelleStructure, setNouvelleStructure] = useState({ nom: '', nomResponsable: '', email: '', telephone: '' })
   const [structureEnvoi, setStructureEnvoi] = useState(false)
   const [seniorEdition, setSeniorEdition] = useState(null) // { id, name, date_naissance, city }
   const [structureEdition, setStructureEdition] = useState(null) // { id, nom, gestionnaires: [{ id, nom, email, compteActif }] }
@@ -139,7 +139,7 @@ export default function Admin() {
   async function creerStructure() {
     if (await actionStructure({ action: 'creer', ...nouvelleStructure })) {
       alert('Structure créée ✓ — ' + (nouvelleStructure.email) + ' a reçu son invitation par email.')
-      setNouvelleStructure({ nom: '', nomResponsable: '', email: '' })
+      setNouvelleStructure({ nom: '', nomResponsable: '', email: '', telephone: '' })
     }
   }
 
@@ -421,6 +421,7 @@ export default function Admin() {
                 <input placeholder="Nom de la structure *" value={nouvelleStructure.nom} onChange={e => setNouvelleStructure({ ...nouvelleStructure, nom: e.target.value })} style={inputStyle} />
                 <input placeholder="Nom du responsable" value={nouvelleStructure.nomResponsable} onChange={e => setNouvelleStructure({ ...nouvelleStructure, nomResponsable: e.target.value })} style={inputStyle} />
                 <input type="email" placeholder="Email du responsable *" value={nouvelleStructure.email} onChange={e => setNouvelleStructure({ ...nouvelleStructure, email: e.target.value })} style={inputStyle} />
+                <input type="tel" placeholder="Téléphone du responsable" value={nouvelleStructure.telephone} onChange={e => setNouvelleStructure({ ...nouvelleStructure, telephone: e.target.value })} style={inputStyle} />
               </div>
               <button onClick={creerStructure} disabled={structureEnvoi || !nouvelleStructure.nom || !nouvelleStructure.email}
                 style={{ background: '#7FAF9B', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: (!nouvelleStructure.nom || !nouvelleStructure.email) ? 0.5 : 1 }}>
@@ -450,6 +451,7 @@ export default function Admin() {
                         <input type="email" placeholder="Email" value={g.email || ''} onChange={changer('email')} disabled={g.compteActif}
                           title={g.compteActif ? 'Compte actif : l’email est son identifiant de connexion' : undefined}
                           style={{ ...inputStyle, opacity: g.compteActif ? 0.6 : 1 }} />
+                        <input type="tel" placeholder="Téléphone" value={g.telephone || ''} onChange={changer('telephone')} style={inputStyle} />
                       </div>
                     )
                   })}
@@ -492,7 +494,9 @@ export default function Admin() {
                             </div>
                             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 3 }}>
                               <a href={'mailto:' + g.email} style={{ color: '#4A8870', wordBreak: 'break-all' }}>{g.email}</a>
-                              {g.telephone ? <a href={'tel:' + g.telephone.replace(/\s/g, '')} style={{ color: '#4A8870' }}>{g.telephone}</a>
+                              {g.telephone || g.telephoneAilleurs
+                                ? <a href={'tel:' + (g.telephone || g.telephoneAilleurs).replace(/\s/g, '')} style={{ color: '#4A8870' }}
+                                  title={g.telephone ? undefined : 'Numéro trouvé sur une autre fiche avec le même email'}>{g.telephone || g.telephoneAilleurs}{!g.telephone && ' (autre fiche)'}</a>
                                 : <span style={{ color: '#9BB5AA' }}>Téléphone inconnu</span>}
                             </div>
                             <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 3 }}>

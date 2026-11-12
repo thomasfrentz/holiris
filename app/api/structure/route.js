@@ -147,7 +147,7 @@ export async function GET(request) {
     supabaseAdmin.from('structures').select('id, nom, adresse, adresse_facturation').eq('id', structureId).single(),
     supabaseAdmin.from('seniors').select('id, name, city, age, date_naissance').eq('structure_id', structureId).order('name'),
     supabaseAdmin.from('salaries').select('*').eq('structure_id', structureId).is('archived_at', null).order('nom'),
-    supabaseAdmin.from('structure_membres').select('id, nom, email, user_id, created_at').eq('structure_id', structureId).order('created_at'),
+    supabaseAdmin.from('structure_membres').select('id, nom, email, telephone, user_id, created_at').eq('structure_id', structureId).order('created_at'),
     supabaseAdmin.from('demandes_rattachement').select('id, senior_nom, email_proche, statut, created_at')
       .eq('structure_id', structureId).order('created_at', { ascending: false }).limit(20),
     // Réclamations à traiter, et celles traitées ces 30 derniers jours
@@ -179,7 +179,7 @@ export async function GET(request) {
     demandes: demandes.data || [],
     passagesAVenir: passages.count || 0,
     reclamations: (reclamations.data || []).map(r => ({ id: r.id, seniorId: r.senior_id, auteur: r.auteur, resume: r.resume, createdAt: r.created_at, traiteeAt: r.traitee_at, note: r.notes?.content || null })),
-    gestionnaires: (gestionnaires.data || []).map(g => ({ id: g.id, nom: g.nom, email: g.email, compteActif: !!g.user_id, moi: g.user_id === user.id })),
+    gestionnaires: (gestionnaires.data || []).map(g => ({ id: g.id, nom: g.nom, email: g.email, telephone: g.telephone, compteActif: !!g.user_id, moi: g.user_id === user.id })),
   })
 }
 
@@ -494,11 +494,19 @@ export async function POST(request) {
       if (!EMAIL_VALIDE.test(email)) return NextResponse.json({ success: false, error: 'Email invalide' }, { status: 400 })
       const { data: structure } = await supabaseAdmin.from('structures').select('nom').eq('id', structureId).single()
       const { data: gestionnaire, error } = await supabaseAdmin.from('structure_membres')
-        .upsert({ structure_id: structureId, email, nom: champ(body.nom, 80) || null }, { onConflict: 'structure_id,email' })
+        .upsert({ structure_id: structureId, email, nom: champ(body.nom, 80) || null, ...(champ(body.telephone, 30) && { telephone: champ(body.telephone, 30) }) }, { onConflict: 'structure_id,email' })
         .select().single()
       if (error) throw error
       const result = await inviterGestionnaire(gestionnaire, structure.nom)
       return NextResponse.json({ success: result.success, linked: result.linked })
+    }
+
+    // Le gestionnaire connecté renseigne son propre téléphone
+    if (body.action === 'mon_telephone') {
+      const { error } = await supabaseAdmin.from('structure_membres').update({ telephone: champ(body.telephone, 30) || null })
+        .eq('structure_id', structureId).eq('user_id', user.id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
     }
 
     return NextResponse.json({ success: false, error: 'Action inconnue' }, { status: 400 })

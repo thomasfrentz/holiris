@@ -3,6 +3,7 @@ import { supabaseAdmin, verifierAdmin } from '@/lib/serveur'
 import { inviterGestionnaire } from '@/lib/invitations'
 
 const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const telephone = v => String(v || '').trim().slice(0, 30) || null
 
 // Structures (admin Holiris uniquement), avec les coordonnées de leurs gestionnaires
 export async function GET() {
@@ -12,13 +13,13 @@ export async function GET() {
 
   const [structures, membres, seniors] = await Promise.all([
     supabaseAdmin.from('structures').select('id, nom, adresse, created_at').order('nom'),
-    supabaseAdmin.from('structure_membres').select('id, structure_id, nom, email, user_id, created_at').order('created_at'),
+    supabaseAdmin.from('structure_membres').select('id, structure_id, nom, email, telephone, user_id, created_at').order('created_at'),
     supabaseAdmin.from('seniors').select('id, structure_id'),
   ])
   if (structures.error) return NextResponse.json({ error: structures.error.message }, { status: 500 })
 
-  // Le gestionnaire n'a pas de téléphone à lui : celui laissé ailleurs avec le même email (demande d'accès,
-  // fiche proche ou intervenant), s'il y en a un. Dernière connexion : celle de son compte.
+  // Téléphone du gestionnaire ; à défaut, celui laissé ailleurs avec le même email (demande d'accès,
+  // fiche proche ou intervenant). Dernière connexion : celle de son compte.
   const emails = [...new Set((membres.data || []).map(m => m.email.toLowerCase()))]
   const [demandes, proches, intervenants, comptes] = emails.length ? await Promise.all([
     supabaseAdmin.from('demandes_acces').select('email, telephone').in('email', emails).not('telephone', 'is', null),
@@ -38,7 +39,7 @@ export async function GET() {
       ...s,
       gestionnaires: (membres.data || []).filter(m => m.structure_id === s.id).map(m => ({
         id: m.id, nom: m.nom, email: m.email, compteActif: !!m.user_id, inviteLe: m.created_at,
-        telephone: telephones.get(m.email.toLowerCase()) || null, derniereConnexion: connexions.get(m.user_id) || null,
+        telephone: m.telephone || null, telephoneAilleurs: m.telephone ? null : telephones.get(m.email.toLowerCase()) || null, derniereConnexion: connexions.get(m.user_id) || null,
       })),
       nbSeniors: (seniors.data || []).filter(x => x.structure_id === s.id).length,
     })),
@@ -61,7 +62,7 @@ export async function POST(request) {
       const { data: structure, error } = await supabaseAdmin.from('structures').insert({ nom }).select().single()
       if (error) throw error
       const { data: gestionnaire, error: errM } = await supabaseAdmin.from('structure_membres')
-        .insert({ structure_id: structure.id, email, nom: String(body.nomResponsable || '').trim().slice(0, 80) || null })
+        .insert({ structure_id: structure.id, email, nom: String(body.nomResponsable || '').trim().slice(0, 80) || null, telephone: telephone(body.telephone) })
         .select().single()
       if (errM) throw errM
 
@@ -78,7 +79,7 @@ export async function POST(request) {
       return NextResponse.json({ success: true, linked: result.linked })
     }
 
-    // Nom de la structure, nom et email de ses gestionnaires. L'email d'un compte déjà actif ne change pas ici :
+    // Nom de la structure, nom, email et téléphone de ses gestionnaires. L'email d'un compte déjà actif ne change pas ici :
     // c'est son identifiant de connexion
     if (body.action === 'modifier') {
       const nom = String(body.nom || '').trim().slice(0, 120)
@@ -91,12 +92,12 @@ export async function POST(request) {
         const email = String(g.email || '').trim().toLowerCase()
         if (email !== membre.email && membre.user_id) return NextResponse.json({ success: false, error: 'L’email d’un compte déjà actif ne peut pas être changé ici' }, { status: 400 })
         if (!EMAIL_VALIDE.test(email)) return NextResponse.json({ success: false, error: 'Email invalide : ' + email }, { status: 400 })
-        modifs.push({ id: membre.id, nom: String(g.nom || '').trim().slice(0, 80) || null, email })
+        modifs.push({ id: membre.id, nom: String(g.nom || '').trim().slice(0, 80) || null, email, telephone: telephone(g.telephone) })
       }
       const { error } = await supabaseAdmin.from('structures').update({ nom }).eq('id', body.structureId)
       if (error) throw error
       for (const m of modifs) {
-        const { error: e } = await supabaseAdmin.from('structure_membres').update({ nom: m.nom, email: m.email }).eq('id', m.id)
+        const { error: e } = await supabaseAdmin.from('structure_membres').update({ nom: m.nom, email: m.email, telephone: m.telephone }).eq('id', m.id)
         if (e) throw e
       }
       return NextResponse.json({ success: true })
