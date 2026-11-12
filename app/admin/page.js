@@ -476,20 +476,40 @@ export default function Admin() {
                       ✏️ Modifier
                     </button>
                   </div>
-                  <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>{st.nbSeniors} client{st.nbSeniors > 1 ? 's' : ''}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                    {st.gestionnaires.map(g => (
-                      <span key={g.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, padding: g.compteActif ? '3px 10px' : '3px 4px 3px 10px', borderRadius: 20, background: g.compteActif ? '#EAF4EF' : '#FDF3E7', color: g.compteActif ? '#4A8870' : '#C4844A' }}>
-                        {g.nom || g.email} · {g.compteActif ? 'compte actif' : 'invitation envoyée'}
-                        {!g.compteActif && (
-                          <button onClick={() => renvoyerInvitation(g, st.nom)} disabled={structureEnvoi}
-                            style={{ background: '#fff', color: '#C4844A', border: '1px solid #F0D6B8', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                            ↻ Renvoyer
-                          </button>
-                        )}
-                      </span>
-                    ))}
+                  <div style={{ fontSize: 12, color: '#9BB5AA', marginTop: 3 }}>
+                    {st.nbSeniors} client{st.nbSeniors > 1 ? 's' : ''}{st.adresse ? ' · ' + st.adresse : ''}
                   </div>
+                  {st.gestionnaires.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                      {st.gestionnaires.map(g => (
+                        <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: '#F7F9F8', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>
+                          <div style={{ flex: 1, minWidth: 200 }}>
+                            <div style={{ fontWeight: 500, color: '#1F2A24' }}>
+                              {g.nom || 'Gestionnaire'}
+                              <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: g.compteActif ? '#EAF4EF' : '#FDF3E7', color: g.compteActif ? '#4A8870' : '#C4844A' }}>
+                                {g.compteActif ? 'Compte actif' : 'Invitation envoyée'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 3 }}>
+                              <a href={'mailto:' + g.email} style={{ color: '#4A8870', wordBreak: 'break-all' }}>{g.email}</a>
+                              {g.telephone ? <a href={'tel:' + g.telephone.replace(/\s/g, '')} style={{ color: '#4A8870' }}>{g.telephone}</a>
+                                : <span style={{ color: '#9BB5AA' }}>Téléphone inconnu</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#9BB5AA', marginTop: 3 }}>
+                              Invité le {new Date(g.inviteLe).toLocaleDateString('fr-FR')}
+                              {g.compteActif && (g.derniereConnexion ? ' · dernière connexion le ' + new Date(g.derniereConnexion).toLocaleDateString('fr-FR') : ' · jamais connecté')}
+                            </div>
+                          </div>
+                          {!g.compteActif && (
+                            <button onClick={() => renvoyerInvitation(g, st.nom)} disabled={structureEnvoi}
+                              style={{ background: '#fff', color: '#C4844A', border: '1px solid #F0D6B8', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              ↻ Renvoyer l&apos;invitation
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

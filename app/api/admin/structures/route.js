@@ -4,23 +4,42 @@ import { inviterGestionnaire } from '@/lib/invitations'
 
 const EMAIL_VALIDE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// Structures (admin Holiris uniquement)
+// Structures (admin Holiris uniquement), avec les coordonnées de leurs gestionnaires
 export async function GET() {
   const { user, admin } = await verifierAdmin()
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   if (!admin) return NextResponse.json({ error: 'Réservé à l\'admin' }, { status: 403 })
 
   const [structures, membres, seniors] = await Promise.all([
-    supabaseAdmin.from('structures').select('id, nom, created_at').order('nom'),
-    supabaseAdmin.from('structure_membres').select('id, structure_id, nom, email, user_id'),
+    supabaseAdmin.from('structures').select('id, nom, adresse, created_at').order('nom'),
+    supabaseAdmin.from('structure_membres').select('id, structure_id, nom, email, user_id, created_at').order('created_at'),
     supabaseAdmin.from('seniors').select('id, structure_id'),
   ])
   if (structures.error) return NextResponse.json({ error: structures.error.message }, { status: 500 })
 
+  // Le gestionnaire n'a pas de téléphone à lui : celui laissé ailleurs avec le même email (demande d'accès,
+  // fiche proche ou intervenant), s'il y en a un. Dernière connexion : celle de son compte.
+  const emails = [...new Set((membres.data || []).map(m => m.email.toLowerCase()))]
+  const [demandes, proches, intervenants, comptes] = emails.length ? await Promise.all([
+    supabaseAdmin.from('demandes_acces').select('email, telephone').in('email', emails).not('telephone', 'is', null),
+    supabaseAdmin.from('famille').select('email, phone').in('email', emails).not('phone', 'is', null),
+    supabaseAdmin.from('intervenants').select('email, phone').in('email', emails).not('phone', 'is', null),
+    Promise.all((membres.data || []).filter(m => m.user_id).map(m => supabaseAdmin.auth.admin.getUserById(m.user_id)
+      .then(({ data }) => [m.user_id, data?.user?.last_sign_in_at || null]).catch(() => [m.user_id, null]))),
+  ]) : [{}, {}, {}, []]
+  const telephones = new Map()
+  for (const [liste, champ] of [[demandes.data, 'telephone'], [proches.data, 'phone'], [intervenants.data, 'phone']]) {
+    for (const x of liste || []) if (!telephones.has(x.email.toLowerCase())) telephones.set(x.email.toLowerCase(), x[champ])
+  }
+  const connexions = new Map(comptes)
+
   return NextResponse.json({
     structures: structures.data.map(s => ({
       ...s,
-      gestionnaires: (membres.data || []).filter(m => m.structure_id === s.id).map(m => ({ id: m.id, nom: m.nom, email: m.email, compteActif: !!m.user_id })),
+      gestionnaires: (membres.data || []).filter(m => m.structure_id === s.id).map(m => ({
+        id: m.id, nom: m.nom, email: m.email, compteActif: !!m.user_id, inviteLe: m.created_at,
+        telephone: telephones.get(m.email.toLowerCase()) || null, derniereConnexion: connexions.get(m.user_id) || null,
+      })),
       nbSeniors: (seniors.data || []).filter(x => x.structure_id === s.id).length,
     })),
   })
