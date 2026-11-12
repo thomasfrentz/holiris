@@ -108,6 +108,23 @@ async function notifier(senior, auteurUserId, auteur, contenu, membres = null) {
   return messages.length
 }
 
+// Derniers messages de la même conversation (48 h) : une réponse comme « Le 24/12 à 11 h » se comprend avec la question
+async function contexteConversation(message, userId, auteur, dest) {
+  let requete = supabaseAdmin.from('messages').select('auteur_nom, contenu').eq('senior_id', message.senior_id)
+    .neq('id', message.id).lte('created_at', message.created_at)
+    .gte('created_at', new Date(new Date(message.created_at).getTime() - 48 * HEURE).toISOString())
+    .order('created_at', { ascending: false }).limit(4)
+  if (message.groupe_id) requete = requete.eq('groupe_id', message.groupe_id)
+  else if (dest) {
+    const versLui = `and(auteur_user_id.eq.${userId},destinataire_id.eq.${dest.id})`
+    requete = dest.user_id && auteur.id
+      ? requete.or(`${versLui},and(auteur_user_id.eq.${dest.user_id},destinataire_id.eq.${auteur.id})`)
+      : requete.or(versLui)
+  } else requete = requete.is('groupe_id', null).is('destinataire_id', null)
+  const { data } = await requete
+  return (data || []).reverse().filter(m => m.contenu).map(m => m.auteur_nom + ' : ' + m.contenu).join('\n')
+}
+
 export async function POST(request) {
   try {
     const user = await utilisateurCourant()
@@ -146,7 +163,7 @@ export async function POST(request) {
     }
     const signalementId = medical ? await creerSignalement({ seniorId, auteur, source: 'messages' }) : null
     // Rendez-vous cité dans le message : proposé sous le message, à l'auteur comme aux lecteurs
-    const rdv = message ? await proposerRdv({ seniorId, texte: contenu, messageId: message.id }) : []
+    const rdv = message ? await proposerRdv({ seniorId, texte: contenu, contexte: await contexteConversation(message, user.id, auteur, dest), messageId: message.id }) : []
     const notifies = !message ? 0 : membres ? await notifier(senior, user.id, auteur, contenu, membres)
       : dest ? await notifierDestinataire(senior, auteur, contenu, dest) : await notifier(senior, user.id, auteur, contenu)
     if (message) {
