@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin, utilisateurCourant } from '@/lib/serveur'
-import { creerPassages } from '@/lib/passagesReguliers'
+import { supabaseAdmin, utilisateurCourant, peutGererSenior } from '@/lib/serveur'
+import { creerPassages, passagesDe, passagesDuGroupe } from '@/lib/passagesReguliers'
 
-// Proposition de passages réguliers envoyée par Holiris : lue et acceptée ou refusée par son seul destinataire
+// Proposition de passages réguliers envoyée par Holiris : lue et acceptée ou refusée par son destinataire,
+// l'intervenant lui-même ou, pour un groupe du même métier, l'un des proches (ou la structure) du senior
 async function propositionDe(id, user) {
   if (!id || !user) return null
   const { data: p } = await supabaseAdmin.from('propositions_passages')
     .select('*, intervenants(id, name, role, user_id, archived_at)').eq('id', id).maybeSingle()
-  return p && p.intervenants?.user_id === user.id ? p : null
+  if (!p) return null
+  if (p.intervenant_id) return p.intervenants?.user_id === user.id ? p : null
+  const { data: proche } = await supabaseAdmin.from('famille').select('id')
+    .eq('user_id', user.id).eq('senior_id', p.senior_id).is('archived_at', null).limit(1)
+  return proche?.length || await peutGererSenior(user.id, p.senior_id) ? p : null
 }
 
-const reponse = p => ({ statut: p.statut, passagesCrees: p.passages_crees, jours: p.jours, heure: p.heure, reponduAt: p.repondu_at })
+const reponse = p => ({ statut: p.statut, passagesCrees: p.passages_crees, jours: p.jours, heure: p.heure, reponduAt: p.repondu_at, groupe: !p.intervenant_id })
 
 export async function GET(request) {
   const user = await utilisateurCourant()
@@ -28,7 +33,7 @@ export async function POST(request) {
     const p = await propositionDe(body.id, user)
     if (!p) return NextResponse.json({ success: false, error: 'Proposition introuvable' }, { status: 404 })
     if (p.statut !== 'proposee') return NextResponse.json({ success: true, ...reponse(p) }) // déjà répondu (double clic, autre appareil)
-    if (p.intervenants.archived_at) return NextResponse.json({ success: false, error: 'Vous ne suivez plus ce dossier.' }, { status: 403 })
+    if (p.intervenants?.archived_at) return NextResponse.json({ success: false, error: 'Vous ne suivez plus ce dossier.' }, { status: 403 })
 
     // Jours et heure modifiés par l'intervenant quand la proposition ne lui convient pas
     const choix = {}
@@ -49,7 +54,7 @@ export async function POST(request) {
     if (!body.accepter) return NextResponse.json({ success: true, ...reponse(prise) })
 
     try {
-      const nombre = await creerPassages(prise, p.intervenants)
+      const nombre = await creerPassages(prise, p.intervenant_id ? passagesDe(p.intervenants) : passagesDuGroupe(prise))
       const { data: finale } = await supabaseAdmin.from('propositions_passages').update({ passages_crees: nombre }).eq('id', p.id).select().single()
       return NextResponse.json({ success: true, ...reponse(finale) })
     } catch (e) {

@@ -54,7 +54,7 @@ export default function PropositionPassage({ id }) {
     const valide = modif.jours.length > 0 && /^\d{2}:\d{2}$/.test(modif.heure)
     return (
       <div style={cadre}>
-        <div style={{ color: '#1F2A24', fontWeight: 500, marginBottom: 8 }}>Quand passez-vous ?</div>
+        <div style={{ color: '#1F2A24', fontWeight: 500, marginBottom: 8 }}>{etat.groupe ? 'Quels jours et à quelle heure ?' : 'Quand passez-vous ?'}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           {SEMAINE.map(j => {
             const coche = modif.jours.includes(j)
